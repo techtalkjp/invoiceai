@@ -39,16 +39,16 @@ cp .env.example .env
 必要な環境変数:
 
 ```env
-# freee API
-FREEE_API_CLIENT_ID=your_client_id
-FREEE_API_CLIENT_SECRET=your_client_secret
+# Turso Database (本番環境用)
+DATABASE_URL=
+DATABASE_AUTH_TOKEN=
 
 # better-auth
-BETTER_AUTH_SECRET=your_secret_key
+BETTER_AUTH_SECRET=
 BETTER_AUTH_URL=http://localhost:5173
 
-# Database
-DATABASE_URL=file:./db/app.db
+# Gemini
+GOOGLE_GENERATIVE_AI_API_KEY=your_api_key
 ```
 
 ### 3. データベースのセットアップ

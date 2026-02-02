@@ -1,9 +1,2 @@
 onlyBuiltDependencies:
-  - b
-  - d
-  - e
-  - i
-  - l
   - msw
-  - s
-  - u
