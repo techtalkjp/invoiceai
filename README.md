@@ -2,6 +2,8 @@
 
 AI を活用した請求書管理アプリ。フリーランス・小規模チーム向けに、freee 請求書連携で月次請求業務を効率化。
 
+<img width="2348" height="1766" alt="CleanShot 2026-02-02 at 22 14 44@2x" src="https://github.com/user-attachments/assets/bfed01d0-a420-4fdf-a667-763dc336bf2d" />
+
 ## 機能
 
 - **月次請求管理**: クライアントごとの請求書作成状況を一覧表示
