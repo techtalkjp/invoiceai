@@ -1,5 +1,6 @@
 import {
   Building2Icon,
+  FlagIcon,
   LayoutDashboardIcon,
   LogOutIcon,
   UsersIcon,
@@ -46,6 +47,11 @@ const navItems = [
     title: '組織管理',
     url: '/admin/organizations',
     icon: Building2Icon,
+  },
+  {
+    title: 'Feature Flags',
+    url: '/admin/feature-flags',
+    icon: FlagIcon,
   },
 ]
 

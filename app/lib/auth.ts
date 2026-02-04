@@ -1,6 +1,8 @@
 import { betterAuth } from 'better-auth'
+import { APIError } from 'better-auth/api'
 import { admin, organization } from 'better-auth/plugins'
 import { authDb } from './db/kysely'
+import { isFeatureEnabled } from './feature-flags.server'
 
 export const auth = betterAuth({
   baseURL: process.env.BETTER_AUTH_URL ?? 'http://localhost:5173',
@@ -15,6 +17,14 @@ export const auth = betterAuth({
     user: {
       create: {
         before: async (user) => {
+          // Feature flag: 新規登録が無効な場合はエラー
+          const signupEnabled = await isFeatureEnabled('signup_enabled')
+          if (!signupEnabled) {
+            throw new APIError('BAD_REQUEST', {
+              message: '現在、新規登録は受け付けていません',
+            })
+          }
+
           // 最初のユーザーを管理者にする
           const existingUsers = await authDb
             .selectFrom('user')

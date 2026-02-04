@@ -16,6 +16,13 @@ import {
 import { Input } from '~/components/ui/input'
 import { Label } from '~/components/ui/label'
 import { signUp } from '~/lib/auth-client'
+import { isFeatureEnabled } from '~/lib/feature-flags.server'
+import type { Route } from './+types/signup'
+
+export async function loader() {
+  const signupEnabled = await isFeatureEnabled('signup_enabled')
+  return { signupEnabled }
+}
 
 export const formSchema = z
   .object({
@@ -40,7 +47,8 @@ export const formSchema = z
     path: ['confirmPassword'],
   })
 
-export default function SignUp() {
+export default function SignUp({ loaderData }: Route.ComponentProps) {
+  const { signupEnabled } = loaderData
   const navigate = useNavigate()
   const [serverError, setServerError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
@@ -84,6 +92,26 @@ export default function SignUp() {
       }
     },
   })
+
+  if (!signupEnabled) {
+    return (
+      <div className="flex min-h-[80vh] items-center justify-center">
+        <Card className="w-full max-w-md">
+          <CardHeader className="text-center">
+            <CardTitle className="text-2xl">登録受付停止中</CardTitle>
+            <CardDescription>
+              現在、新規登録は受け付けていません。
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button asChild className="w-full">
+              <Link to="/auth/signin">ログインはこちら</Link>
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
 
   return (
     <div className="flex min-h-[80vh] items-center justify-center">

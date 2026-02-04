@@ -229,3 +229,15 @@ CREATE INDEX IF NOT EXISTS "work_entry_invoice_idx" ON "work_entry"("invoice_id"
 CREATE INDEX IF NOT EXISTS "invoice_pdf_invoice_idx" ON "invoice_pdf"("invoice_id");
 CREATE UNIQUE INDEX IF NOT EXISTS "provider_token_org_provider_idx"
   ON "provider_token"("organization_id", "provider");
+
+-- Feature flags
+CREATE TABLE IF NOT EXISTS "feature_flag" (
+  "id" TEXT PRIMARY KEY NOT NULL,
+  "key" TEXT NOT NULL UNIQUE,
+  "description" TEXT,
+  "default_value" INTEGER NOT NULL DEFAULT 0,
+  "created_at" TEXT NOT NULL DEFAULT (datetime('now')),
+  "updated_at" TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS "feature_flag_key_idx" ON "feature_flag"("key");

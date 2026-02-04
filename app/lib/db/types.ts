@@ -40,9 +40,16 @@ export interface Client {
   name: string;
   organizationId: string;
   paymentTerms: Generated<string>;
-  spreadsheetId: string | null;
-  spreadsheetPattern: string | null;
   unitLabel: Generated<string | null>;
+  updatedAt: Generated<string>;
+}
+
+export interface FeatureFlag {
+  createdAt: Generated<string>;
+  defaultValue: Generated<number>;
+  description: string | null;
+  id: string;
+  key: string;
   updatedAt: Generated<string>;
 }
 
@@ -212,6 +219,7 @@ export interface WorkEntry {
 export interface DB {
   account: Account;
   client: Client;
+  featureFlag: FeatureFlag;
   invitation: Invitation;
   invoice: Invoice;
   invoiceLine: InvoiceLine;
