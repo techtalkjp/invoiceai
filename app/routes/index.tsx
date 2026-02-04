@@ -12,8 +12,8 @@ import type { Route } from './+types/index'
 
 export function meta() {
   return [
-    { title: 'Freee Invoices' },
-    { name: 'description', content: 'Freee invoices management' },
+    { title: 'Invoice AI' },
+    { name: 'description', content: 'Invoice AI - 請求書管理システム' },
   ]
 }
 
@@ -41,7 +41,7 @@ export default function Home({ loaderData }: Route.ComponentProps) {
       <div className="flex min-h-[80vh] items-center justify-center">
         <Card className="w-full max-w-md">
           <CardHeader className="text-center">
-            <CardTitle className="text-2xl">Freee Invoices</CardTitle>
+            <CardTitle className="text-2xl">Invoice AI</CardTitle>
             <CardDescription>請求書管理システム</CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col gap-4">
@@ -50,6 +50,9 @@ export default function Home({ loaderData }: Route.ComponentProps) {
             </Button>
             <Button variant="outline" asChild>
               <Link to="/auth/signup">新規登録</Link>
+            </Button>
+            <Button variant="ghost" asChild>
+              <Link to="/playground">Playground</Link>
             </Button>
           </CardContent>
         </Card>

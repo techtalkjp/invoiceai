@@ -116,9 +116,9 @@ export default function App() {
             className="flex items-center gap-3 text-lg font-semibold"
           >
             <span className="bg-foreground text-background inline-flex h-9 w-9 items-center justify-center rounded-full">
-              F
+              I
             </span>
-            Freee Invoices
+            Invoice AI
           </Link>
           <HeaderNav />
         </div>
@@ -127,7 +127,15 @@ export default function App() {
         <Outlet />
       </main>
       <footer className="border-border/60 text-muted-foreground border-t py-6 text-center text-xs">
-        Freee Invoices Web • CLI は引き続き利用可能
+        Copyright © {new Date().getFullYear()}{' '}
+        <a
+          href="https://www.techtalk.jp/"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="hover:text-foreground underline underline-offset-2 transition-colors"
+        >
+          TechTalk Inc.
+        </a>
       </footer>
     </div>
   )

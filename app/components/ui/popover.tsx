@@ -1,4 +1,4 @@
-import * as PopoverPrimitive from '@radix-ui/react-popover'
+import { Popover as PopoverPrimitive } from 'radix-ui'
 import type * as React from 'react'
 
 import { cn } from '~/lib/utils'
@@ -43,6 +43,19 @@ function PopoverAnchor({
   return <PopoverPrimitive.Anchor data-slot="popover-anchor" {...props} />
 }
 
+function PopoverArrow({
+  className,
+  ...props
+}: React.ComponentProps<typeof PopoverPrimitive.Arrow>) {
+  return (
+    <PopoverPrimitive.Arrow
+      data-slot="popover-arrow"
+      className={cn('fill-popover', className)}
+      {...props}
+    />
+  )
+}
+
 function PopoverHeader({ className, ...props }: React.ComponentProps<'div'>) {
   return (
     <div
@@ -79,6 +92,7 @@ function PopoverDescription({
 export {
   Popover,
   PopoverAnchor,
+  PopoverArrow,
   PopoverContent,
   PopoverDescription,
   PopoverHeader,
