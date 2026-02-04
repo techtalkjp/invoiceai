@@ -1,24 +1,40 @@
 # InvoiceAI
 
-AI を活用した請求書管理アプリ。フリーランス・小規模チーム向けに、freee 請求書連携で月次請求業務を効率化。
-
-<img width="2348" height="1766" alt="CleanShot 2026-02-02 at 22 14 44@2x" src="https://github.com/user-attachments/assets/bfed01d0-a420-4fdf-a667-763dc336bf2d" />
+フリーランス・小規模チーム向けの請求書管理アプリ。freee 請求書連携による月次請求業務の効率化と、タイムシート管理機能を提供。
 
 ## 機能
+
+### 請求書管理（要ログイン）
 
 - **月次請求管理**: クライアントごとの請求書作成状況を一覧表示
 - **freee 連携**: freee 請求書 API で請求書を自動作成・更新
 - **稼働時間管理**: スタッフの稼働時間を記録・集計
-- **タイムシート PDF**: 稼働報告書 PDF を自動生成（日本語フォント対応）
+- **タイムシート PDF**: 稼働報告書 PDF を自動生成
 - **メールテンプレート**: 請求書送付メールのテンプレート生成
+
+### タイムシート Playground（ログイン不要）
+
+スプレッドシート風のタイムシート入力デモ。`/playground` でアクセス可能。
+
+- キーボードナビゲーション（矢印キー、Tab、Enter でセル移動）
+- 柔軟な時間入力（`9` → 09:00、`930` → 09:30、`+1h` → 基準時間+1時間）
+- ドラッグ選択・コピー＆ペースト
+- 平日のみペースト（土日祝を除外）
+- PDF 出力（稼働報告書）
+- 日本の祝日対応
+
+詳細: [docs/playground-ux-patterns.md](docs/playground-ux-patterns.md)
 
 ## 技術スタック
 
-- **フレームワーク**: React Router v7 (framework mode)
-- **データベース**: SQLite + Kysely
-- **認証**: better-auth (freee OAuth 連携)
-- **PDF 生成**: @react-pdf/renderer
-- **UI**: Tailwind CSS + shadcn/ui
+| カテゴリ | 技術 |
+|----------|------|
+| フレームワーク | React Router v7 (framework mode) |
+| データベース | SQLite (Turso) + Kysely |
+| 認証 | better-auth |
+| PDF 生成 | @react-pdf/renderer |
+| UI | Tailwind CSS v4 + shadcn/ui + Radix UI |
+| フォーム | conform + zod |
 
 ## セットアップ
 
@@ -30,8 +46,6 @@ pnpm install
 
 ### 2. 環境変数の設定
 
-`.env.example` をコピーして `.env` を作成:
-
 ```bash
 cp .env.example .env
 ```
@@ -39,7 +53,7 @@ cp .env.example .env
 必要な環境変数:
 
 ```env
-# Turso Database (本番環境用)
+# Turso Database
 DATABASE_URL=
 DATABASE_AUTH_TOKEN=
 
@@ -47,8 +61,8 @@ DATABASE_AUTH_TOKEN=
 BETTER_AUTH_SECRET=
 BETTER_AUTH_URL=http://localhost:5173
 
-# Gemini
-GOOGLE_GENERATIVE_AI_API_KEY=your_api_key
+# Gemini (オプション)
+GOOGLE_GENERATIVE_AI_API_KEY=
 ```
 
 ### 3. データベースのセットアップ
@@ -65,112 +79,66 @@ pnpm dev
 
 http://localhost:5173 でアクセス可能。
 
-## 主要な画面
+## 画面構成
 
 | パス | 説明 |
 |------|------|
-| `/` | ダッシュボード |
+| `/` | トップページ（ログイン/新規登録） |
+| `/playground` | タイムシート Playground |
+| `/org/:slug` | 組織ダッシュボード |
 | `/org/:slug/invoices` | 月次請求一覧 |
 | `/org/:slug/invoices/create` | 請求書作成 |
-| `/org/:slug/work-entries` | 稼働時間入力 |
-| `/org/:slug/settings` | 組織設定・クライアント管理 |
-
-## 月次請求ワークフロー
-
-1. **稼働時間入力**: `/org/:slug/work-entries` でスタッフが稼働時間を記録
-2. **請求書作成**: `/org/:slug/invoices` で月を選択し、クライアントごとに請求書を作成
-3. **タイムシート PDF**: 時間制クライアントは稼働報告書 PDF をダウンロード可能
-4. **freee 確認**: 外部リンクボタンから freee の請求書詳細画面へ遷移
-5. **メール送付**: メールテンプレートをコピーして送付
-
-## CLI コマンド（レガシー）
-
-CLI ツールも引き続き利用可能:
-
-```bash
-# クライアント一覧
-pnpm invoice list
-
-# 稼働時間確認
-pnpm invoice hours <client_id> <YYYY-MM>
-
-# 請求書作成（ドライラン）
-pnpm invoice create <client_id> <YYYY-MM> --dry-run
-
-# 請求書作成
-pnpm invoice create <client_id> <YYYY-MM>
-```
+| `/org/:slug/work-hours` | 稼働時間入力 |
+| `/org/:slug/clients` | クライアント管理 |
+| `/org/:slug/settings` | 組織設定 |
+| `/admin` | 管理画面 |
 
 ## 開発コマンド
 
 ```bash
-# 開発サーバー
-pnpm dev
-
-# ビルド
-pnpm build
-
-# 型チェック
-pnpm typecheck
-
-# Lint
-pnpm lint
-
-# フォーマット
-pnpm format
-
-# テスト
-pnpm test
-
-# DBスキーマ適用
-pnpm db:push
-
-# DB型生成
-pnpm db:types
+pnpm dev          # 開発サーバー
+pnpm build        # ビルド
+pnpm start        # 本番サーバー起動
+pnpm typecheck    # 型チェック
+pnpm lint         # Lint (Biome)
+pnpm format       # フォーマットチェック (Prettier)
+pnpm test         # テスト (Vitest)
+pnpm db:push      # DBスキーマ適用
+pnpm db:types     # DB型生成
 ```
 
 ## ディレクトリ構成
 
 ```
-freee-invoices/
-├── app/                    # React Router アプリ
-│   ├── assets/fonts/       # 日本語フォント (Noto Sans JP)
-│   ├── components/         # 共通コンポーネント
-│   ├── lib/                # ユーティリティ・DB
-│   ├── routes/             # ルートコンポーネント
-│   │   └── org.$orgSlug/
-│   │       ├── invoices/   # 請求書関連
-│   │       │   ├── +pdf/   # PDF テンプレート
-│   │       │   └── ...
-│   │       ├── settings/   # 設定関連
-│   │       └── work-entries/ # 稼働時間
-│   └── utils/              # ヘルパー関数
-├── src/                    # CLI ツール（レガシー）
-├── db/                     # SQLite データベース
-├── docs/                   # API ドキュメント
-└── output/                 # 生成された PDF
+invoiceai/
+├── app/                      # React Router アプリ
+│   ├── components/           # 共通コンポーネント (shadcn/ui)
+│   ├── lib/                  # ユーティリティ・DB・認証
+│   └── routes/               # ルートコンポーネント
+│       ├── index.tsx         # トップページ
+│       ├── playground/       # タイムシート Playground
+│       ├── auth/             # 認証 (signin/signup)
+│       ├── admin/            # 管理画面
+│       └── org.$orgSlug/     # 組織関連
+│           ├── invoices/     # 請求書
+│           ├── clients/      # クライアント
+│           ├── work-hours/   # 稼働時間
+│           └── settings/     # 設定
+├── src/                      # CLI ツール（レガシー）
+├── db/                       # SQLite データベース
+├── docs/                     # ドキュメント
+└── public/                   # 静的アセット
 ```
 
-## freee API 制限事項
-
-- 請求書 PDF はAPI経由でダウンロードできません（Web UI のみ）
-- 請求書詳細画面への外部リンクで対応しています
-
-## トラブルシューティング
-
-### freee トークン期限切れ
-
-設定画面から freee 再認証を実行してください。
-
-### PDF 生成エラー
-
-日本語フォント `app/assets/fonts/NotoSansJP-Regular.ttf` が必要です。
-[Noto Sans JP](https://fonts.google.com/noto/specimen/Noto+Sans+JP) からダウンロードしてください。
-
-### データベースエラー
+## CLI コマンド（レガシー）
 
 ```bash
-pnpm db:push
+pnpm cli:invoice   # 請求書作成
+pnpm cli:auth      # freee 認証
+pnpm cli:google    # Google 認証
+pnpm cli:freee     # freee 請求書一覧
 ```
 
-でスキーマを再適用してください。
+## ライセンス
+
+ISC

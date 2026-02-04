@@ -1,9 +1,11 @@
 # InvoiceAI Project Overview
 
 ## Purpose
+
 AI-powered invoice management application for freelancers and small teams, integrated with freee accounting software.
 
 ## Tech Stack
+
 - **Framework**: React Router v7 (with react-router-auto-routes for file-based routing)
 - **Language**: TypeScript (ESM)
 - **Database**: SQLite (libsql) with Kysely ORM
@@ -16,6 +18,7 @@ AI-powered invoice management application for freelancers and small teams, integ
 - **Package Manager**: pnpm
 
 ## Project Structure
+
 ```
 app/           # React Router v7 web app
   ├── routes/     # File-based routing
@@ -37,6 +40,7 @@ output/        # Generated invoice outputs
 ```
 
 ## Key Integrations
+
 - freee API (accounting/invoicing)
 - Google OAuth
 - AI-powered parsing/generation
