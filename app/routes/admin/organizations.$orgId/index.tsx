@@ -1,6 +1,13 @@
 import { parseWithZod } from '@conform-to/zod/v4'
-import { ArrowLeftIcon, ExternalLinkIcon, Trash2Icon } from 'lucide-react'
-import { Form, Link, redirect, useActionData } from 'react-router'
+import {
+  ArrowLeftIcon,
+  ExternalLinkIcon,
+  Trash2Icon,
+  UserMinusIcon,
+  UserPlusIcon,
+} from 'lucide-react'
+import { useState } from 'react'
+import { Form, Link, redirect, useActionData, useFetcher } from 'react-router'
 import { z } from 'zod'
 import { Badge } from '~/components/ui/badge'
 import { Button } from '~/components/ui/button'
@@ -12,6 +19,13 @@ import {
   CardTitle,
 } from '~/components/ui/card'
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '~/components/ui/select'
+import {
   Table,
   TableBody,
   TableCell,
@@ -19,40 +33,41 @@ import {
   TableHeader,
   TableRow,
 } from '~/components/ui/table'
-import { db } from '~/lib/db/kysely'
 import { formatDate } from '~/utils/date'
-import type { Route } from './+types/organizations.$orgId'
+import { UserCombobox } from './+components/user-combobox'
+import {
+  addMember,
+  deleteOrganization,
+  getMembers,
+  getOrganization,
+  removeMember,
+} from './+queries.server'
+import type { Route } from './+types/index'
 
-const deleteOrgSchema = z.object({
-  intent: z.literal('deleteOrg'),
-})
+const actionSchema = z.discriminatedUnion('intent', [
+  z.object({
+    intent: z.literal('deleteOrg'),
+  }),
+  z.object({
+    intent: z.literal('addMember'),
+    userId: z.string().min(1),
+    role: z.enum(['owner', 'admin', 'member']),
+  }),
+  z.object({
+    intent: z.literal('removeMember'),
+    memberId: z.string().min(1),
+  }),
+])
 
 export async function loader({ params }: Route.LoaderArgs) {
   const { orgId } = params
 
-  const organization = await db
-    .selectFrom('organization')
-    .select(['id', 'name', 'slug', 'freeeCompanyId', 'createdAt'])
-    .where('id', '=', orgId)
-    .executeTakeFirst()
-
+  const organization = await getOrganization(orgId)
   if (!organization) {
     throw new Response('組織が見つかりません', { status: 404 })
   }
 
-  const members = await db
-    .selectFrom('member')
-    .innerJoin('user', 'user.id', 'member.userId')
-    .select([
-      'member.id',
-      'member.role',
-      'member.createdAt',
-      'user.name as userName',
-      'user.email as userEmail',
-    ])
-    .where('member.organizationId', '=', orgId)
-    .orderBy('member.createdAt', 'asc')
-    .execute()
+  const members = await getMembers(orgId)
 
   return { organization, members }
 }
@@ -60,25 +75,46 @@ export async function loader({ params }: Route.LoaderArgs) {
 export async function action({ request, params }: Route.ActionArgs) {
   const { orgId } = params
   const formData = await request.formData()
-  const submission = parseWithZod(formData, { schema: deleteOrgSchema })
+  const submission = parseWithZod(formData, { schema: actionSchema })
 
   if (submission.status !== 'success') {
     return { error: 'Invalid request' }
   }
 
-  // メンバーを先に削除（外部キー制約）
-  await db.deleteFrom('member').where('organizationId', '=', orgId).execute()
+  const { intent } = submission.value
 
-  // 組織を削除
-  await db.deleteFrom('organization').where('id', '=', orgId).execute()
+  switch (intent) {
+    case 'deleteOrg': {
+      await deleteOrganization(orgId)
+      return redirect('/admin/organizations')
+    }
 
-  return redirect('/admin/organizations')
+    case 'addMember': {
+      const { userId, role } = submission.value
+      await addMember(orgId, userId, role)
+      return { success: true }
+    }
+
+    case 'removeMember': {
+      const { memberId } = submission.value
+      await removeMember(memberId)
+      return { success: true }
+    }
+  }
 }
 
 export default function AdminOrganizationDetail({
   loaderData: { organization, members },
+  params,
 }: Route.ComponentProps) {
   const actionData = useActionData<typeof action>()
+  const fetcher = useFetcher()
+  const [selectedUserId, setSelectedUserId] = useState('')
+  const [selectedRole, setSelectedRole] = useState<'owner' | 'admin' | 'member'>(
+    'member',
+  )
+
+  const isSubmitting = fetcher.state !== 'idle'
 
   return (
     <div className="space-y-6">
@@ -147,11 +183,58 @@ export default function AdminOrganizationDetail({
         </Card>
       </div>
 
+      {/* メンバー追加 */}
+      <Card>
+        <CardHeader>
+          <CardTitle>メンバーを追加</CardTitle>
+          <CardDescription>
+            ユーザーを選択して組織に追加します
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <fetcher.Form method="post" className="flex items-end gap-4">
+            <input type="hidden" name="intent" value="addMember" />
+            <div className="flex-1 space-y-2">
+              <span className="text-sm font-medium">ユーザー</span>
+              <input type="hidden" name="userId" value={selectedUserId} />
+              <UserCombobox
+                orgId={params.orgId}
+                value={selectedUserId}
+                onValueChange={setSelectedUserId}
+              />
+            </div>
+            <div className="w-40 space-y-2">
+              <span className="text-sm font-medium">ロール</span>
+              <Select
+                name="role"
+                value={selectedRole}
+                onValueChange={(v) =>
+                  setSelectedRole(v as 'owner' | 'admin' | 'member')
+                }
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="owner">オーナー</SelectItem>
+                  <SelectItem value="admin">管理者</SelectItem>
+                  <SelectItem value="member">メンバー</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <Button type="submit" disabled={!selectedUserId || isSubmitting}>
+              <UserPlusIcon className="mr-2 h-4 w-4" />
+              追加
+            </Button>
+          </fetcher.Form>
+        </CardContent>
+      </Card>
+
       <Card>
         <CardHeader>
           <CardTitle>メンバー一覧</CardTitle>
           <CardDescription>
-            この組織に所属しているメンバーの一覧（読み取り専用）
+            この組織に所属しているメンバーの一覧
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -162,6 +245,7 @@ export default function AdminOrganizationDetail({
                 <TableHead>メールアドレス</TableHead>
                 <TableHead>ロール</TableHead>
                 <TableHead>参加日</TableHead>
+                <TableHead className="text-right">操作</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -181,12 +265,35 @@ export default function AdminOrganizationDetail({
                     </Badge>
                   </TableCell>
                   <TableCell>{formatDate(member.createdAt)}</TableCell>
+                  <TableCell className="text-right">
+                    <fetcher.Form method="post" className="inline">
+                      <input type="hidden" name="intent" value="removeMember" />
+                      <input type="hidden" name="memberId" value={member.id} />
+                      <Button
+                        type="submit"
+                        variant="ghost"
+                        size="sm"
+                        disabled={isSubmitting}
+                        onClick={(e) => {
+                          if (
+                            !confirm(
+                              `${member.userName}を組織から削除しますか？`,
+                            )
+                          ) {
+                            e.preventDefault()
+                          }
+                        }}
+                      >
+                        <UserMinusIcon className="h-4 w-4" />
+                      </Button>
+                    </fetcher.Form>
+                  </TableCell>
                 </TableRow>
               ))}
               {members.length === 0 && (
                 <TableRow>
                   <TableCell
-                    colSpan={4}
+                    colSpan={5}
                     className="text-muted-foreground text-center"
                   >
                     メンバーがいません
