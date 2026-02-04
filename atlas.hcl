@@ -4,8 +4,8 @@ env "local" {
   dev = "sqlite://file?mode=memory"
 }
 
-env "turso" {
+env "production" {
   src = "file://db/schema.sql"
-  url = getenv("DATABASE_URL")
+  url = "${getenv("DATABASE_URL")}?authToken=${getenv("DATABASE_AUTH_TOKEN")}"
   dev = "sqlite://file?mode=memory"
 }

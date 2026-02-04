@@ -3,6 +3,8 @@ node_modules/
 
 # Environment
 .env
+.env.*
+!.env.example
 
 # Output
 output/
@@ -30,3 +32,5 @@ db/local.db
 
 # references
 z/
+.vercel
+.env*.local
