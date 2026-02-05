@@ -196,7 +196,7 @@ function TimesheetTimeCell({
               placeholder=""
               className={cn(
                 'h-7! w-20! text-center text-xs',
-                'border-transparent! bg-transparent!',
+                'border-transparent! bg-muted/70! md:bg-transparent!',
                 'hover:border-border! hover:bg-accent/50!',
                 'focus:border-primary! focus:bg-background!',
                 disabled && 'pointer-events-none opacity-50',
@@ -290,8 +290,8 @@ function TimesheetBreakCell({
             type="button"
             onKeyDown={handleKeyDown}
             className={cn(
-              'h-7 w-20 rounded-md border text-center text-xs leading-7',
-              'border-transparent bg-transparent',
+              'h-7 w-20 rounded-md border text-center leading-7',
+              'border-transparent bg-muted/70 md:bg-transparent',
               'hover:border-border hover:bg-accent/50',
               'focus:border-primary focus:bg-background focus:outline-none',
             )}
@@ -382,7 +382,7 @@ function TimesheetDescriptionCell({
             rows={1}
             placeholder=""
             className={cn(
-              'absolute inset-0 field-sizing-content min-h-7 w-full min-w-32 resize-none rounded-md border px-2 py-1 text-xs',
+              'absolute inset-0 field-sizing-content min-h-7 w-full min-w-32 resize-none rounded-md border px-2 py-1 text-base md:text-xs',
               'border-primary bg-background outline-none',
             )}
           />
@@ -399,7 +399,7 @@ function TimesheetDescriptionCell({
             }}
             className={cn(
               'absolute inset-0 min-h-7 w-full min-w-32 cursor-text rounded-md border px-2 py-1 text-left text-xs',
-              'border-transparent bg-transparent',
+              'border-transparent bg-muted/70 md:bg-transparent',
               'hover:border-border hover:bg-accent/50',
               'focus:border-primary focus:bg-background focus:outline-none',
               !value && 'text-transparent',
@@ -411,7 +411,7 @@ function TimesheetDescriptionCell({
           </button>
         )}
         {isFocused && (
-          <span className="text-muted-foreground pointer-events-none absolute right-1 bottom-1.5 z-10 text-[10px]">
+          <span className="text-muted-foreground pointer-events-none absolute right-1 bottom-1.5 z-10 hidden text-[10px] md:block">
             Shift+Enter: 改行
           </span>
         )}
@@ -549,6 +549,26 @@ export function TimesheetDemo() {
     setIsDragging(false)
   }, [])
 
+  // タッチ開始: ドラッグ選択開始（モバイル用）
+  const handleTouchStart = useCallback(
+    (date: string, e: React.TouchEvent) => {
+      // input要素、textarea要素、select要素をタッチした場合は選択しない
+      if (
+        e.target instanceof HTMLInputElement ||
+        e.target instanceof HTMLTextAreaElement ||
+        e.target instanceof HTMLSelectElement ||
+        e.target instanceof HTMLButtonElement
+      ) {
+        return
+      }
+
+      setIsDragging(true)
+      setDragStartDate(date)
+      setSelectedDates([date])
+    },
+    [],
+  )
+
   // グローバルなmouseup/mousemoveをリッスン + 自動スクロール
   useEffect(() => {
     let scrollAnimationId: number | null = null
@@ -641,11 +661,64 @@ export function TimesheetDemo() {
       }
     }
 
+    const handleGlobalTouchEnd = () => {
+      setIsDragging(false)
+      if (scrollAnimationId) {
+        cancelAnimationFrame(scrollAnimationId)
+        scrollAnimationId = null
+      }
+    }
+
+    const handleGlobalTouchMove = (e: TouchEvent) => {
+      if (!isDragging || !dragStartDate) return
+
+      const touch = e.touches[0]
+      if (!touch) return
+
+      const touchY = touch.clientY
+      const viewportHeight = window.innerHeight
+      const scrollThreshold = 80
+      const scrollSpeed = 15
+
+      if (scrollAnimationId) {
+        cancelAnimationFrame(scrollAnimationId)
+        scrollAnimationId = null
+      }
+
+      const autoScroll = () => {
+        let scrolled = false
+        if (touchY < scrollThreshold) {
+          window.scrollBy(0, -scrollSpeed)
+          scrolled = true
+        } else if (touchY > viewportHeight - scrollThreshold) {
+          window.scrollBy(0, scrollSpeed)
+          scrolled = true
+        }
+
+        if (scrolled && isDragging) {
+          updateSelectionFromMouseY(touchY)
+          scrollAnimationId = requestAnimationFrame(autoScroll)
+        }
+      }
+
+      if (touchY < scrollThreshold || touchY > viewportHeight - scrollThreshold) {
+        scrollAnimationId = requestAnimationFrame(autoScroll)
+      }
+
+      updateSelectionFromMouseY(touchY)
+      // タッチ中のスクロールを防止（選択操作を優先）
+      e.preventDefault()
+    }
+
     window.addEventListener('mouseup', handleGlobalMouseUp)
     window.addEventListener('mousemove', handleGlobalMouseMove)
+    window.addEventListener('touchend', handleGlobalTouchEnd)
+    window.addEventListener('touchmove', handleGlobalTouchMove, { passive: false })
     return () => {
       window.removeEventListener('mouseup', handleGlobalMouseUp)
       window.removeEventListener('mousemove', handleGlobalMouseMove)
+      window.removeEventListener('touchend', handleGlobalTouchEnd)
+      window.removeEventListener('touchmove', handleGlobalTouchMove)
       if (scrollAnimationId) {
         cancelAnimationFrame(scrollAnimationId)
       }
@@ -813,21 +886,22 @@ export function TimesheetDemo() {
       {/* ヘッダー */}
       {/* biome-ignore lint/a11y/useKeyWithClickEvents lint/a11y/noStaticElementInteractions: stop propagation only */}
       <div
-        className="flex items-center justify-between"
+        className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="icon" onClick={handlePrevMonth}>
-            <ChevronLeft className="size-4" />
-          </Button>
-          <span className="min-w-32 text-center text-lg font-medium">
-            {year}年{month}月
-          </span>
-          <Button variant="outline" size="icon" onClick={handleNextMonth}>
-            <ChevronRight className="size-4" />
-          </Button>
-        </div>
-        <div className="flex items-center gap-4">
+        {/* 上段: 月切替 + 合計 */}
+        <div className="flex items-center justify-between gap-4 sm:justify-start">
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="icon" onClick={handlePrevMonth}>
+              <ChevronLeft className="size-4" />
+            </Button>
+            <span className="min-w-32 text-center text-lg font-medium">
+              {year}年{month}月
+            </span>
+            <Button variant="outline" size="icon" onClick={handleNextMonth}>
+              <ChevronRight className="size-4" />
+            </Button>
+          </div>
           <div className="text-muted-foreground text-sm">
             合計:{' '}
             <span className="font-bold">
@@ -841,6 +915,9 @@ export function TimesheetDemo() {
               )}
             </span>
           </div>
+        </div>
+        {/* 下段: アクションボタン群 */}
+        <div className="flex items-center justify-end gap-2 sm:gap-4">
           <Button
             variant="ghost"
             size="sm"
@@ -1034,22 +1111,25 @@ export function TimesheetDemo() {
                         'cursor-pointer transition-colors',
                         isOffDay && 'bg-muted/30',
                         selected && 'bg-primary/5',
-                        !selected && 'hover:bg-muted/50',
+                        !selected && !isOffDay && 'odd:bg-muted/10',
+                        !selected && 'active:bg-muted/40',
+                        !selected && 'md:hover:bg-muted/50',
                       )}
                       onMouseDown={(e) => handleMouseDown(date, e)}
                       onMouseEnter={() => handleMouseEnter(date)}
+                      onTouchStart={(e) => handleTouchStart(date, e)}
                     >
                       <TableCell className="relative py-0.5 font-medium">
                         {selected && (
                           <div className="bg-primary absolute top-0 bottom-0 left-0 w-0.5" />
                         )}
-                        <div className="flex items-baseline gap-1">
+                        <div className="flex flex-col">
                           <span className={dateColorClass}>
                             {formatDateRow(date)}
                           </span>
                           {holidayName && (
                             <span
-                              className="text-destructive/70 max-w-16 truncate text-[10px]"
+                              className="text-destructive/70 max-w-20 truncate text-[9px] leading-tight"
                               title={holidayName}
                             >
                               {holidayName}
