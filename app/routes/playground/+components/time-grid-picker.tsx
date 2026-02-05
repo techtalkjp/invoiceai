@@ -1,4 +1,4 @@
-import { useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Button } from '~/components/ui/button'
 import { cn } from '~/lib/utils'
 import { formatTime, getTimeCategory, type TimeCategory } from './time-utils'
@@ -38,19 +38,23 @@ export function TimeGridPicker({
   }, [interval, allow24Plus])
 
   // 初回マウント時に選択位置へスクロール
-  useLayoutEffect(() => {
-    if (selectedRef.current && scrollRef.current) {
-      const container = scrollRef.current
-      const selected = selectedRef.current
+  // useEffect + rAF でペイント後に実行し、Forced Reflow を回避
+  useEffect(() => {
+    const rafId = requestAnimationFrame(() => {
+      if (selectedRef.current && scrollRef.current) {
+        const container = scrollRef.current
+        const selected = selectedRef.current
 
-      // 選択要素をコンテナの中央に配置
-      const containerHeight = container.clientHeight
-      const selectedTop = selected.offsetTop
-      const selectedHeight = selected.clientHeight
+        // 選択要素をコンテナの中央に配置
+        const containerHeight = container.clientHeight
+        const selectedTop = selected.offsetTop
+        const selectedHeight = selected.clientHeight
 
-      container.scrollTop =
-        selectedTop - containerHeight / 2 + selectedHeight / 2
-    }
+        container.scrollTop =
+          selectedTop - containerHeight / 2 + selectedHeight / 2
+      }
+    })
+    return () => cancelAnimationFrame(rafId)
   }, [])
 
   // 時間帯に応じた色を取得
