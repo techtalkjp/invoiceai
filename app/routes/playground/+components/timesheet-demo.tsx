@@ -40,6 +40,7 @@ import { Input } from '~/components/ui/input'
 import { Label } from '~/components/ui/label'
 import {
   type Clipboard,
+  type MonthData,
   type TimesheetEntry,
   FloatingToolbar,
   MonthTotalDisplay,
@@ -51,8 +52,13 @@ import {
   useTimesheetStore,
 } from './timesheet'
 import { downloadBlob, generateTimesheetPdf } from './timesheet-pdf'
+import { useAutoSave, useSaveAction } from './timesheet/use-auto-save'
 
-export function TimesheetDemo() {
+interface TimesheetDemoProps {
+  initialData?: Record<string, MonthData>
+}
+
+export function TimesheetDemo({ initialData }: TimesheetDemoProps) {
   const now = new Date()
   const [year, setYear] = useState(now.getFullYear())
   const [month, setMonth] = useState(now.getMonth() + 1)
@@ -72,6 +78,17 @@ export function TimesheetDemo() {
   })
 
   const monthDates = useMemo(() => getMonthDates(year, month), [year, month])
+  const monthKey = `${year}-${String(month).padStart(2, '0')}`
+
+  // 自動保存（debounce 付き）
+  useAutoSave(monthKey)
+  const { clearAll } = useSaveAction()
+
+  // 月切り替え時に initialData から store にセット
+  useEffect(() => {
+    const data = initialData?.[monthKey] ?? {}
+    useTimesheetStore.getState().setMonthData(data)
+  }, [initialData, monthKey])
 
   // monthDates を store にセット（範囲選択で使用）
   useEffect(() => {
@@ -329,7 +346,8 @@ export function TimesheetDemo() {
   // 全クリア
   const handleClearAll = useCallback(() => {
     useTimesheetStore.getState().clearAllData()
-  }, [])
+    clearAll() // LocalStorage からも削除
+  }, [clearAll])
 
   const handlePrevMonth = () => {
     if (month === 1) {
@@ -338,7 +356,7 @@ export function TimesheetDemo() {
     } else {
       setMonth(month - 1)
     }
-    useTimesheetStore.getState().clearAllData()
+    // 月切り替え時は useEffect で initialData から読み込む
   }
 
   const handleNextMonth = () => {
@@ -348,7 +366,7 @@ export function TimesheetDemo() {
     } else {
       setMonth(month + 1)
     }
-    useTimesheetStore.getState().clearAllData()
+    // 月切り替え時は useEffect で initialData から読み込む
   }
 
   return (

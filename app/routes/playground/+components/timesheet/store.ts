@@ -1,14 +1,14 @@
 import { create } from 'zustand'
 import type { MonthData, TimesheetEntry } from './types'
 
-// タイムシート store の状態
+// タイムシート store の状態（UI状態管理のみ、永続化は clientAction で行う）
 export interface TimesheetState {
   // 選択状態
   selectedDates: string[]
   isDragging: boolean
   dragStartDate: string | null
   monthDates: string[] // 範囲選択のため
-  // データ
+  // データ（メモリ上のみ - 永続化は clientAction で行う）
   monthData: MonthData
   // 選択操作
   setMonthDates: (dates: string[]) => void
