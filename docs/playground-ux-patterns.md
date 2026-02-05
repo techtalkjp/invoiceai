@@ -633,6 +633,120 @@ const dateColorClass =
 </Button>
 ```
 
+### 8.3 ヘッダーの2段レイアウト（モバイル）
+
+モバイルではヘッダーを2段に分割:
+
+```typescript
+<div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
+  {/* 上段: 月切替 + 合計 */}
+  <div className="flex items-center justify-between gap-4 sm:justify-start">
+    {/* 月切替ボタン */}
+    {/* 合計表示 */}
+  </div>
+  {/* 下段: アクションボタン群 */}
+  <div className="flex items-center justify-end gap-2 sm:gap-4">
+    {/* サンプル / PDF / 全クリア */}
+  </div>
+</div>
+```
+
+### 8.4 テーブル行のモバイル対応
+
+ホバーがないモバイルでも視認性を確保:
+
+```typescript
+<TableRow
+  className={cn(
+    'cursor-pointer transition-colors',
+    isOffDay && 'bg-muted/30',
+    selected && 'bg-primary/5',
+    !selected && !isOffDay && 'odd:bg-muted/10',  // ゼブラストライプ
+    !selected && 'active:bg-muted/40',             // タップフィードバック
+    !selected && 'md:hover:bg-muted/50',           // ホバーはPC(md以上)のみ
+  )}
+>
+```
+
+### 8.5 タッチでのドラッグ選択
+
+モバイルでもドラッグ選択を可能に:
+
+```typescript
+// タッチ開始
+const handleTouchStart = useCallback((date: string, e: React.TouchEvent) => {
+  if (e.target instanceof HTMLButtonElement) return  // ボタンは除外
+  setIsDragging(true)
+  setDragStartDate(date)
+  setSelectedDates([date])
+}, [])
+
+// グローバルタッチイベント（useEffect内）
+window.addEventListener('touchend', handleGlobalTouchEnd)
+window.addEventListener('touchmove', handleGlobalTouchMove, { passive: false })
+```
+
+### 8.6 入力フィールドの視認性向上
+
+モバイルでは空欄でもタップ領域がわかるよう背景色を追加:
+
+```typescript
+// TimeInput, BreakCell, DescriptionCell
+className={cn(
+  'border-transparent bg-muted/70 md:bg-transparent',
+  'hover:border-border hover:bg-accent/50',
+  // ...
+)}
+```
+
+### 8.7 iOSズーム防止
+
+16px未満のフォントサイズでフォーカス時にiOSがズームするのを防止:
+
+```typescript
+// 概要欄のtextarea
+className="text-base md:text-xs"  // モバイルは16px、PCは12px
+```
+
+### 8.8 祝日名の2行表示
+
+日付の下に祝日名を表示（行高さは祝日がある行のみ増加）:
+
+```typescript
+<div className="flex flex-col">
+  <span className={dateColorClass}>{formatDateRow(date)}</span>
+  {holidayName && (
+    <span className="text-destructive/70 max-w-20 truncate text-[9px] leading-tight">
+      {holidayName}
+    </span>
+  )}
+</div>
+```
+
+### 8.9 キーボードヒントの非表示（モバイル）
+
+モバイルではキーボードショートカットのヒントを非表示:
+
+```typescript
+{isFocused && (
+  <span className="hidden md:block text-[10px]">
+    Shift+Enter: 改行
+  </span>
+)}
+```
+
+### 8.10 ページ余白の調整
+
+モバイルでは余白を減らしてコンテンツ領域を確保:
+
+```typescript
+// root.tsx
+<main className="px-2 pt-4 pb-8 sm:px-6 sm:pt-10 sm:pb-16">
+
+// playground/index.tsx
+<div className="py-4 sm:py-8">
+```
+
 ---
 
 ## 9. その他の工夫

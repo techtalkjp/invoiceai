@@ -9,7 +9,8 @@ import {
   Shuffle,
   Trash2,
 } from 'lucide-react'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { memo, useCallback, useEffect, useMemo, useState } from 'react'
+import { create } from 'zustand'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -63,6 +64,7 @@ import { downloadBlob, generateTimesheetPdf } from './timesheet-pdf'
 
 const DAY_LABELS = ['日', '月', '火', '水', '木', '金', '土']
 
+// タイムシートエントリの型（先に定義）
 export interface TimesheetEntry {
   startTime: string
   endTime: string
@@ -71,6 +73,125 @@ export interface TimesheetEntry {
 }
 
 type MonthData = Record<string, TimesheetEntry>
+
+// タイムシート store（選択状態 + データ - パフォーマンス最適化: 各行が自分の状態のみ subscribe）
+interface TimesheetState {
+  // 選択状態
+  selectedDates: string[]
+  isDragging: boolean
+  dragStartDate: string | null
+  monthDates: string[] // 範囲選択のため
+  // データ
+  monthData: MonthData
+  // 選択操作
+  setMonthDates: (dates: string[]) => void
+  setSelectedDates: (
+    dates: string[] | ((prev: string[]) => string[]),
+  ) => void
+  setIsDragging: (isDragging: boolean) => void
+  setDragStartDate: (date: string | null) => void
+  clearSelection: () => void
+  startSelection: (date: string, shiftKey: boolean) => void
+  extendSelection: (date: string) => void
+  // データ操作
+  setMonthData: (data: MonthData | ((prev: MonthData) => MonthData)) => void
+  updateEntry: (date: string, field: keyof TimesheetEntry, value: string | number) => void
+  clearAllData: () => void
+}
+
+const useTimesheetStore = create<TimesheetState>((set, get) => ({
+  // 選択状態
+  selectedDates: [],
+  isDragging: false,
+  dragStartDate: null,
+  monthDates: [],
+  // データ
+  monthData: {},
+  // 選択操作
+  setMonthDates: (monthDates) => set({ monthDates }),
+  setSelectedDates: (dates) =>
+    set((state) => ({
+      selectedDates: typeof dates === 'function' ? dates(state.selectedDates) : dates,
+    })),
+  setIsDragging: (isDragging) => set({ isDragging }),
+  setDragStartDate: (dragStartDate) => set({ dragStartDate }),
+  clearSelection: () => set({ selectedDates: [], isDragging: false, dragStartDate: null }),
+  startSelection: (date, shiftKey) => {
+    const { selectedDates, monthDates } = get()
+    const getDateRange = (start: string, end: string): string[] => {
+      const startIdx = monthDates.indexOf(start)
+      const endIdx = monthDates.indexOf(end)
+      const [fromIdx, toIdx] = startIdx <= endIdx ? [startIdx, endIdx] : [endIdx, startIdx]
+      return monthDates.slice(fromIdx, toIdx + 1)
+    }
+
+    set({ isDragging: true, dragStartDate: date })
+
+    if (shiftKey && selectedDates.length > 0) {
+      const lastSelected = selectedDates[selectedDates.length - 1]
+      if (lastSelected) {
+        set({ selectedDates: getDateRange(lastSelected, date) })
+      }
+    } else if (selectedDates.length === 1 && selectedDates[0] === date) {
+      set({ selectedDates: [] })
+    } else {
+      set({ selectedDates: [date] })
+    }
+  },
+  extendSelection: (date) => {
+    const { isDragging, dragStartDate, monthDates } = get()
+    if (!isDragging || !dragStartDate) return
+
+    const startIdx = monthDates.indexOf(dragStartDate)
+    const endIdx = monthDates.indexOf(date)
+    const [fromIdx, toIdx] = startIdx <= endIdx ? [startIdx, endIdx] : [endIdx, startIdx]
+    set({ selectedDates: monthDates.slice(fromIdx, toIdx + 1) })
+  },
+  // データ操作
+  setMonthData: (data) =>
+    set((state) => ({
+      monthData: typeof data === 'function' ? data(state.monthData) : data,
+    })),
+  updateEntry: (date, field, value) => {
+    set((state) => {
+      const entry = state.monthData[date] ?? {
+        startTime: '',
+        endTime: '',
+        breakMinutes: 0,
+        description: '',
+      }
+      const updated = {
+        ...entry,
+        [field]: value,
+      }
+      // 開始 or 終了が入力され、休憩が未設定の場合はデフォルト1時間
+      if (
+        (field === 'startTime' || field === 'endTime') &&
+        value &&
+        entry.breakMinutes === 0
+      ) {
+        updated.breakMinutes = 60
+      }
+      return {
+        monthData: {
+          ...state.monthData,
+          [date]: updated,
+        },
+      }
+    })
+  },
+  clearAllData: () => set({ monthData: {}, selectedDates: [] }),
+}))
+
+// 各行が自分の選択状態のみ subscribe するセレクタ
+function useIsSelected(date: string) {
+  return useTimesheetStore((state) => state.selectedDates.includes(date))
+}
+
+// 各セルが自分のフィールドのみ subscribe するセレクタ
+function useEntryField<K extends keyof TimesheetEntry>(date: string, field: K) {
+  return useTimesheetStore((state) => state.monthData[date]?.[field])
+}
 
 function getMonthDates(year: number, month: number): string[] {
   const dates: string[] = []
@@ -152,38 +273,45 @@ function navigateToCell(
   }
 }
 
-// タイムシート用の時間入力セル（Popover付き）
+// タイムシート用の時間入力セル（Popover付き） - 各セルが自分のフィールドのみ subscribe
 function TimesheetTimeCell({
-  value,
-  onChange,
-  baseTime,
+  date,
+  field,
+  baseTimeField,
   allow24Plus = false,
   disabled = false,
-  date,
   col,
   defaultValue = '09:00',
   open,
   onOpenChange,
   onSelectFromPicker,
 }: {
-  value: string
-  onChange: (value: string) => void
-  baseTime?: string | undefined
+  date: string
+  field: 'startTime' | 'endTime'
+  baseTimeField?: 'startTime' | 'endTime' | undefined
   allow24Plus?: boolean
   disabled?: boolean
-  date: string
   col: number
   defaultValue?: string
   open?: boolean
   onOpenChange?: (open: boolean) => void
   onSelectFromPicker?: () => void
 }) {
+  // 自分のフィールドのみ subscribe（フックは常に呼び出す）
+  const value = useEntryField(date, field) ?? ''
+  const startTime = useEntryField(date, 'startTime')
+  const baseTime = baseTimeField === 'startTime' ? startTime : undefined
+
   const [internalOpen, setInternalOpen] = useState(false)
   const isControlled = open !== undefined
   const isOpen = isControlled ? open : internalOpen
   const setIsOpen = isControlled
     ? (onOpenChange ?? (() => {}))
     : setInternalOpen
+
+  const handleChange = (v: string) => {
+    useTimesheetStore.getState().updateEntry(date, field, v)
+  }
 
   return (
     <TableCell className="p-1 text-center" data-col={col}>
@@ -192,11 +320,11 @@ function TimesheetTimeCell({
           <div className="inline-block">
             <TimeInput
               value={value}
-              onChange={onChange}
+              onChange={handleChange}
               placeholder=""
               className={cn(
                 'h-7! w-20! text-center text-xs',
-                'border-transparent! bg-transparent!',
+                'border-transparent! bg-muted/70! md:bg-transparent!',
                 'hover:border-border! hover:bg-accent/50!',
                 'focus:border-primary! focus:bg-background!',
                 disabled && 'pointer-events-none opacity-50',
@@ -211,7 +339,7 @@ function TimesheetTimeCell({
           <TimeGridPicker
             value={value || defaultValue}
             onChange={(v) => {
-              onChange(v)
+              handleChange(v)
               setIsOpen(false)
               onSelectFromPicker?.()
             }}
@@ -224,18 +352,16 @@ function TimesheetTimeCell({
   )
 }
 
-// 休憩時間入力セル（Popover付き）
+// 休憩時間入力セル（Popover付き） - 自分のフィールドのみ subscribe
 function TimesheetBreakCell({
-  value,
-  onChange,
   date,
   col,
 }: {
-  value: number
-  onChange: (value: number) => void
   date: string
   col: number
 }) {
+  // 自分のフィールドのみ subscribe
+  const value = useEntryField(date, 'breakMinutes') ?? 0
   const [open, setOpen] = useState(false)
 
   const formatBreak = (minutes: number): React.ReactNode => {
@@ -282,6 +408,10 @@ function TimesheetBreakCell({
     }
   }
 
+  const handleChange = (v: number) => {
+    useTimesheetStore.getState().updateEntry(date, 'breakMinutes', v)
+  }
+
   return (
     <TableCell className="p-1 text-center" data-col={col}>
       <Popover open={open} onOpenChange={setOpen}>
@@ -290,8 +420,8 @@ function TimesheetBreakCell({
             type="button"
             onKeyDown={handleKeyDown}
             className={cn(
-              'h-7 w-20 rounded-md border text-center text-xs leading-7',
-              'border-transparent bg-transparent',
+              'h-7 w-20 rounded-md border text-center leading-7',
+              'border-transparent bg-muted/70 md:bg-transparent',
               'hover:border-border hover:bg-accent/50',
               'focus:border-primary focus:bg-background focus:outline-none',
             )}
@@ -304,7 +434,7 @@ function TimesheetBreakCell({
           <BreakGridPicker
             value={value}
             onChange={(v) => {
-              onChange(v)
+              handleChange(v)
               setOpen(false)
             }}
           />
@@ -314,19 +444,21 @@ function TimesheetBreakCell({
   )
 }
 
-// 備考入力セル
+// 備考入力セル - 自分のフィールドのみ subscribe
 function TimesheetDescriptionCell({
-  value,
-  onChange,
   date,
   col,
 }: {
-  value: string
-  onChange: (value: string) => void
   date: string
   col: number
 }) {
+  // 自分のフィールドのみ subscribe
+  const value = useEntryField(date, 'description') ?? ''
   const [isFocused, setIsFocused] = useState(false)
+
+  const handleChange = (v: string) => {
+    useTimesheetStore.getState().updateEntry(date, 'description', v)
+  }
 
   return (
     <TableCell className="p-1" data-col={col}>
@@ -343,7 +475,7 @@ function TimesheetDescriptionCell({
         {isFocused ? (
           <textarea
             value={value}
-            onChange={(e) => onChange(e.target.value)}
+            onChange={(e) => handleChange(e.target.value)}
             onBlur={() => setIsFocused(false)}
             onKeyDown={(e) => {
               // IME変換中は何もしない
@@ -382,7 +514,7 @@ function TimesheetDescriptionCell({
             rows={1}
             placeholder=""
             className={cn(
-              'absolute inset-0 field-sizing-content min-h-7 w-full min-w-32 resize-none rounded-md border px-2 py-1 text-xs',
+              'absolute inset-0 field-sizing-content min-h-7 w-full min-w-32 resize-none rounded-md border px-2 py-1 text-base md:text-xs',
               'border-primary bg-background outline-none',
             )}
           />
@@ -399,7 +531,7 @@ function TimesheetDescriptionCell({
             }}
             className={cn(
               'absolute inset-0 min-h-7 w-full min-w-32 cursor-text rounded-md border px-2 py-1 text-left text-xs',
-              'border-transparent bg-transparent',
+              'border-transparent bg-muted/70 md:bg-transparent',
               'hover:border-border hover:bg-accent/50',
               'focus:border-primary focus:bg-background focus:outline-none',
               !value && 'text-transparent',
@@ -411,7 +543,7 @@ function TimesheetDescriptionCell({
           </button>
         )}
         {isFocused && (
-          <span className="text-muted-foreground pointer-events-none absolute right-1 bottom-1.5 z-10 text-[10px]">
+          <span className="text-muted-foreground pointer-events-none absolute right-1 bottom-1.5 z-10 hidden text-[10px] md:block">
             Shift+Enter: 改行
           </span>
         )}
@@ -450,22 +582,252 @@ function generateSampleData(year: number, month: number): MonthData {
 // クリップボードの型
 type Clipboard = TimesheetEntry[] | null
 
+// 稼働時間表示セル - 必要なフィールドのみ subscribe
+function TimesheetWorkCell({ date }: { date: string }) {
+  const startTime = useEntryField(date, 'startTime')
+  const endTime = useEntryField(date, 'endTime')
+  const breakMinutes = useEntryField(date, 'breakMinutes') ?? 0
+
+  let workDisplay: React.ReactNode = null
+  if (startTime && endTime) {
+    const duration = calculateWorkDuration(startTime, endTime, breakMinutes)
+    if (duration.workMinutes > 0) {
+      const hours = Math.floor(duration.workMinutes / 60)
+      const mins = duration.workMinutes % 60
+      workDisplay = (
+        <>
+          {hours}
+          <span className="text-[0.7em]">時間</span>
+          {mins > 0 && (
+            <>
+              {mins}
+              <span className="text-[0.7em]">分</span>
+            </>
+          )}
+        </>
+      )
+    }
+  }
+
+  return (
+    <TableCell className="text-muted-foreground text-center">
+      {workDisplay}
+    </TableCell>
+  )
+}
+
+// 行コンポーネント（パフォーマンス最適化のため分離 - 選択状態のみ subscribe、各セルが自分のフィールドを subscribe）
+function TimesheetRow({ date }: { date: string }) {
+  // store から自分の選択状態のみ subscribe
+  const selected = useIsSelected(date)
+
+  // 選択操作（store から直接取得 - stable reference）
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (
+      e.target instanceof HTMLInputElement ||
+      e.target instanceof HTMLTextAreaElement ||
+      e.target instanceof HTMLSelectElement ||
+      e.target instanceof HTMLButtonElement
+    ) {
+      return
+    }
+    const currentSelectedDates = useTimesheetStore.getState().selectedDates
+    if (e.button === 2 && currentSelectedDates.includes(date)) {
+      return
+    }
+    if (document.activeElement instanceof HTMLElement) {
+      document.activeElement.blur()
+    }
+    e.preventDefault()
+    useTimesheetStore.getState().startSelection(date, e.shiftKey)
+  }
+
+  const handleMouseEnter = () => {
+    useTimesheetStore.getState().extendSelection(date)
+  }
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (
+      e.target instanceof HTMLInputElement ||
+      e.target instanceof HTMLTextAreaElement ||
+      e.target instanceof HTMLSelectElement ||
+      e.target instanceof HTMLButtonElement
+    ) {
+      return
+    }
+    useTimesheetStore.getState().startSelection(date, false)
+  }
+  // Picker の開閉状態を行内で管理（0: startTime, 1: endTime）
+  const [openPickerCol, setOpenPickerCol] = useState<number | null>(null)
+
+  const saturday = isSaturday(date)
+  const sunday = isSunday(date)
+  const holidayName = getHolidayName(date)
+  const isOffDay = saturday || sunday || holidayName !== null
+
+  const dateColorClass =
+    sunday || holidayName
+      ? 'text-destructive'
+      : saturday
+        ? 'text-blue-500'
+        : undefined
+
+  return (
+    <TableRow
+      data-date={date}
+      className={cn(
+        'cursor-pointer transition-colors',
+        isOffDay && 'bg-muted/30',
+        selected && 'bg-primary/5',
+        !selected && !isOffDay && 'odd:bg-muted/10',
+        !selected && 'active:bg-muted/40',
+        !selected && 'md:hover:bg-muted/50',
+      )}
+      onMouseDown={handleMouseDown}
+      onMouseEnter={handleMouseEnter}
+      onTouchStart={handleTouchStart}
+    >
+      <TableCell className="relative py-0.5 font-medium">
+        {selected && (
+          <div className="bg-primary absolute top-0 bottom-0 left-0 w-0.5" />
+        )}
+        <div className="flex flex-col">
+          <span className={dateColorClass}>{formatDateRow(date)}</span>
+          {holidayName && (
+            <span
+              className="text-destructive/70 max-w-20 truncate text-[9px] leading-tight"
+              title={holidayName}
+            >
+              {holidayName}
+            </span>
+          )}
+        </div>
+      </TableCell>
+      <TimesheetTimeCell
+        date={date}
+        field="startTime"
+        col={0}
+        open={openPickerCol === 0}
+        onOpenChange={(open) => setOpenPickerCol(open ? 0 : null)}
+        onSelectFromPicker={() => {
+          // 終了時間が未入力なら終了時間のPickerを開く
+          const endTime = useTimesheetStore.getState().monthData[date]?.endTime
+          if (!endTime) {
+            setOpenPickerCol(1)
+          } else {
+            // 両方入力済みなら備考欄にフォーカス
+            setTimeout(() => {
+              const descButton = document.querySelector(
+                `[data-date="${date}"] [data-col="3"] button`,
+              ) as HTMLButtonElement | null
+              descButton?.click()
+            }, 0)
+          }
+        }}
+      />
+      <TimesheetTimeCell
+        date={date}
+        field="endTime"
+        baseTimeField="startTime"
+        allow24Plus
+        col={1}
+        defaultValue="18:00"
+        open={openPickerCol === 1}
+        onOpenChange={(open) => setOpenPickerCol(open ? 1 : null)}
+        onSelectFromPicker={() => {
+          // 開始時間が未入力なら開始時間のPickerを開く
+          const startTime = useTimesheetStore.getState().monthData[date]?.startTime
+          if (!startTime) {
+            setOpenPickerCol(0)
+          } else {
+            // 両方入力済みなら備考欄にフォーカス
+            setTimeout(() => {
+              const descButton = document.querySelector(
+                `[data-date="${date}"] [data-col="3"] button`,
+              ) as HTMLButtonElement | null
+              descButton?.click()
+            }, 0)
+          }
+        }}
+      />
+      <TimesheetBreakCell date={date} col={2} />
+      <TimesheetWorkCell date={date} />
+      <TimesheetDescriptionCell date={date} col={3} />
+    </TableRow>
+  )
+}
+
+// 月合計表示（自分だけが再レンダリング - monthData の変更で TimesheetDemo を再レンダリングしない）
+function MonthTotalDisplay({ monthDates }: { monthDates: string[] }) {
+  const monthTotal = useTimesheetStore((s) => {
+    return monthDates.reduce((sum, date) => {
+      const entry = s.monthData[date]
+      if (!entry?.startTime || !entry?.endTime) return sum
+      const duration = calculateWorkDuration(
+        entry.startTime,
+        entry.endTime,
+        entry.breakMinutes,
+      )
+      return sum + duration.workMinutes
+    }, 0)
+  })
+
+  return (
+    <div className="text-muted-foreground text-sm">
+      合計:{' '}
+      <span className="font-bold">
+        {Math.floor(monthTotal / 60)}
+        <span className="text-[0.8em]">時間</span>
+        {monthTotal % 60 > 0 && (
+          <>
+            {monthTotal % 60}
+            <span className="text-[0.8em]">分</span>
+          </>
+        )}
+      </span>
+    </div>
+  )
+}
+
+// テーブル本体（memo で親の再レンダリングから分離）
+const TimesheetTable = memo(function TimesheetTable({
+  monthDates,
+  onMouseUp,
+}: {
+  monthDates: string[]
+  onMouseUp: () => void
+}) {
+  return (
+    <Table>
+      <TableHeader>
+        <TableRow>
+          <TableHead className="w-28">日付</TableHead>
+          <TableHead className="w-24 text-center">開始</TableHead>
+          <TableHead className="w-24 text-center">終了</TableHead>
+          <TableHead className="w-20 text-center">休憩</TableHead>
+          <TableHead className="w-20 text-center">稼働</TableHead>
+          <TableHead>概要</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody onMouseUp={onMouseUp}>
+        {monthDates.map((date) => (
+          <TimesheetRow key={date} date={date} />
+        ))}
+      </TableBody>
+    </Table>
+  )
+})
+
 export function TimesheetDemo() {
   const now = new Date()
   const [year, setYear] = useState(now.getFullYear())
   const [month, setMonth] = useState(now.getMonth() + 1)
-  const [monthData, setMonthData] = useState<MonthData>({})
 
-  // 選択状態
-  const [selectedDates, setSelectedDates] = useState<string[]>([])
-  const [dragStartDate, setDragStartDate] = useState<string | null>(null)
-  const [isDragging, setIsDragging] = useState(false)
+  // 選択状態（length のみ subscribe - 配列全体を subscribe すると全行が再レンダリングされる）
+  const selectedCount = useTimesheetStore((s) => s.selectedDates.length)
 
   // クリップボード
   const [clipboard, setClipboard] = useState<Clipboard>(null)
-
-  // 時間Pickerの開閉状態 (date-col の形式でキーを管理)
-  const [openPickerKey, setOpenPickerKey] = useState<string | null>(null)
 
   // PDFダウンロードダイアログ
   const [pdfDialogOpen, setPdfDialogOpen] = useState(false)
@@ -477,76 +839,14 @@ export function TimesheetDemo() {
 
   const monthDates = useMemo(() => getMonthDates(year, month), [year, month])
 
-  // 範囲選択のヘルパー
-  const getDateRange = useCallback(
-    (start: string, end: string): string[] => {
-      const startIdx = monthDates.indexOf(start)
-      const endIdx = monthDates.indexOf(end)
-      const [fromIdx, toIdx] =
-        startIdx <= endIdx ? [startIdx, endIdx] : [endIdx, startIdx]
-      return monthDates.slice(fromIdx, toIdx + 1)
-    },
-    [monthDates],
-  )
-
-  // マウスダウン: 選択開始
-  const handleMouseDown = useCallback(
-    (date: string, e: React.MouseEvent) => {
-      // input要素、textarea要素、select要素をクリックした場合は選択しない
-      if (
-        e.target instanceof HTMLInputElement ||
-        e.target instanceof HTMLTextAreaElement ||
-        e.target instanceof HTMLSelectElement
-      ) {
-        return
-      }
-
-      // 右クリックで既に選択範囲内の場合は選択を維持
-      if (e.button === 2 && selectedDates.includes(date)) {
-        return
-      }
-
-      // 現在フォーカスがある要素からフォーカスを外す
-      if (document.activeElement instanceof HTMLElement) {
-        document.activeElement.blur()
-      }
-
-      e.preventDefault()
-      setIsDragging(true)
-      setDragStartDate(date)
-
-      if (e.shiftKey && selectedDates.length > 0) {
-        // Shift+クリック: 最後の選択から範囲選択
-        const lastSelected = selectedDates[selectedDates.length - 1]
-        if (lastSelected) {
-          const range = getDateRange(lastSelected, date)
-          setSelectedDates(range)
-        }
-      } else if (selectedDates.length === 1 && selectedDates[0] === date) {
-        // 1行選択中にその行をクリック: 選択クリア
-        setSelectedDates([])
-      } else {
-        // 通常クリック: 新しい選択
-        setSelectedDates([date])
-      }
-    },
-    [selectedDates, getDateRange],
-  )
-
-  // マウス移動: ドラッグ選択
-  const handleMouseEnter = useCallback(
-    (date: string) => {
-      if (isDragging && dragStartDate) {
-        const range = getDateRange(dragStartDate, date)
-        setSelectedDates(range)
-      }
-    },
-    [isDragging, dragStartDate, getDateRange],
-  )
+  // monthDates を store にセット（範囲選択で使用）
+  useEffect(() => {
+    useTimesheetStore.getState().setMonthDates(monthDates)
+  }, [monthDates])
 
   // マウスアップ: 選択終了
   const handleMouseUp = useCallback(() => {
-    setIsDragging(false)
+    useTimesheetStore.getState().setIsDragging(false)
   }, [])
 
   // グローバルなmouseup/mousemoveをリッスン + 自動スクロール
@@ -554,7 +854,7 @@ export function TimesheetDemo() {
     let scrollAnimationId: number | null = null
 
     const handleGlobalMouseUp = () => {
-      setIsDragging(false)
+      useTimesheetStore.getState().setIsDragging(false)
       if (scrollAnimationId) {
         cancelAnimationFrame(scrollAnimationId)
         scrollAnimationId = null
@@ -562,7 +862,8 @@ export function TimesheetDemo() {
     }
 
     const handleGlobalMouseMove = (e: MouseEvent) => {
-      if (!isDragging || !dragStartDate) return
+      const { isDragging: dragging, dragStartDate: startDate } = useTimesheetStore.getState()
+      if (!dragging || !startDate) return
 
       const mouseY = e.clientY
       const viewportHeight = window.innerHeight
@@ -587,7 +888,7 @@ export function TimesheetDemo() {
           scrolled = true
         }
 
-        if (scrolled && isDragging) {
+        if (scrolled && useTimesheetStore.getState().isDragging) {
           // スクロール後に選択を更新
           updateSelectionFromMouseY(mouseY)
           scrollAnimationId = requestAnimationFrame(autoScroll)
@@ -632,43 +933,98 @@ export function TimesheetDemo() {
         }
       }
 
-      if (closestRow && dragStartDate) {
+      if (closestRow) {
         const date = closestRow.dataset.date
         if (date) {
-          const range = getDateRange(dragStartDate, date)
-          setSelectedDates(range)
+          useTimesheetStore.getState().extendSelection(date)
         }
       }
     }
 
+    const handleGlobalTouchEnd = () => {
+      useTimesheetStore.getState().setIsDragging(false)
+      if (scrollAnimationId) {
+        cancelAnimationFrame(scrollAnimationId)
+        scrollAnimationId = null
+      }
+    }
+
+    const handleGlobalTouchMove = (e: TouchEvent) => {
+      const { isDragging: dragging, dragStartDate: startDate } = useTimesheetStore.getState()
+      if (!dragging || !startDate) return
+
+      const touch = e.touches[0]
+      if (!touch) return
+
+      const touchY = touch.clientY
+      const viewportHeight = window.innerHeight
+      const scrollThreshold = 80
+      const scrollSpeed = 15
+
+      if (scrollAnimationId) {
+        cancelAnimationFrame(scrollAnimationId)
+        scrollAnimationId = null
+      }
+
+      const autoScroll = () => {
+        let scrolled = false
+        if (touchY < scrollThreshold) {
+          window.scrollBy(0, -scrollSpeed)
+          scrolled = true
+        } else if (touchY > viewportHeight - scrollThreshold) {
+          window.scrollBy(0, scrollSpeed)
+          scrolled = true
+        }
+
+        if (scrolled && useTimesheetStore.getState().isDragging) {
+          updateSelectionFromMouseY(touchY)
+          scrollAnimationId = requestAnimationFrame(autoScroll)
+        }
+      }
+
+      if (touchY < scrollThreshold || touchY > viewportHeight - scrollThreshold) {
+        scrollAnimationId = requestAnimationFrame(autoScroll)
+      }
+
+      updateSelectionFromMouseY(touchY)
+      // タッチ中のスクロールを防止（選択操作を優先）
+      e.preventDefault()
+    }
+
     window.addEventListener('mouseup', handleGlobalMouseUp)
     window.addEventListener('mousemove', handleGlobalMouseMove)
+    window.addEventListener('touchend', handleGlobalTouchEnd)
+    window.addEventListener('touchmove', handleGlobalTouchMove, { passive: false })
     return () => {
       window.removeEventListener('mouseup', handleGlobalMouseUp)
       window.removeEventListener('mousemove', handleGlobalMouseMove)
+      window.removeEventListener('touchend', handleGlobalTouchEnd)
+      window.removeEventListener('touchmove', handleGlobalTouchMove)
       if (scrollAnimationId) {
         cancelAnimationFrame(scrollAnimationId)
       }
     }
-  }, [isDragging, dragStartDate, getDateRange])
+  }, [])
 
   // 選択解除（テーブル外クリック）
   const handleClearSelection = useCallback(() => {
+    const { selectedDates, setSelectedDates } = useTimesheetStore.getState()
     if (selectedDates.length > 0) {
       setSelectedDates([])
     }
-  }, [selectedDates.length])
+  }, [])
 
   // コピー
   const handleCopy = useCallback(() => {
+    const { selectedDates, monthData } = useTimesheetStore.getState()
     if (selectedDates.length === 0) return
     const entries = selectedDates
-      .map((date) => monthData[date])
+      .map((date: string) => monthData[date])
       .filter((e): e is TimesheetEntry => e !== undefined)
     if (entries.length > 0) {
       setClipboard(entries)
     }
-  }, [selectedDates, monthData])
+  }, [])
 
   // 平日かどうか判定
   const isWeekday = useCallback((dateStr: string): boolean => {
@@ -678,12 +1034,13 @@ export function TimesheetDemo() {
 
   // ペースト
   const handlePaste = useCallback(() => {
+    const { selectedDates, setMonthData } = useTimesheetStore.getState()
     if (!clipboard || clipboard.length === 0 || selectedDates.length === 0)
       return
 
     setMonthData((prev) => {
       const newData = { ...prev }
-      selectedDates.forEach((date, idx) => {
+      selectedDates.forEach((date: string, idx: number) => {
         // クリップボードの内容を繰り返し適用
         const entry = clipboard[idx % clipboard.length]
         if (entry) {
@@ -692,10 +1049,11 @@ export function TimesheetDemo() {
       })
       return newData
     })
-  }, [clipboard, selectedDates])
+  }, [clipboard])
 
   // 平日のみペースト
   const handlePasteWeekdaysOnly = useCallback(() => {
+    const { selectedDates, setMonthData } = useTimesheetStore.getState()
     if (!clipboard || clipboard.length === 0 || selectedDates.length === 0)
       return
 
@@ -704,7 +1062,7 @@ export function TimesheetDemo() {
 
     setMonthData((prev) => {
       const newData = { ...prev }
-      weekdayDates.forEach((date, idx) => {
+      weekdayDates.forEach((date: string, idx: number) => {
         const entry = clipboard[idx % clipboard.length]
         if (entry) {
           newData[date] = { ...entry }
@@ -712,26 +1070,26 @@ export function TimesheetDemo() {
       })
       return newData
     })
-  }, [clipboard, selectedDates, isWeekday])
+  }, [clipboard, isWeekday])
 
   // 選択行クリア
   const handleClearSelected = useCallback(() => {
+    const { selectedDates, setMonthData, setSelectedDates } = useTimesheetStore.getState()
     if (selectedDates.length === 0) return
 
     setMonthData((prev) => {
       const newData = { ...prev }
-      selectedDates.forEach((date) => {
+      selectedDates.forEach((date: string) => {
         delete newData[date]
       })
       return newData
     })
     setSelectedDates([])
-  }, [selectedDates])
+  }, [])
 
   // 全クリア
   const handleClearAll = useCallback(() => {
-    setMonthData({})
-    setSelectedDates([])
+    useTimesheetStore.getState().clearAllData()
   }, [])
 
   const handlePrevMonth = () => {
@@ -741,8 +1099,7 @@ export function TimesheetDemo() {
     } else {
       setMonth(month - 1)
     }
-    setMonthData({})
-    setSelectedDates([])
+    useTimesheetStore.getState().clearAllData()
   }
 
   const handleNextMonth = () => {
@@ -752,60 +1109,8 @@ export function TimesheetDemo() {
     } else {
       setMonth(month + 1)
     }
-    setMonthData({})
-    setSelectedDates([])
+    useTimesheetStore.getState().clearAllData()
   }
-
-  const handleUpdateEntry = (
-    date: string,
-    field: keyof TimesheetEntry,
-    value: string | number,
-  ) => {
-    setMonthData((prev) => {
-      const entry = prev[date] ?? {
-        startTime: '',
-        endTime: '',
-        breakMinutes: 0,
-        description: '',
-      }
-      const updated = {
-        ...entry,
-        [field]: value,
-      }
-      // 開始 or 終了が入力され、休憩が未設定の場合はデフォルト1時間
-      if (
-        (field === 'startTime' || field === 'endTime') &&
-        value &&
-        entry.breakMinutes === 0
-      ) {
-        updated.breakMinutes = 60
-      }
-      return {
-        ...prev,
-        [date]: updated,
-      }
-    })
-  }
-
-  // 月合計計算
-  const monthTotal = useMemo(() => {
-    return monthDates.reduce((sum, date) => {
-      const entry = monthData[date]
-      if (!entry?.startTime || !entry?.endTime) return sum
-      const duration = calculateWorkDuration(
-        entry.startTime,
-        entry.endTime,
-        entry.breakMinutes,
-      )
-      return sum + duration.workMinutes
-    }, 0)
-  }, [monthDates, monthData])
-
-  // 選択中かどうか
-  const isSelected = useCallback(
-    (date: string) => selectedDates.includes(date),
-    [selectedDates],
-  )
 
   return (
     // biome-ignore lint/a11y/useKeyWithClickEvents lint/a11y/noStaticElementInteractions: selection clear on background click
@@ -813,38 +1118,30 @@ export function TimesheetDemo() {
       {/* ヘッダー */}
       {/* biome-ignore lint/a11y/useKeyWithClickEvents lint/a11y/noStaticElementInteractions: stop propagation only */}
       <div
-        className="flex items-center justify-between"
+        className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="icon" onClick={handlePrevMonth}>
-            <ChevronLeft className="size-4" />
-          </Button>
-          <span className="min-w-32 text-center text-lg font-medium">
-            {year}年{month}月
-          </span>
-          <Button variant="outline" size="icon" onClick={handleNextMonth}>
-            <ChevronRight className="size-4" />
-          </Button>
-        </div>
-        <div className="flex items-center gap-4">
-          <div className="text-muted-foreground text-sm">
-            合計:{' '}
-            <span className="font-bold">
-              {Math.floor(monthTotal / 60)}
-              <span className="text-[0.8em]">時間</span>
-              {monthTotal % 60 > 0 && (
-                <>
-                  {monthTotal % 60}
-                  <span className="text-[0.8em]">分</span>
-                </>
-              )}
+        {/* 上段: 月切替 + 合計 */}
+        <div className="flex items-center justify-between gap-4 sm:justify-start">
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="icon" onClick={handlePrevMonth}>
+              <ChevronLeft className="size-4" />
+            </Button>
+            <span className="min-w-32 text-center text-lg font-medium">
+              {year}年{month}月
             </span>
+            <Button variant="outline" size="icon" onClick={handleNextMonth}>
+              <ChevronRight className="size-4" />
+            </Button>
           </div>
+          <MonthTotalDisplay monthDates={monthDates} />
+        </div>
+        {/* 下段: アクションボタン群 */}
+        <div className="flex items-center justify-end gap-2 sm:gap-4">
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => setMonthData(generateSampleData(year, month))}
+            onClick={() => useTimesheetStore.getState().setMonthData(generateSampleData(year, month))}
             className="text-muted-foreground"
           >
             <Shuffle className="size-4" />
@@ -915,6 +1212,7 @@ export function TimesheetDemo() {
               <DialogFooter>
                 <Button
                   onClick={async () => {
+                    const { monthData } = useTimesheetStore.getState()
                     const blob = await generateTimesheetPdf(
                       year,
                       month,
@@ -973,175 +1271,16 @@ export function TimesheetDemo() {
             className="overflow-hidden rounded-md border select-none"
             onClick={(e) => e.stopPropagation()}
           >
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-28">日付</TableHead>
-                  <TableHead className="w-24 text-center">開始</TableHead>
-                  <TableHead className="w-24 text-center">終了</TableHead>
-                  <TableHead className="w-20 text-center">休憩</TableHead>
-                  <TableHead className="w-20 text-center">稼働</TableHead>
-                  <TableHead>概要</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody onMouseUp={handleMouseUp}>
-                {monthDates.map((date) => {
-                  const entry = monthData[date]
-                  const saturday = isSaturday(date)
-                  const sunday = isSunday(date)
-                  const holidayName = getHolidayName(date)
-                  const isOffDay = saturday || sunday || holidayName !== null
-                  const selected = isSelected(date)
-
-                  const dateColorClass =
-                    sunday || holidayName
-                      ? 'text-destructive'
-                      : saturday
-                        ? 'text-blue-500'
-                        : undefined
-
-                  // 稼働時間計算
-                  let workDisplay: React.ReactNode = null
-                  if (entry?.startTime && entry?.endTime) {
-                    const duration = calculateWorkDuration(
-                      entry.startTime,
-                      entry.endTime,
-                      entry.breakMinutes,
-                    )
-                    if (duration.workMinutes > 0) {
-                      const hours = Math.floor(duration.workMinutes / 60)
-                      const mins = duration.workMinutes % 60
-                      workDisplay = (
-                        <>
-                          {hours}
-                          <span className="text-[0.7em]">時間</span>
-                          {mins > 0 && (
-                            <>
-                              {mins}
-                              <span className="text-[0.7em]">分</span>
-                            </>
-                          )}
-                        </>
-                      )
-                    }
-                  }
-
-                  return (
-                    <TableRow
-                      key={date}
-                      data-date={date}
-                      className={cn(
-                        'cursor-pointer transition-colors',
-                        isOffDay && 'bg-muted/30',
-                        selected && 'bg-primary/5',
-                        !selected && 'hover:bg-muted/50',
-                      )}
-                      onMouseDown={(e) => handleMouseDown(date, e)}
-                      onMouseEnter={() => handleMouseEnter(date)}
-                    >
-                      <TableCell className="relative py-0.5 font-medium">
-                        {selected && (
-                          <div className="bg-primary absolute top-0 bottom-0 left-0 w-0.5" />
-                        )}
-                        <div className="flex items-baseline gap-1">
-                          <span className={dateColorClass}>
-                            {formatDateRow(date)}
-                          </span>
-                          {holidayName && (
-                            <span
-                              className="text-destructive/70 max-w-16 truncate text-[10px]"
-                              title={holidayName}
-                            >
-                              {holidayName}
-                            </span>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TimesheetTimeCell
-                        value={entry?.startTime ?? ''}
-                        onChange={(value) =>
-                          handleUpdateEntry(date, 'startTime', value)
-                        }
-                        date={date}
-                        col={0}
-                        open={openPickerKey === `${date}-0`}
-                        onOpenChange={(open) =>
-                          setOpenPickerKey(open ? `${date}-0` : null)
-                        }
-                        onSelectFromPicker={() => {
-                          // 終了時間が未入力なら終了時間のPickerを開く
-                          if (!entry?.endTime) {
-                            setOpenPickerKey(`${date}-1`)
-                          } else {
-                            // 両方入力済みなら備考欄にフォーカス（buttonをクリックしてフォーカスモードにする）
-                            setTimeout(() => {
-                              const descButton = document.querySelector(
-                                `[data-date="${date}"] [data-col="3"] button`,
-                              ) as HTMLButtonElement | null
-                              descButton?.click()
-                            }, 0)
-                          }
-                        }}
-                      />
-                      <TimesheetTimeCell
-                        value={entry?.endTime ?? ''}
-                        onChange={(value) =>
-                          handleUpdateEntry(date, 'endTime', value)
-                        }
-                        baseTime={entry?.startTime}
-                        allow24Plus
-                        date={date}
-                        col={1}
-                        defaultValue="18:00"
-                        open={openPickerKey === `${date}-1`}
-                        onOpenChange={(open) =>
-                          setOpenPickerKey(open ? `${date}-1` : null)
-                        }
-                        onSelectFromPicker={() => {
-                          // 開始時間が未入力なら開始時間のPickerを開く
-                          if (!entry?.startTime) {
-                            setOpenPickerKey(`${date}-0`)
-                          } else {
-                            // 両方入力済みなら備考欄にフォーカス（buttonをクリックしてフォーカスモードにする）
-                            setTimeout(() => {
-                              const descButton = document.querySelector(
-                                `[data-date="${date}"] [data-col="3"] button`,
-                              ) as HTMLButtonElement | null
-                              descButton?.click()
-                            }, 0)
-                          }
-                        }}
-                      />
-                      <TimesheetBreakCell
-                        value={entry?.breakMinutes ?? 0}
-                        onChange={(value) =>
-                          handleUpdateEntry(date, 'breakMinutes', value)
-                        }
-                        date={date}
-                        col={2}
-                      />
-                      <TableCell className="text-muted-foreground text-center">
-                        {workDisplay}
-                      </TableCell>
-                      <TimesheetDescriptionCell
-                        value={entry?.description ?? ''}
-                        onChange={(value) =>
-                          handleUpdateEntry(date, 'description', value)
-                        }
-                        date={date}
-                        col={3}
-                      />
-                    </TableRow>
-                  )
-                })}
-              </TableBody>
-            </Table>
+            <TimesheetTable
+              monthDates={monthDates}
+              onMouseUp={handleMouseUp}
+            />
           </div>
         </ContextMenuTrigger>
         <ContextMenuContent>
           <ContextMenuItem
             onClick={handleCopy}
-            disabled={selectedDates.length === 0}
+            disabled={selectedCount === 0}
           >
             <Copy className="size-4" />
             コピー
@@ -1149,7 +1288,7 @@ export function TimesheetDemo() {
           <ContextMenuItem
             onClick={handlePaste}
             disabled={
-              !clipboard || clipboard.length === 0 || selectedDates.length === 0
+              !clipboard || clipboard.length === 0 || selectedCount === 0
             }
           >
             <ClipboardPaste className="size-4" />
@@ -1158,7 +1297,7 @@ export function TimesheetDemo() {
           <ContextMenuItem
             onClick={handlePasteWeekdaysOnly}
             disabled={
-              !clipboard || clipboard.length === 0 || selectedDates.length === 0
+              !clipboard || clipboard.length === 0 || selectedCount === 0
             }
           >
             <ClipboardPaste className="size-4" />
@@ -1167,7 +1306,7 @@ export function TimesheetDemo() {
           <ContextMenuSeparator />
           <ContextMenuItem
             onClick={handleClearSelected}
-            disabled={selectedDates.length === 0}
+            disabled={selectedCount === 0}
             variant="destructive"
           >
             <Trash2 className="size-4" />
@@ -1187,11 +1326,11 @@ export function TimesheetDemo() {
       </div>
 
       {/* フローティングツールバー */}
-      {selectedDates.length > 0 && (
+      {selectedCount > 0 && (
         <div className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2">
           <div className="bg-background/95 flex items-center gap-1 rounded-full border px-2 py-1.5 shadow-lg backdrop-blur sm:gap-2 sm:px-4 sm:py-2">
             <span className="text-xs font-medium whitespace-nowrap sm:text-sm">
-              {selectedDates.length}行
+              {selectedCount}行
             </span>
             <div className="bg-border h-4 w-px" />
             <Button

@@ -11,13 +11,17 @@ export function meta() {
 
 export default function PlaygroundIndex() {
   return (
-    <div className="container mx-auto max-w-4xl px-4 py-8">
-      <div className="mb-8 flex items-center justify-between">
+    <div className="mx-auto max-w-4xl py-4 sm:py-8">
+      <div className="mb-4 flex items-center justify-between sm:mb-8">
         <div>
-          <h1 className="mb-2 text-3xl font-bold">Timesheet Playground</h1>
-          <p className="text-muted-foreground">月次タイムシートのデモ</p>
+          <h1 className="text-xl font-bold sm:mb-2 sm:text-3xl">
+            Timesheet Playground
+          </h1>
+          <p className="text-muted-foreground hidden sm:block">
+            月次タイムシートのデモ
+          </p>
         </div>
-        <Button variant="ghost" asChild>
+        <Button variant="ghost" size="sm" asChild className="sm:size-default">
           <Link to="/">← トップへ</Link>
         </Button>
       </div>

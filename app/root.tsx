@@ -123,7 +123,7 @@ export default function App() {
           <HeaderNav />
         </div>
       </header>
-      <main className="mx-auto max-w-6xl px-6 pt-10 pb-16">
+      <main className="mx-auto max-w-6xl px-2 pt-4 pb-8 sm:px-6 sm:pt-10 sm:pb-16">
         <Outlet />
       </main>
       <footer className="border-border/60 text-muted-foreground border-t py-6 text-center text-xs">
