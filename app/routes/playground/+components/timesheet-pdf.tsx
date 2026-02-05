@@ -8,7 +8,7 @@ import {
   pdf,
 } from '@react-pdf/renderer'
 import { calculateWorkDuration } from './time-utils'
-import type { TimesheetEntry } from './timesheet-demo'
+import type { TimesheetEntry } from './timesheet'
 
 // 日本語フォント登録（Google Fonts CDN）
 Font.register({
