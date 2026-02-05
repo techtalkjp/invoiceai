@@ -15,7 +15,14 @@ export async function isFeatureEnabled(key: FeatureFlagKey): Promise<boolean> {
 export async function getFeatureFlags() {
   return await db
     .selectFrom('featureFlag')
-    .select(['id', 'key', 'description', 'defaultValue', 'createdAt', 'updatedAt'])
+    .select([
+      'id',
+      'key',
+      'description',
+      'defaultValue',
+      'createdAt',
+      'updatedAt',
+    ])
     .orderBy('key', 'asc')
     .execute()
 }

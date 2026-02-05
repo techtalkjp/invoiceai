@@ -46,8 +46,9 @@ function navigateToCell(
 
 ```typescript
 const atStart = textarea.selectionStart === 0 && textarea.selectionEnd === 0
-const atEnd = textarea.selectionStart === textarea.value.length &&
-              textarea.selectionEnd === textarea.value.length
+const atEnd =
+  textarea.selectionStart === textarea.value.length &&
+  textarea.selectionEnd === textarea.value.length
 
 if (e.key === 'ArrowUp' && atStart) {
   e.preventDefault()
@@ -65,9 +66,9 @@ if (e.key === 'ArrowUp' && atStart) {
 ```typescript
 if (e.key === 'ArrowUp') {
   if (e.shiftKey) {
-    adjustTime(15)  // +15分
+    adjustTime(15) // +15分
   } else {
-    onNavigate?.('up')  // セル移動
+    onNavigate?.('up') // セル移動
   }
 }
 ```
@@ -95,16 +96,16 @@ onKeyDown={(e) => {
 
 様々な形式の入力を自動認識:
 
-| 入力 | 解釈 |
-|------|------|
-| `9` | 09:00 |
-| `18` | 18:00 |
-| `930` | 09:30 |
-| `0930` | 09:30 |
-| `9:30` | 09:30 |
-| `26` | 26:00（翌2:00） |
-| `+1h` | 基準時間 +1時間 |
-| `+30m` | 基準時間 +30分 |
+| 入力   | 解釈            |
+| ------ | --------------- |
+| `9`    | 09:00           |
+| `18`   | 18:00           |
+| `930`  | 09:30           |
+| `0930` | 09:30           |
+| `9:30` | 09:30           |
+| `26`   | 26:00（翌2:00） |
+| `+1h`  | 基準時間 +1時間 |
+| `+30m` | 基準時間 +30分  |
 
 ### 2.2 コロン自動補完
 
@@ -117,7 +118,7 @@ onKeyDown={(e) => {
 if (/^\d{2}$/.test(newValue) && !inputValue.includes(':')) {
   const hour = parseInt(newValue, 10)
   if (hour >= 0 && hour <= 29) {
-    setInputValue(`${newValue}:`)  // "09" → "09:"
+    setInputValue(`${newValue}:`) // "09" → "09:"
   }
 }
 ```
@@ -128,9 +129,12 @@ if (/^\d{2}$/.test(newValue) && !inputValue.includes(':')) {
 
 ```typescript
 // "09:" からバックスペースで "09" になった場合、"0" に戻す
-if (/^\d{2}$/.test(newValue) && inputValue.endsWith(':') &&
-    newValue.length < inputValue.length) {
-  setInputValue(newValue.slice(0, 1))  // "09" → "0"
+if (
+  /^\d{2}$/.test(newValue) &&
+  inputValue.endsWith(':') &&
+  newValue.length < inputValue.length
+) {
+  setInputValue(newValue.slice(0, 1)) // "09" → "0"
 }
 ```
 
@@ -143,7 +147,7 @@ if (/^\d{2}$/.test(newValue) && inputValue.endsWith(':') &&
 if (/^\d{1,2}:\d{2}$/.test(inputValue) && newValue.length > inputValue.length) {
   const addedChar = newValue.slice(-1)
   if (/^\d$/.test(addedChar)) {
-    setInputValue(addedChar)  // "09:30" + "1" → "1"
+    setInputValue(addedChar) // "09:30" + "1" → "1"
   }
 }
 ```
@@ -155,7 +159,7 @@ if (/^\d{1,2}:\d{2}$/.test(inputValue) && newValue.length > inputValue.length) {
 ```typescript
 const handleFocus = useCallback((e: FocusEvent<HTMLInputElement>) => {
   setIsEditing(true)
-  e.target.select()  // 全選択してすぐ上書き可能に
+  e.target.select() // 全選択してすぐ上書き可能に
 }, [])
 ```
 
@@ -166,9 +170,12 @@ const handleFocus = useCallback((e: FocusEvent<HTMLInputElement>) => {
 開始・終了時間を入力したとき、休憩が未設定ならデフォルト1時間を設定:
 
 ```typescript
-if ((field === 'startTime' || field === 'endTime') &&
-    value && entry.breakMinutes === 0) {
-  updated.breakMinutes = 60  // デフォルト1時間
+if (
+  (field === 'startTime' || field === 'endTime') &&
+  value &&
+  entry.breakMinutes === 0
+) {
+  updated.breakMinutes = 60 // デフォルト1時間
 }
 ```
 
@@ -189,12 +196,15 @@ const handleMouseDown = useCallback((date: string, e: React.MouseEvent) => {
   setSelectedDates([date])
 }, [])
 
-const handleMouseEnter = useCallback((date: string) => {
-  if (isDragging && dragStartDate) {
-    const range = getDateRange(dragStartDate, date)
-    setSelectedDates(range)
-  }
-}, [isDragging, dragStartDate])
+const handleMouseEnter = useCallback(
+  (date: string) => {
+    if (isDragging && dragStartDate) {
+      const range = getDateRange(dragStartDate, date)
+      setSelectedDates(range)
+    }
+  },
+  [isDragging, dragStartDate],
+)
 ```
 
 ### 3.2 Shift+クリックで範囲拡張
@@ -212,14 +222,14 @@ if (e.shiftKey && selectedDates.length > 0) {
 ドラッグ中に画面端（上下80px以内）に近づくと自動スクロール:
 
 ```typescript
-const scrollThreshold = 80  // 画面端からこのpx以内で自動スクロール開始
+const scrollThreshold = 80 // 画面端からこのpx以内で自動スクロール開始
 const scrollSpeed = 15
 
 const autoScroll = () => {
   if (mouseY < scrollThreshold) {
-    window.scrollBy(0, -scrollSpeed)  // 上にスクロール
+    window.scrollBy(0, -scrollSpeed) // 上にスクロール
   } else if (mouseY > viewportHeight - scrollThreshold) {
-    window.scrollBy(0, scrollSpeed)   // 下にスクロール
+    window.scrollBy(0, scrollSpeed) // 下にスクロール
   }
   // スクロール後に選択を更新
   updateSelectionFromMouseY(mouseY)
@@ -251,7 +261,7 @@ const updateSelectionFromMouseY = (mouseY: number) => {
 
 ```typescript
 if (selectedDates.length === 1 && selectedDates[0] === date) {
-  setSelectedDates([])  // 選択クリア
+  setSelectedDates([]) // 選択クリア
 }
 ```
 
@@ -260,10 +270,12 @@ if (selectedDates.length === 1 && selectedDates[0] === date) {
 input/textarea/select をクリックした場合は行選択しない:
 
 ```typescript
-if (e.target instanceof HTMLInputElement ||
-    e.target instanceof HTMLTextAreaElement ||
-    e.target instanceof HTMLSelectElement) {
-  return  // 選択しない
+if (
+  e.target instanceof HTMLInputElement ||
+  e.target instanceof HTMLTextAreaElement ||
+  e.target instanceof HTMLSelectElement
+) {
+  return // 選択しない
 }
 ```
 
@@ -273,7 +285,7 @@ if (e.target instanceof HTMLInputElement ||
 
 ```typescript
 if (e.button === 2 && selectedDates.includes(date)) {
-  return  // 選択を維持
+  return // 選択を維持
 }
 ```
 
@@ -411,11 +423,16 @@ useLayoutEffect(() => {
 ```typescript
 const getCategoryColor = (category: TimeCategory): string => {
   switch (category) {
-    case 'early-morning': return 'bg-indigo-100 ...'   // 6時前
-    case 'morning': return 'bg-amber-100 ...'          // 6-9時
-    case 'daytime': return 'bg-emerald-100 ...'        // 9-18時
-    case 'evening': return 'bg-orange-100 ...'         // 18-22時
-    case 'night': return 'bg-purple-100 ...'           // 22時以降
+    case 'early-morning':
+      return 'bg-indigo-100 ...' // 6時前
+    case 'morning':
+      return 'bg-amber-100 ...' // 6-9時
+    case 'daytime':
+      return 'bg-emerald-100 ...' // 9-18時
+    case 'evening':
+      return 'bg-orange-100 ...' // 18-22時
+    case 'night':
+      return 'bg-purple-100 ...' // 22時以降
   }
 }
 ```
@@ -479,7 +496,7 @@ const handleCopy = useCallback(() => {
 ```typescript
 const handlePaste = useCallback(() => {
   selectedDates.forEach((date, idx) => {
-    const entry = clipboard[idx % clipboard.length]  // 繰り返し
+    const entry = clipboard[idx % clipboard.length] // 繰り返し
     newData[date] = { ...entry }
   })
 }, [clipboard, selectedDates])
@@ -548,8 +565,11 @@ const isWeekday = (dateStr: string): boolean => {
 
 ```typescript
 const dateColorClass =
-  sunday || holidayName ? 'text-destructive' :    // 日曜・祝日は赤
-  saturday ? 'text-blue-500' : undefined          // 土曜は青
+  sunday || holidayName
+    ? 'text-destructive' // 日曜・祝日は赤
+    : saturday
+      ? 'text-blue-500'
+      : undefined // 土曜は青
 ```
 
 ### 7.3 祝日名のツールチップ
@@ -675,7 +695,7 @@ const dateColorClass =
 ```typescript
 // タッチ開始
 const handleTouchStart = useCallback((date: string, e: React.TouchEvent) => {
-  if (e.target instanceof HTMLButtonElement) return  // ボタンは除外
+  if (e.target instanceof HTMLButtonElement) return // ボタンは除外
   setIsDragging(true)
   setDragStartDate(date)
   setSelectedDates([date])
@@ -705,7 +725,7 @@ className={cn(
 
 ```typescript
 // 概要欄のtextarea
-className="text-base md:text-xs"  // モバイルは16px、PCは12px
+className = 'text-base md:text-xs' // モバイルは16px、PCは12px
 ```
 
 ### 8.8 祝日名の2行表示
@@ -809,7 +829,12 @@ react-pdf/renderer を使用した稼働報告書のPDF生成:
 
 ```typescript
 const blob = await generateTimesheetPdf(
-  year, month, monthData, monthDates, getHolidayName, pdfInfo
+  year,
+  month,
+  monthData,
+  monthDates,
+  getHolidayName,
+  pdfInfo,
 )
 downloadBlob(blob, `稼働報告書_${year}年${month}月.pdf`)
 ```

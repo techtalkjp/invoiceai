@@ -27,14 +27,14 @@
 
 ## 技術スタック
 
-| カテゴリ | 技術 |
-|----------|------|
-| フレームワーク | React Router v7 (framework mode) |
-| データベース | SQLite (Turso) + Kysely |
-| 認証 | better-auth |
-| PDF 生成 | @react-pdf/renderer |
-| UI | Tailwind CSS v4 + shadcn/ui + Radix UI |
-| フォーム | conform + zod |
+| カテゴリ       | 技術                                   |
+| -------------- | -------------------------------------- |
+| フレームワーク | React Router v7 (framework mode)       |
+| データベース   | SQLite (Turso) + Kysely                |
+| 認証           | better-auth                            |
+| PDF 生成       | @react-pdf/renderer                    |
+| UI             | Tailwind CSS v4 + shadcn/ui + Radix UI |
+| フォーム       | conform + zod                          |
 
 ## セットアップ
 
@@ -81,17 +81,17 @@ http://localhost:5173 でアクセス可能。
 
 ## 画面構成
 
-| パス | 説明 |
-|------|------|
-| `/` | トップページ（ログイン/新規登録） |
-| `/playground` | タイムシート Playground |
-| `/org/:slug` | 組織ダッシュボード |
-| `/org/:slug/invoices` | 月次請求一覧 |
-| `/org/:slug/invoices/create` | 請求書作成 |
-| `/org/:slug/work-hours` | 稼働時間入力 |
-| `/org/:slug/clients` | クライアント管理 |
-| `/org/:slug/settings` | 組織設定 |
-| `/admin` | 管理画面 |
+| パス                         | 説明                              |
+| ---------------------------- | --------------------------------- |
+| `/`                          | トップページ（ログイン/新規登録） |
+| `/playground`                | タイムシート Playground           |
+| `/org/:slug`                 | 組織ダッシュボード                |
+| `/org/:slug/invoices`        | 月次請求一覧                      |
+| `/org/:slug/invoices/create` | 請求書作成                        |
+| `/org/:slug/work-hours`      | 稼働時間入力                      |
+| `/org/:slug/clients`         | クライアント管理                  |
+| `/org/:slug/settings`        | 組織設定                          |
+| `/admin`                     | 管理画面                          |
 
 ## 開発コマンド
 

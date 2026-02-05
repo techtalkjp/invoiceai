@@ -124,10 +124,7 @@ export default function FeatureFlagsPage({
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-2">
-                        <Label
-                          htmlFor={`flag-${flag.key}`}
-                          className="sr-only"
-                        >
+                        <Label htmlFor={`flag-${flag.key}`} className="sr-only">
                           {flag.key}
                         </Label>
                         <Switch

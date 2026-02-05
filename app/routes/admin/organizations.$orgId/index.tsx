@@ -110,9 +110,9 @@ export default function AdminOrganizationDetail({
   const actionData = useActionData<typeof action>()
   const fetcher = useFetcher()
   const [selectedUserId, setSelectedUserId] = useState('')
-  const [selectedRole, setSelectedRole] = useState<'owner' | 'admin' | 'member'>(
-    'member',
-  )
+  const [selectedRole, setSelectedRole] = useState<
+    'owner' | 'admin' | 'member'
+  >('member')
 
   const isSubmitting = fetcher.state !== 'idle'
 
@@ -187,9 +187,7 @@ export default function AdminOrganizationDetail({
       <Card>
         <CardHeader>
           <CardTitle>メンバーを追加</CardTitle>
-          <CardDescription>
-            ユーザーを選択して組織に追加します
-          </CardDescription>
+          <CardDescription>ユーザーを選択して組織に追加します</CardDescription>
         </CardHeader>
         <CardContent>
           <fetcher.Form method="post" className="flex items-end gap-4">

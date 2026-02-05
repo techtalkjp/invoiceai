@@ -1,6 +1,7 @@
 # Feature Flags 機能の追加
 
 ## 目的
+
 新規ユーザー登録の許可/不許可を制御するFeature flags機能を追加する。
 将来的には特定テナント/特定ユーザー単位での制御も可能にする。
 
@@ -25,6 +26,7 @@ CREATE INDEX IF NOT EXISTS "feature_flag_key_idx" ON "feature_flag"("key");
 **フェーズ1では組織/ユーザー単位のオーバーライドテーブルは追加しない**（YAGNI原則）
 
 ### 初期データ
+
 ```sql
 INSERT INTO "feature_flag" ("id", "key", "description", "default_value")
 VALUES ('ff_signup', 'signup_enabled', '新規ユーザー登録の許可', 1);
@@ -33,11 +35,13 @@ VALUES ('ff_signup', 'signup_enabled', '新規ユーザー登録の許可', 1);
 ## 実装ファイル
 
 ### 1. DBスキーマ追加
+
 **ファイル**: `db/schema.sql`
 
 末尾に `feature_flag` テーブルとインデックスを追加。
 
 ### 2. Feature Flagサービス作成
+
 **ファイル**: `app/lib/feature-flags.server.ts` (新規)
 
 ```typescript
@@ -57,6 +61,7 @@ export async function isFeatureEnabled(key: FeatureFlagKey): Promise<boolean> {
 ```
 
 ### 3. auth.tsの修正
+
 **ファイル**: `app/lib/auth.ts`
 
 `databaseHooks.user.create.before` に登録可否チェックを追加:
@@ -79,6 +84,7 @@ before: async (user) => {
 ```
 
 ### 4. signup.tsxの修正（UX向上）
+
 **ファイル**: `app/routes/auth/signup.tsx`
 
 loader追加で事前チェック、フラグOFFならメッセージ表示:
@@ -110,6 +116,7 @@ if (!loaderData.signupEnabled) {
 ```
 
 ### 5. 管理画面追加
+
 **ファイル**: `app/routes/admin/feature-flags/index.tsx` (新規)
 
 - フラグ一覧表示

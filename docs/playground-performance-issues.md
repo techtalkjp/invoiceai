@@ -6,9 +6,9 @@
 
 **INP: 972ms → 56ms（94% 改善）** - 目標達成！
 
-| 指標 | 初期値 | 最終値 | 目標 | 状態 |
-|------|--------|--------|------|------|
-| INP | 972ms | 56ms | 200ms以下 | ✅ Good |
+| 指標 | 初期値 | 最終値 | 目標      | 状態    |
+| ---- | ------ | ------ | --------- | ------- |
+| INP  | 972ms  | 56ms   | 200ms以下 | ✅ Good |
 
 ## 改善履歴
 
@@ -16,11 +16,11 @@
 
 **INP: 972ms → 423ms（-56%）**
 
-| フェーズ | Before | After | 変化 |
-|---------|--------|-------|------|
-| Input delay | 1ms | 0.8ms | - |
-| Processing duration | 372ms | 386ms | +14ms |
-| Presentation delay | 599ms | 36ms | **-94%** |
+| フェーズ            | Before | After | 変化     |
+| ------------------- | ------ | ----- | -------- |
+| Input delay         | 1ms    | 0.8ms | -        |
+| Processing duration | 372ms  | 386ms | +14ms    |
+| Presentation delay  | 599ms  | 36ms  | **-94%** |
 
 React Compiler が自動的にメモ化を行い、DOM 更新後のレイアウト/ペイント処理が軽量化。
 
@@ -28,13 +28,14 @@ React Compiler が自動的にメモ化を行い、DOM 更新後のレイアウ�
 
 **INP: 423ms → 389ms（-8%）**
 
-| フェーズ | Before | After | 変化 |
-|---------|--------|-------|------|
-| Input delay | 0.8ms | 0.8ms | - |
-| Processing duration | 386ms | 355ms | -8% |
-| Presentation delay | 36ms | 34ms | - |
+| フェーズ            | Before | After | 変化 |
+| ------------------- | ------ | ----- | ---- |
+| Input delay         | 0.8ms  | 0.8ms | -    |
+| Processing duration | 386ms  | 355ms | -8%  |
+| Presentation delay  | 36ms   | 34ms  | -    |
 
 実施内容:
+
 1. `TimesheetRow` コンポーネントを分離（map 内のロジックを独立コンポーネントに）
 2. `openPickerKey` を `TimesheetRow` 内部の state に移動
 
@@ -42,13 +43,14 @@ React Compiler が自動的にメモ化を行い、DOM 更新後のレイアウ�
 
 **INP: 389ms → 256ms（-34%）**
 
-| フェーズ | Before | After | 変化 |
-|---------|--------|-------|------|
-| Input delay | 0.8ms | 0.7ms | - |
-| Processing duration | 355ms | 220ms | -38% |
-| Presentation delay | 34ms | 35ms | - |
+| フェーズ            | Before | After | 変化 |
+| ------------------- | ------ | ----- | ---- |
+| Input delay         | 0.8ms  | 0.7ms | -    |
+| Processing duration | 355ms  | 220ms | -38% |
+| Presentation delay  | 34ms   | 35ms  | -    |
 
 実施内容:
+
 1. Zustand で選択状態を外部 store 化
 2. `useIsSelected(date)` セレクタで行ごとに選択状態を購読
 3. イベントハンドラを `TimesheetRow` 内部に移動し、`store.getState()` で state を読み取る
@@ -58,13 +60,14 @@ React Compiler が自動的にメモ化を行い、DOM 更新後のレイアウ�
 
 **INP: 256ms → 56ms（-78%）**
 
-| フェーズ | Before | After | 変化 |
-|---------|--------|-------|------|
-| Input delay | 0.7ms | 0.3ms | - |
-| Processing duration | 220ms | 26ms | **-88%** |
-| Presentation delay | 35ms | 30ms | - |
+| フェーズ            | Before | After | 変化     |
+| ------------------- | ------ | ----- | -------- |
+| Input delay         | 0.7ms  | 0.3ms | -        |
+| Processing duration | 220ms  | 26ms  | **-88%** |
+| Presentation delay  | 35ms   | 30ms  | -        |
 
 実施内容:
+
 1. `selectedDates` 配列全体の subscribe → `selectedCount`（長さのみ）に変更
 2. `TimesheetTable` を `memo` でラップ
 3. `handleUpdateEntry` を `useCallback` でメモ化
@@ -76,6 +79,7 @@ React Compiler が自動的にメモ化を行い、DOM 更新後のレイアウ�
 再レンダリング範囲: 行全体 → 変更されたセルのみ
 
 実施内容:
+
 1. `monthData` を Zustand store に統合（`useTimesheetStore`）
 2. `useEntryField(date, field)` セレクタを追加 - 各セルが特定フィールドのみ subscribe
 3. 各セルコンポーネントを内部で store を subscribe するように変更:
@@ -87,6 +91,7 @@ React Compiler が自動的にメモ化を行い、DOM 更新後のレイアウ�
 5. `TimesheetDemo` から `monthData` state を削除
 
 **効果:**
+
 - description 編集時に同じ行の他セル（開始時間、終了時間、休憩）は再レンダリングされない
 - 各セルが完全に独立してレンダリング
 
@@ -115,7 +120,13 @@ function useEntryField<K extends keyof TimesheetEntry>(date: string, field: K) {
 }
 
 // 使用例: description セルは description のみ subscribe
-function TimesheetDescriptionCell({ date, col }: { date: string; col: number }) {
+function TimesheetDescriptionCell({
+  date,
+  col,
+}: {
+  date: string
+  col: number
+}) {
   const value = useEntryField(date, 'description') ?? ''
   // ...
 }

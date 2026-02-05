@@ -208,7 +208,7 @@ export const TimeInput = forwardRef<HTMLInputElement, TimeInputProps>(
         placeholder={placeholder}
         className={cn(
           'font-mono tabular-nums placeholder:text-center',
-          'focus-visible:ring-0 focus-visible:border-input',
+          'focus-visible:border-input focus-visible:ring-0',
           className,
         )}
         autoComplete="off"
