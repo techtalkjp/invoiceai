@@ -83,9 +83,11 @@ export function TimesheetRow({ date }: TimesheetRowProps) {
       )}
       onMouseDown={handleMouseDown}
       onMouseEnter={handleMouseEnter}
-      onTouchStart={handleTouchStart}
     >
-      <TableCell className="relative py-0.5 font-medium">
+      <TableCell
+        className="relative touch-none py-0.5 font-medium md:touch-auto"
+        onTouchStart={handleTouchStart}
+      >
         {selected && (
           <div className="bg-primary absolute top-0 bottom-0 left-0 w-0.5" />
         )}
