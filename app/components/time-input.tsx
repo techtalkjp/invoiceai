@@ -1,7 +1,6 @@
 import {
   forwardRef,
   useCallback,
-  useEffect,
   useState,
   type FocusEvent,
   type KeyboardEvent,
@@ -33,43 +32,32 @@ export const TimeInput = forwardRef<HTMLInputElement, TimeInputProps>(
     },
     ref,
   ) {
-    const [inputValue, setInputValue] = useState(value)
-    const [isEditing, setIsEditing] = useState(false)
-
-    // 外部からの値変更を反映
-    useEffect(() => {
-      if (!isEditing) {
-        setInputValue(value)
-      }
-    }, [value, isEditing])
+    const [editingValue, setEditingValue] = useState<string | null>(null)
+    const inputValue = editingValue ?? value
 
     // 入力値のパースと反映
     const handleConfirm = useCallback(() => {
       const parsed = parseTimeInput(inputValue, baseTime || value)
       if (parsed) {
         const formatted = formatTime(parsed.hours, parsed.minutes)
-        setInputValue(formatted)
         onChange(formatted)
-      } else {
-        // パース失敗時は元の値に戻す
-        setInputValue(value)
       }
-      setIsEditing(false)
+      // 編集終了（成功時は onChange で親が value を更新、失敗時は元の value に戻る）
+      setEditingValue(null)
       onConfirm?.()
     }, [inputValue, baseTime, value, onChange, onConfirm])
 
-    // 矢印キーで時間を調整
+    // Shift+矢印キーで時間を15分単位で調整
     const adjustTime = useCallback(
       (deltaMinutes: number) => {
         const parsed = parseTimeInput(inputValue, baseTime)
         if (parsed) {
           let totalMinutes = parsed.hours * 60 + parsed.minutes + deltaMinutes
-          // 負の値を防ぐ
           if (totalMinutes < 0) totalMinutes = 0
           const newHours = Math.floor(totalMinutes / 60)
           const newMinutes = totalMinutes % 60
           const formatted = formatTime(newHours, newMinutes)
-          setInputValue(formatted)
+          setEditingValue(formatted)
           onChange(formatted)
         }
       },
@@ -90,8 +78,7 @@ export const TimeInput = forwardRef<HTMLInputElement, TimeInputProps>(
           handleConfirm()
           onNavigate?.('down')
         } else if (e.key === 'Escape') {
-          setInputValue(value)
-          setIsEditing(false)
+          setEditingValue(null)
           input.blur()
         } else if (e.key === 'ArrowUp') {
           e.preventDefault()
@@ -123,15 +110,18 @@ export const TimeInput = forwardRef<HTMLInputElement, TimeInputProps>(
           onNavigate?.(e.shiftKey ? 'left' : 'right')
         }
       },
-      [handleConfirm, value, adjustTime, onNavigate],
+      [handleConfirm, adjustTime, onNavigate],
     )
 
-    // フォーカス時
-    const handleFocus = useCallback((e: FocusEvent<HTMLInputElement>) => {
-      setIsEditing(true)
-      // 全選択
-      e.target.select()
-    }, [])
+    // フォーカス時: 編集用の draft を開始
+    const handleFocus = useCallback(
+      (e: FocusEvent<HTMLInputElement>) => {
+        setEditingValue(value)
+        // 全選択
+        e.target.select()
+      },
+      [value],
+    )
 
     // ブラー時
     const handleBlur = useCallback(() => {
@@ -150,7 +140,7 @@ export const TimeInput = forwardRef<HTMLInputElement, TimeInputProps>(
           inputValue.endsWith(':') &&
           newValue.length < inputValue.length
         ) {
-          setInputValue(newValue.slice(0, 1))
+          setEditingValue(newValue.slice(0, 1))
           return
         }
 
@@ -164,7 +154,7 @@ export const TimeInput = forwardRef<HTMLInputElement, TimeInputProps>(
           const hour = parseInt(newValue, 10)
           // 0-29時間の範囲（24時超えサポート）
           if (hour >= 0 && hour <= 29) {
-            setInputValue(`${newValue}:`)
+            setEditingValue(`${newValue}:`)
             return
           }
         }
@@ -178,19 +168,19 @@ export const TimeInput = forwardRef<HTMLInputElement, TimeInputProps>(
           const addedChar = newValue.slice(-1)
           // 数字なら、その数字で新規入力開始
           if (/^\d$/.test(addedChar)) {
-            setInputValue(addedChar)
+            setEditingValue(addedChar)
             return
           }
           // 数字以外（+など）ならそのまま許可
           if (/^[+-]$/.test(addedChar)) {
-            setInputValue(addedChar)
+            setEditingValue(addedChar)
             return
           }
           // それ以外は無視
           return
         }
 
-        setInputValue(newValue)
+        setEditingValue(newValue)
       },
       [inputValue],
     )

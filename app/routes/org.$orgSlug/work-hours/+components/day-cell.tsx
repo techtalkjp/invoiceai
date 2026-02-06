@@ -1,5 +1,5 @@
 import { MessageSquareIcon } from 'lucide-react'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import { useFetcher } from 'react-router'
 import { BreakGridPicker } from '~/components/break-grid-picker'
 import { HoursDurationDisplay } from '~/components/duration-display'
@@ -47,33 +47,28 @@ function TimeInput({
   placeholder: string
   baseTime?: string | undefined
 }) {
-  const [draft, setDraft] = useState(value)
-
-  // 外部から value が変わったら draft を同期
-  useEffect(() => {
-    setDraft(value)
-  }, [value])
+  const [editingValue, setEditingValue] = useState<string | null>(null)
+  const displayValue = editingValue ?? value
 
   const commit = () => {
-    if (!draft.trim()) {
+    if (!displayValue.trim()) {
       onChange('')
+      setEditingValue(null)
       return
     }
-    const parsed = parseTimeInput(draft, baseTime)
+    const parsed = parseTimeInput(displayValue, baseTime)
     if (parsed) {
       const formatted = formatTime(parsed.hours, parsed.minutes)
-      setDraft(formatted)
       onChange(formatted)
-    } else {
-      // パース失敗 → 元に戻す
-      setDraft(value)
     }
+    setEditingValue(null)
   }
 
   return (
     <Input
-      value={draft}
-      onChange={(e) => setDraft(e.target.value)}
+      value={displayValue}
+      onChange={(e) => setEditingValue(e.target.value)}
+      onFocus={() => setEditingValue(value)}
       onBlur={commit}
       onKeyDown={(e) => {
         if (e.key === 'Enter') {
@@ -247,10 +242,11 @@ export function DayCell({
   const fetcher = useFetcher()
   const isMobile = useIsMobile()
   const [isOpen, setIsOpen] = useState(false)
-  const [startTime, setStartTime] = useState(entry?.startTime ?? '')
-  const [endTime, setEndTime] = useState(entry?.endTime ?? '')
-  const [breakMinutes, setBreakMinutes] = useState(entry?.breakMinutes ?? 0)
-  const [description, setDescription] = useState(entry?.description ?? '')
+  // 編集中のローカル state（openChange で entry から初期化）
+  const [startTime, setStartTime] = useState('')
+  const [endTime, setEndTime] = useState('')
+  const [breakMinutes, setBreakMinutes] = useState(0)
+  const [description, setDescription] = useState('')
 
   // 閉じる前の値を保持して、変更有無を判定
   const openSnapshotRef = useRef({
@@ -259,19 +255,6 @@ export function DayCell({
     breakMinutes: 0,
     description: '',
   })
-
-  // サーバーデータが変わったら反映
-  useEffect(() => {
-    setStartTime(entry?.startTime ?? '')
-    setEndTime(entry?.endTime ?? '')
-    setBreakMinutes(entry?.breakMinutes ?? 0)
-    setDescription(entry?.description ?? '')
-  }, [
-    entry?.startTime,
-    entry?.endTime,
-    entry?.breakMinutes,
-    entry?.description,
-  ])
 
   // 自動保存: 閉じるときに変更があれば保存
   const saveIfChanged = useCallback(() => {
@@ -309,12 +292,20 @@ export function DayCell({
   const handleOpenChange = useCallback(
     (open: boolean) => {
       if (open) {
-        // 開くときにスナップショットを保存
+        // 開くときに entry から編集用 state を初期化 + スナップショットを保存
+        const s = entry?.startTime ?? ''
+        const e = entry?.endTime ?? ''
+        const b = entry?.breakMinutes ?? 0
+        const d = entry?.description ?? ''
+        setStartTime(s)
+        setEndTime(e)
+        setBreakMinutes(b)
+        setDescription(d)
         openSnapshotRef.current = {
-          startTime,
-          endTime,
-          breakMinutes,
-          description,
+          startTime: s,
+          endTime: e,
+          breakMinutes: b,
+          description: d,
         }
       } else {
         // 閉じるときに自動保存
@@ -322,7 +313,7 @@ export function DayCell({
       }
       setIsOpen(open)
     },
-    [startTime, endTime, breakMinutes, description, saveIfChanged],
+    [entry, saveIfChanged],
   )
 
   const hours = calculateHours(

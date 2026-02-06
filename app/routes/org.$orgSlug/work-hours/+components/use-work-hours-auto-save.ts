@@ -20,8 +20,9 @@ export function useWorkHoursAutoSave(
   const lastSavedRef = useRef<string>('')
   const dirtyRef = useRef(false)
   const fallbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const [status, setStatus] = useState<SaveStatus>('idle')
+  const [showSaved, setShowSaved] = useState(false)
   const savedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const prevFetcherStateRef = useRef(fetcher.state)
 
   // 実際の保存処理
   const flush = useCallback(() => {
@@ -44,19 +45,21 @@ export function useWorkHoursAutoSave(
     fetcher.submit(formData, { method: 'POST' })
   }, [clientId, year, month, fetcher])
 
-  // fetcher 状態に連動: saving → saved → idle
-  useEffect(() => {
-    if (fetcher.state !== 'idle') {
-      setStatus('saving')
-    } else if (fetcher.data) {
-      setStatus('saved')
-      if (savedTimerRef.current) clearTimeout(savedTimerRef.current)
-      savedTimerRef.current = setTimeout(() => setStatus('idle'), 2000)
-    }
-    return () => {
-      if (savedTimerRef.current) clearTimeout(savedTimerRef.current)
-    }
-  }, [fetcher.state, fetcher.data])
+  // saving → idle への遷移を検出して「保存済み」を2秒間表示（タイマー = 外部リソース）
+  if (
+    prevFetcherStateRef.current !== 'idle' &&
+    fetcher.state === 'idle' &&
+    fetcher.data
+  ) {
+    setShowSaved(true)
+    if (savedTimerRef.current) clearTimeout(savedTimerRef.current)
+    savedTimerRef.current = setTimeout(() => setShowSaved(false), 2000)
+  }
+  prevFetcherStateRef.current = fetcher.state
+
+  // status を導出
+  const status: SaveStatus =
+    fetcher.state !== 'idle' ? 'saving' : showSaved ? 'saved' : 'idle'
 
   // store 変更 → dirty + fallback タイマーリセット
   useEffect(() => {

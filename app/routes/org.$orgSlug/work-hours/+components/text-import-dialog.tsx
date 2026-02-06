@@ -1,5 +1,5 @@
 import { LoaderIcon, SparklesIcon } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useFetcher } from 'react-router'
 import { formatMinutesToDuration } from '~/components/time-utils'
 import { useTimesheetStore } from '~/components/timesheet/store'
@@ -34,8 +34,7 @@ type Props = {
 export function TextImportDialog({ clientId, year, month }: Props) {
   const [isOpen, setIsOpen] = useState(false)
   const [inputText, setInputText] = useState('')
-  const [parsedEntries, setParsedEntries] = useState<ParsedWorkEntry[]>([])
-  const [parseErrors, setParseErrors] = useState<string[]>([])
+  const [removedIndices, setRemovedIndices] = useState<Set<number>>(new Set())
 
   const parseFetcher = useFetcher<{
     entries?: ParsedWorkEntry[]
@@ -45,16 +44,18 @@ export function TextImportDialog({ clientId, year, month }: Props) {
 
   const isParsing = parseFetcher.state !== 'idle'
 
-  // 解析結果を受け取ったら表示
-  useEffect(() => {
-    if (parseFetcher.data?.entries) {
-      setParsedEntries(parseFetcher.data.entries)
-      setParseErrors(parseFetcher.data.parseErrors ?? [])
-    }
-  }, [parseFetcher.data])
+  // fetcher.data から直接導出（removedIndices でフィルタ）
+  const parsedEntries = useMemo(() => {
+    const entries = parseFetcher.data?.entries ?? []
+    if (removedIndices.size === 0) return entries
+    return entries.filter((_, i) => !removedIndices.has(i))
+  }, [parseFetcher.data?.entries, removedIndices])
+
+  const parseErrors = parseFetcher.data?.parseErrors ?? []
 
   const handleParse = () => {
     if (!inputText.trim()) return
+    setRemovedIndices(new Set())
 
     parseFetcher.submit(
       {
@@ -86,12 +87,26 @@ export function TextImportDialog({ clientId, year, month }: Props) {
 
     setIsOpen(false)
     setInputText('')
-    setParsedEntries([])
-    setParseErrors([])
+    setRemovedIndices(new Set())
   }
 
   const handleRemoveEntry = (index: number) => {
-    setParsedEntries((prev) => prev.filter((_, i) => i !== index))
+    // 元の entries 配列でのインデックスを計算
+    const allEntries = parseFetcher.data?.entries ?? []
+    let originalIndex = -1
+    let visibleCount = 0
+    for (let i = 0; i < allEntries.length; i++) {
+      if (!removedIndices.has(i)) {
+        if (visibleCount === index) {
+          originalIndex = i
+          break
+        }
+        visibleCount++
+      }
+    }
+    if (originalIndex >= 0) {
+      setRemovedIndices((prev) => new Set(prev).add(originalIndex))
+    }
   }
 
   const formatTime = (time: string | undefined) => {

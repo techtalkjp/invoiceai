@@ -1,5 +1,5 @@
-import { execSync } from 'node:child_process'
 import { defineHook, runHook } from 'cc-hooks-ts'
+import { execSync } from 'node:child_process'
 
 const FORMATTABLE_EXTENSIONS = [
   '.ts',

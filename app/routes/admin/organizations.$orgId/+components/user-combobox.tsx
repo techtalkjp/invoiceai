@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useState } from 'react'
 import { useFetcher } from 'react-router'
 import {
   Combobox,
@@ -25,14 +25,35 @@ export function UserCombobox({
   const [query, setQuery] = useState('')
   const [open, setOpen] = useState(false)
 
-  // Combobox が開いたとき、または検索クエリが変わったときにロード
-  useEffect(() => {
-    if (open) {
+  const loadUsers = useCallback(
+    (q: string) => {
       fetcher.load(
-        `/admin/organizations/${orgId}/users?q=${encodeURIComponent(query)}`,
+        `/admin/organizations/${orgId}/users?q=${encodeURIComponent(q)}`,
       )
-    }
-  }, [open, query, orgId, fetcher.load])
+    },
+    [orgId, fetcher],
+  )
+
+  const handleOpenChange = useCallback(
+    (nextOpen: boolean) => {
+      setOpen(nextOpen)
+      if (nextOpen) {
+        loadUsers(query)
+      }
+    },
+    [loadUsers, query],
+  )
+
+  const handleQueryChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const q = e.target.value
+      setQuery(q)
+      if (open) {
+        loadUsers(q)
+      }
+    },
+    [open, loadUsers],
+  )
 
   const users = fetcher.data?.users ?? []
   const isLoading = fetcher.state === 'loading'
@@ -42,13 +63,13 @@ export function UserCombobox({
       value={value}
       onValueChange={(v) => onValueChange(v ?? '')}
       open={open}
-      onOpenChange={setOpen}
+      onOpenChange={handleOpenChange}
     >
       <ComboboxInput
         placeholder="名前またはメールで検索..."
         className="w-full"
         value={query}
-        onChange={(e) => setQuery(e.target.value)}
+        onChange={handleQueryChange}
       />
       <ComboboxContent>
         <ComboboxList>

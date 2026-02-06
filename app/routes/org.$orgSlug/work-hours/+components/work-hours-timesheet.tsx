@@ -113,18 +113,13 @@ export function WorkHoursTimesheet({
     flush,
   } = useWorkHoursAutoSave(clientId, year, month)
 
-  // サーバーデータを store にセット
-  useEffect(() => {
+  // サーバーデータを store にセット（URL ナビゲーションで clientEntry が変わると React Router が再マウントする）
+  useState(() => {
     const data = toMonthData(clientEntry.entries)
     useTimesheetStore.getState().setMonthData(data)
-    // 初期データを lastSaved に設定して無駄な保存を防ぐ
-    initializeLastSaved(JSON.stringify(data))
-  }, [clientEntry, initializeLastSaved])
-
-  // monthDates を store にセット
-  useEffect(() => {
     useTimesheetStore.getState().setMonthDates(monthDates)
-  }, [monthDates])
+    initializeLastSaved(JSON.stringify(data))
+  })
 
   // マウスアップ: 選択終了
   const handleMouseUp = useCallback(() => {

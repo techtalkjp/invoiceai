@@ -95,16 +95,21 @@ export function TimesheetDemo({ initialData }: TimesheetDemoProps) {
   useAutoSave(monthKey)
   const { clearAll } = useSaveAction()
 
-  // 月切り替え時に initialData から store にセット
-  useEffect(() => {
-    const data = initialData?.[monthKey] ?? {}
-    useTimesheetStore.getState().setMonthData(data)
-  }, [initialData, monthKey])
+  // store に月データをセットするヘルパー
+  const syncStoreForMonth = useCallback(
+    (y: number, m: number) => {
+      const key = `${y}-${String(m).padStart(2, '0')}`
+      const data = initialData?.[key] ?? {}
+      useTimesheetStore.getState().setMonthData(data)
+      useTimesheetStore.getState().setMonthDates(getMonthDates(y, m))
+    },
+    [initialData],
+  )
 
-  // monthDates を store にセット（範囲選択で使用）
-  useEffect(() => {
-    useTimesheetStore.getState().setMonthDates(monthDates)
-  }, [monthDates])
+  // 初回マウント時に store を初期化
+  useState(() => {
+    syncStoreForMonth(year, month)
+  })
 
   // マウスアップ: 選択終了
   const handleMouseUp = useCallback(() => {
@@ -361,23 +366,19 @@ export function TimesheetDemo({ initialData }: TimesheetDemoProps) {
   }, [clearAll])
 
   const handlePrevMonth = () => {
-    if (month === 1) {
-      setYear(year - 1)
-      setMonth(12)
-    } else {
-      setMonth(month - 1)
-    }
-    // 月切り替え時は useEffect で initialData から読み込む
+    const newYear = month === 1 ? year - 1 : year
+    const newMonth = month === 1 ? 12 : month - 1
+    setYear(newYear)
+    setMonth(newMonth)
+    syncStoreForMonth(newYear, newMonth)
   }
 
   const handleNextMonth = () => {
-    if (month === 12) {
-      setYear(year + 1)
-      setMonth(1)
-    } else {
-      setMonth(month + 1)
-    }
-    // 月切り替え時は useEffect で initialData から読み込む
+    const newYear = month === 12 ? year + 1 : year
+    const newMonth = month === 12 ? 1 : month + 1
+    setYear(newYear)
+    setMonth(newMonth)
+    syncStoreForMonth(newYear, newMonth)
   }
 
   return (
