@@ -1,6 +1,7 @@
 import { Link, useLoaderData } from 'react-router'
 import { z } from 'zod'
 import { PageHeader } from '~/components/page-header'
+import { PublicLayout } from '~/components/public-layout'
 import type { MonthData } from '~/components/timesheet'
 import { monthDataSchema } from '~/components/timesheet/schema'
 import { Button } from '~/components/ui/button'
@@ -99,18 +100,20 @@ export default function PlaygroundIndex() {
   const { storedData } = useLoaderData<typeof clientLoader>()
 
   return (
-    <div className="mx-auto grid max-w-4xl gap-4 py-4 sm:py-8">
-      <PageHeader
-        title="Timesheet Playground"
-        subtitle="月次タイムシートのデモ"
-        actions={
-          <Button variant="ghost" size="sm" asChild>
-            <Link to="/">← トップへ</Link>
-          </Button>
-        }
-      />
+    <PublicLayout>
+      <div className="mx-auto grid max-w-4xl gap-4 py-4 sm:py-8">
+        <PageHeader
+          title="Timesheet Playground"
+          subtitle="月次タイムシートのデモ"
+          actions={
+            <Button variant="ghost" size="sm" asChild>
+              <Link to="/">← トップへ</Link>
+            </Button>
+          }
+        />
 
-      <TimesheetDemo initialData={storedData} />
-    </div>
+        <TimesheetDemo initialData={storedData} />
+      </div>
+    </PublicLayout>
   )
 }

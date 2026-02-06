@@ -1,4 +1,6 @@
 import { Link, redirect } from 'react-router'
+import { AppLogo } from '~/components/app-logo'
+import { PublicLayout } from '~/components/public-layout'
 import { Button } from '~/components/ui/button'
 import {
   Card,
@@ -38,44 +40,48 @@ export async function loader({ request }: Route.LoaderArgs) {
 export default function Home({ loaderData }: Route.ComponentProps) {
   if (!loaderData.authenticated) {
     return (
-      <div className="flex min-h-[80vh] items-center justify-center">
-        <Card className="w-full max-w-md">
-          <CardHeader className="text-center">
-            <CardTitle className="text-2xl">Invoice AI</CardTitle>
-            <CardDescription>請求書管理システム</CardDescription>
-          </CardHeader>
-          <CardContent className="flex flex-col gap-4">
-            <Button asChild>
-              <Link to="/auth/signin">ログイン</Link>
-            </Button>
-            <Button variant="outline" asChild>
-              <Link to="/auth/signup">新規登録</Link>
-            </Button>
-            <Button variant="ghost" asChild>
-              <Link to="/playground">Playground</Link>
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
+      <PublicLayout>
+        <div className="flex min-h-[80vh] items-center justify-center">
+          <Card className="w-full max-w-md">
+            <CardHeader className="flex flex-col items-center gap-2 text-center">
+              <AppLogo size="lg" />
+              <CardDescription>請求書管理システム</CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-4">
+              <Button asChild>
+                <Link to="/auth/signin">ログイン</Link>
+              </Button>
+              <Button variant="outline" asChild>
+                <Link to="/auth/signup">新規登録</Link>
+              </Button>
+              <Button variant="ghost" asChild>
+                <Link to="/playground">Playground</Link>
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      </PublicLayout>
     )
   }
 
   // 組織未所属の場合
   return (
-    <div className="flex min-h-[80vh] items-center justify-center">
-      <Card className="w-full max-w-md">
-        <CardHeader className="text-center">
-          <CardTitle className="text-2xl">組織に所属していません</CardTitle>
-          <CardDescription>
-            組織に招待されるか、管理者にお問い合わせください。
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-4">
-          <Button variant="outline" asChild>
-            <Link to="/auth/signin">別のアカウントでログイン</Link>
-          </Button>
-        </CardContent>
-      </Card>
-    </div>
+    <PublicLayout>
+      <div className="flex min-h-[80vh] items-center justify-center">
+        <Card className="w-full max-w-md">
+          <CardHeader className="text-center">
+            <CardTitle className="text-2xl">組織に所属していません</CardTitle>
+            <CardDescription>
+              組織に招待されるか、管理者にお問い合わせください。
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-4">
+            <Button variant="outline" asChild>
+              <Link to="/auth/signin">別のアカウントでログイン</Link>
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    </PublicLayout>
   )
 }

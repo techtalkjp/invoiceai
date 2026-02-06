@@ -6,6 +6,7 @@ import {
   UsersIcon,
 } from 'lucide-react'
 import { Link, NavLink, Outlet } from 'react-router'
+import { AppLogo } from '~/components/app-logo'
 import { Button } from '~/components/ui/button'
 import { Separator } from '~/components/ui/separator'
 import {
@@ -16,6 +17,7 @@ import {
   SidebarGroupContent,
   SidebarGroupLabel,
   SidebarHeader,
+  SidebarInset,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
@@ -24,7 +26,6 @@ import {
   SidebarTrigger,
 } from '~/components/ui/sidebar'
 import { requireAdmin } from '~/lib/auth-helpers.server'
-import { cn } from '~/lib/utils'
 import type { Route } from './+types/_layout'
 
 export async function loader({ request }: Route.LoaderArgs) {
@@ -62,17 +63,18 @@ export default function AdminLayout({
     <SidebarProvider>
       <Sidebar collapsible="icon" variant="floating">
         <SidebarHeader>
-          <Link
-            to="/admin"
-            className="flex items-center gap-2 px-2 py-1.5 font-semibold"
-          >
-            <span className="bg-foreground text-background inline-flex h-8 w-8 items-center justify-center rounded-md text-sm">
-              A
-            </span>
-            <span className="group-data-[collapsible=icon]:hidden">
-              管理画面
-            </span>
-          </Link>
+          <SidebarMenu>
+            <SidebarMenuItem>
+              <SidebarMenuButton size="lg" asChild>
+                <Link to="/admin">
+                  <AppLogo size="sm" showText={false} />
+                  <div className="grid flex-1 text-left text-sm leading-tight">
+                    <span className="truncate font-semibold">Invoice AI</span>
+                  </div>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          </SidebarMenu>
         </SidebarHeader>
         <SidebarContent>
           <SidebarGroup>
@@ -81,18 +83,17 @@ export default function AdminLayout({
               <SidebarMenu>
                 {navItems.map((item) => (
                   <SidebarMenuItem key={item.title}>
-                    <SidebarMenuButton asChild tooltip={item.title}>
-                      <NavLink
-                        to={item.url}
-                        end={item.url === '/admin'}
-                        className={({ isActive }) =>
-                          cn(isActive && 'bg-sidebar-accent')
-                        }
-                      >
-                        <item.icon />
-                        <span>{item.title}</span>
-                      </NavLink>
-                    </SidebarMenuButton>
+                    <NavLink to={item.url} end={item.url === '/admin'}>
+                      {({ isActive }) => (
+                        <SidebarMenuButton
+                          isActive={isActive}
+                          tooltip={item.title}
+                        >
+                          <item.icon />
+                          <span>{item.title}</span>
+                        </SidebarMenuButton>
+                      )}
+                    </NavLink>
                   </SidebarMenuItem>
                 ))}
               </SidebarMenu>
@@ -100,19 +101,20 @@ export default function AdminLayout({
           </SidebarGroup>
         </SidebarContent>
         <SidebarFooter>
-          <div className="flex items-center gap-2 px-2 py-1.5 text-sm">
-            <div className="bg-muted flex h-8 w-8 items-center justify-center rounded-full">
-              {user.name?.charAt(0) ?? user.email?.charAt(0) ?? 'U'}
-            </div>
-            <div className="flex flex-col group-data-[collapsible=icon]:hidden">
-              <span className="font-medium">{user.name}</span>
-              <span className="text-muted-foreground text-xs">
-                {user.email}
-              </span>
-            </div>
-          </div>
-          <Separator className="my-2" />
           <SidebarMenu>
+            <SidebarMenuItem>
+              <SidebarMenuButton size="lg">
+                <div className="bg-muted flex aspect-square size-8 items-center justify-center rounded-lg">
+                  {user.name?.charAt(0) ?? user.email?.charAt(0) ?? 'U'}
+                </div>
+                <div className="grid flex-1 text-left text-sm leading-tight">
+                  <span className="truncate font-medium">{user.name}</span>
+                  <span className="text-muted-foreground truncate text-xs">
+                    {user.email}
+                  </span>
+                </div>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
             <SidebarMenuItem>
               <SidebarMenuButton asChild tooltip="アプリに戻る">
                 <Link to="/">
@@ -126,29 +128,23 @@ export default function AdminLayout({
         <SidebarRail />
       </Sidebar>
 
-      <div
-        className={cn(
-          'ml-auto w-full max-w-full',
-          'peer-data-[state=collapsed]:w-[calc(100%-var(--sidebar-width-icon)-1rem)]',
-          'peer-data-[state=expanded]:w-[calc(100%-var(--sidebar-width))]',
-          'transition-[width] duration-200 ease-linear',
-          'flex h-svh flex-col',
-        )}
-      >
-        <header className="bg-background flex items-center gap-3 border-b px-4 py-2">
-          <SidebarTrigger variant="outline" />
-          <Separator orientation="vertical" className="h-6" />
-          <h1 className="text-lg font-semibold">管理画面</h1>
-          <div className="ml-auto">
+      <SidebarInset>
+        <header className="flex h-16 shrink-0 items-center gap-2 border-b transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12">
+          <div className="flex items-center gap-2 px-4">
+            <SidebarTrigger className="-ml-1" />
+            <Separator orientation="vertical" className="mr-2 h-4" />
+            <span className="text-lg font-semibold">管理画面</span>
+          </div>
+          <div className="ml-auto px-4">
             <Button variant="outline" size="sm" asChild>
               <Link to="/">アプリに戻る</Link>
             </Button>
           </div>
         </header>
-        <main className="flex-1 overflow-auto p-6">
+        <div className="flex-1 overflow-auto p-6">
           <Outlet />
-        </main>
-      </div>
+        </div>
+      </SidebarInset>
     </SidebarProvider>
   )
 }

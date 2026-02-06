@@ -1,6 +1,7 @@
 import {
   BriefcaseIcon,
-  BuildingIcon,
+  CheckIcon,
+  ChevronsUpDownIcon,
   ClockIcon,
   HomeIcon,
   LogOutIcon,
@@ -8,6 +9,7 @@ import {
   ShieldIcon,
 } from 'lucide-react'
 import { Link, NavLink, Outlet, useNavigate } from 'react-router'
+import { AppLogo } from '~/components/app-logo'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -24,6 +26,7 @@ import {
   SidebarGroupContent,
   SidebarGroupLabel,
   SidebarHeader,
+  SidebarInset,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
@@ -32,8 +35,10 @@ import {
   SidebarTrigger,
 } from '~/components/ui/sidebar'
 import { signOut } from '~/lib/auth-client'
-import { requireOrgMember } from '~/lib/auth-helpers.server'
-import { cn } from '~/lib/utils'
+import {
+  getUserOrganizations,
+  requireOrgMember,
+} from '~/lib/auth-helpers.server'
 import type { Route } from './+types/_layout'
 
 export async function loader({ request, params }: Route.LoaderArgs) {
@@ -43,11 +48,13 @@ export async function loader({ request, params }: Route.LoaderArgs) {
     orgSlug,
   )
 
-  return { user, organization, membership }
+  const organizations = await getUserOrganizations(user.id)
+
+  return { user, organization, membership, organizations }
 }
 
 export default function OrgLayout({
-  loaderData: { user, organization, membership },
+  loaderData: { user, organization, membership, organizations },
 }: Route.ComponentProps) {
   const navigate = useNavigate()
   const isOwner = membership.role === 'owner'
@@ -90,17 +97,18 @@ export default function OrgLayout({
     <SidebarProvider>
       <Sidebar collapsible="icon" variant="floating">
         <SidebarHeader>
-          <Link
-            to={`/org/${organization.slug}`}
-            className="flex items-center gap-2 px-2 py-1.5 font-semibold"
-          >
-            <span className="bg-foreground text-background inline-flex h-8 w-8 items-center justify-center rounded-md text-sm">
-              <BuildingIcon className="h-4 w-4" />
-            </span>
-            <span className="truncate group-data-[collapsible=icon]:hidden">
-              {organization.name}
-            </span>
-          </Link>
+          <SidebarMenu>
+            <SidebarMenuItem>
+              <SidebarMenuButton size="lg" asChild>
+                <Link to={`/org/${organization.slug}`}>
+                  <AppLogo size="sm" showText={false} />
+                  <div className="grid flex-1 text-left text-sm leading-tight">
+                    <span className="truncate font-semibold">Invoice AI</span>
+                  </div>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          </SidebarMenu>
         </SidebarHeader>
         <SidebarContent>
           {/* 全スタッフ向け */}
@@ -175,66 +183,99 @@ export default function OrgLayout({
           )}
         </SidebarContent>
         <SidebarFooter>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button
-                type="button"
-                className="hover:bg-sidebar-accent flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm"
-              >
-                <div className="bg-muted flex h-8 w-8 items-center justify-center rounded-full">
-                  {user.name?.charAt(0) ?? user.email?.charAt(0) ?? 'U'}
-                </div>
-                <div className="flex flex-col items-start group-data-[collapsible=icon]:hidden">
-                  <span className="font-medium">{user.name}</span>
-                  <span className="text-muted-foreground text-xs">
-                    {membership.role}
-                  </span>
-                </div>
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="w-48">
-              {isSuperAdmin && (
-                <>
-                  <DropdownMenuItem asChild>
-                    <Link to="/admin" className="flex items-center gap-2">
-                      <ShieldIcon className="h-4 w-4" />
-                      管理者ダッシュボード
-                    </Link>
+          <SidebarMenu>
+            <SidebarMenuItem>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <SidebarMenuButton
+                    size="lg"
+                    className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
+                  >
+                    <div className="bg-muted flex aspect-square size-8 items-center justify-center rounded-lg">
+                      {user.name?.charAt(0) ?? user.email?.charAt(0) ?? 'U'}
+                    </div>
+                    <div className="grid flex-1 text-left text-sm leading-tight">
+                      <span className="truncate font-medium">{user.name}</span>
+                      <span className="text-muted-foreground truncate text-xs">
+                        {membership.role}
+                      </span>
+                    </div>
+                    <ChevronsUpDownIcon className="ml-auto size-4" />
+                  </SidebarMenuButton>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent
+                  className="w-56 rounded-lg"
+                  side="right"
+                  align="end"
+                  sideOffset={4}
+                >
+                  {isSuperAdmin && (
+                    <>
+                      <DropdownMenuItem asChild>
+                        <Link to="/admin">
+                          <ShieldIcon />
+                          管理者ダッシュボード
+                        </Link>
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                    </>
+                  )}
+                  <DropdownMenuItem
+                    onClick={handleSignOut}
+                    className="text-destructive focus:text-destructive"
+                  >
+                    <LogOutIcon />
+                    サインアウト
                   </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                </>
-              )}
-              <DropdownMenuItem
-                onClick={handleSignOut}
-                className="text-destructive focus:text-destructive"
-              >
-                <LogOutIcon className="mr-2 h-4 w-4" />
-                サインアウト
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </SidebarMenuItem>
+          </SidebarMenu>
         </SidebarFooter>
         <SidebarRail />
       </Sidebar>
 
-      <div
-        className={cn(
-          'ml-auto w-full max-w-full',
-          'peer-data-[state=collapsed]:w-[calc(100%-var(--sidebar-width-icon)-1rem)]',
-          'peer-data-[state=expanded]:w-[calc(100%-var(--sidebar-width))]',
-          'transition-[width] duration-200 ease-linear',
-          'flex h-svh flex-col',
-        )}
-      >
-        <header className="bg-background flex items-center gap-3 border-b px-4 py-2">
-          <SidebarTrigger variant="outline" />
-          <Separator orientation="vertical" className="h-6" />
-          <h1 className="text-lg font-semibold">{organization.name}</h1>
+      <SidebarInset>
+        <header className="flex h-16 shrink-0 items-center gap-2 border-b transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12">
+          <div className="flex items-center gap-2 px-4">
+            <SidebarTrigger className="-ml-1" />
+            <Separator orientation="vertical" className="mr-2 h-4" />
+            {organizations.length > 1 ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    type="button"
+                    className="hover:bg-accent flex items-center gap-1.5 rounded-md px-2 py-1 text-sm font-semibold"
+                  >
+                    {organization.name}
+                    <ChevronsUpDownIcon className="text-muted-foreground h-4 w-4" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="w-56">
+                  {organizations.map((org) => (
+                    <DropdownMenuItem key={org.id} asChild>
+                      <Link
+                        to={`/org/${org.slug}`}
+                        className="flex items-center justify-between"
+                      >
+                        {org.name}
+                        {org.id === organization.id && (
+                          <CheckIcon className="h-4 w-4" />
+                        )}
+                      </Link>
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : (
+              <span className="text-sm font-semibold">{organization.name}</span>
+            )}
+          </div>
         </header>
-        <main className="flex-1 overflow-auto p-6">
+        <div className="flex-1 overflow-auto p-6">
           <Outlet context={{ organization, membership, user }} />
-        </main>
-      </div>
+        </div>
+      </SidebarInset>
     </SidebarProvider>
   )
 }

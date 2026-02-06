@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { Link, useNavigate } from 'react-router'
 import { z } from 'zod'
 import { PasswordInput } from '~/components/password-input'
+import { PublicLayout } from '~/components/public-layout'
 import { Button } from '~/components/ui/button'
 import {
   Card,
@@ -70,67 +71,72 @@ export default function SignIn() {
   })
 
   return (
-    <div className="flex min-h-[80vh] items-center justify-center">
-      <Card className="w-full max-w-md">
-        <CardHeader className="text-center">
-          <CardTitle className="text-2xl">ログイン</CardTitle>
-          <CardDescription>
-            メールアドレスとパスワードでログイン
-          </CardDescription>
-        </CardHeader>
-        <form {...getFormProps(form)}>
-          <CardContent className="space-y-4">
-            {serverError && (
-              <div className="bg-destructive/10 text-destructive rounded-md p-3 text-sm">
-                {serverError}
+    <PublicLayout>
+      <div className="flex min-h-[80vh] items-center justify-center">
+        <Card className="w-full max-w-md">
+          <CardHeader className="text-center">
+            <CardTitle className="text-2xl">ログイン</CardTitle>
+            <CardDescription>
+              メールアドレスとパスワードでログイン
+            </CardDescription>
+          </CardHeader>
+          <form {...getFormProps(form)}>
+            <CardContent className="space-y-4">
+              {serverError && (
+                <div className="bg-destructive/10 text-destructive rounded-md p-3 text-sm">
+                  {serverError}
+                </div>
+              )}
+              {form.errors && (
+                <div className="bg-destructive/10 text-destructive rounded-md p-3 text-sm">
+                  {form.errors}
+                </div>
+              )}
+              <div className="space-y-2">
+                <Label htmlFor={email.id}>メールアドレス</Label>
+                <Input
+                  {...getInputProps(email, { type: 'email' })}
+                  placeholder="you@example.com"
+                  disabled={isLoading}
+                />
+                <div
+                  id={email.errorId}
+                  className="text-destructive text-sm empty:hidden"
+                >
+                  {email.errors}
+                </div>
               </div>
-            )}
-            {form.errors && (
-              <div className="bg-destructive/10 text-destructive rounded-md p-3 text-sm">
-                {form.errors}
+              <div className="space-y-2">
+                <Label htmlFor={password.id}>パスワード</Label>
+                <PasswordInput
+                  {...getInputProps(password, { type: 'password' })}
+                  disabled={isLoading}
+                />
+                <div
+                  id={password.errorId}
+                  className="text-destructive text-sm empty:hidden"
+                >
+                  {password.errors}
+                </div>
               </div>
-            )}
-            <div className="space-y-2">
-              <Label htmlFor={email.id}>メールアドレス</Label>
-              <Input
-                {...getInputProps(email, { type: 'email' })}
-                placeholder="you@example.com"
-                disabled={isLoading}
-              />
-              <div
-                id={email.errorId}
-                className="text-destructive text-sm empty:hidden"
-              >
-                {email.errors}
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor={password.id}>パスワード</Label>
-              <PasswordInput
-                {...getInputProps(password, { type: 'password' })}
-                disabled={isLoading}
-              />
-              <div
-                id={password.errorId}
-                className="text-destructive text-sm empty:hidden"
-              >
-                {password.errors}
-              </div>
-            </div>
-          </CardContent>
-          <CardFooter className="flex flex-col gap-4">
-            <Button type="submit" className="w-full" disabled={isLoading}>
-              {isLoading ? 'ログイン中...' : 'ログイン'}
-            </Button>
-            <p className="text-muted-foreground text-center text-sm">
-              アカウントをお持ちでないですか？{' '}
-              <Link to="/auth/signup" className="text-primary hover:underline">
-                登録する
-              </Link>
-            </p>
-          </CardFooter>
-        </form>
-      </Card>
-    </div>
+            </CardContent>
+            <CardFooter className="flex flex-col gap-4">
+              <Button type="submit" className="w-full" disabled={isLoading}>
+                {isLoading ? 'ログイン中...' : 'ログイン'}
+              </Button>
+              <p className="text-muted-foreground text-center text-sm">
+                アカウントをお持ちでないですか？{' '}
+                <Link
+                  to="/auth/signup"
+                  className="text-primary hover:underline"
+                >
+                  登録する
+                </Link>
+              </p>
+            </CardFooter>
+          </form>
+        </Card>
+      </div>
+    </PublicLayout>
   )
 }

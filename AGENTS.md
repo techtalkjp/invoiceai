@@ -82,6 +82,27 @@ org.$orgSlug/
 - テーブルやリストは `<ContentPanel>` で囲む
 - 共通コンポーネント: `~/components/page-header`, `~/components/control-bar`, `~/components/month-nav`, `~/components/content-panel`
 
+## useEffect Policy
+
+`useEffect` は外部世界との同期専用。それ以外では使用禁止。
+
+**許可される用途**: API 呼び出し、WebSocket 接続、ブラウザ API、外部ストアのサブスクリプション、タイマー。
+
+**アンチパターン（禁止）**:
+
+- props や派生値をローカル state にコピーする
+- フラグの変化に応じてロジックを実行する
+- ユーザーアクションを effect 内で処理する（イベントハンドラを使うこと）
+- 派生・バリデーション state を effect 内で更新する
+- 空の依存配列で初期化する（代わりに `useMemo` を使う）
+
+**原則**:
+
+- props / state から導出できる値はレンダー中に計算する
+- ユーザーアクションはイベントハンドラで処理する（effect ではない）
+- effect は外部システムに触れる本物の副作用にのみ使用する
+- `useEffect` を書く際は、同期対象の外部リソースを短いコメントで説明する
+
 ## Navigation
 
 - Parent nav stays active on subroutes.

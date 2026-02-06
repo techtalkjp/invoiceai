@@ -125,3 +125,21 @@ export async function getFirstOrganization(
 
   return member ?? null
 }
+
+/**
+ * ユーザーが所属する全組織を取得
+ */
+export async function getUserOrganizations(userId: string) {
+  return await db
+    .selectFrom('member')
+    .innerJoin('organization', 'organization.id', 'member.organizationId')
+    .select([
+      'organization.id',
+      'organization.name',
+      'organization.slug',
+      'member.role',
+    ])
+    .where('member.userId', '=', userId)
+    .orderBy('member.createdAt', 'asc')
+    .execute()
+}
