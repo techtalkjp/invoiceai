@@ -1,8 +1,6 @@
 import { parseWithZod } from '@conform-to/zod/v4'
-import { ArrowLeftIcon } from 'lucide-react'
-import { Link } from 'react-router'
+import { PageHeader } from '~/components/page-header'
 import { getMonthDates } from '~/components/timesheet'
-import { Button } from '~/components/ui/button'
 import { requireOrgMember } from '~/lib/auth-helpers.server'
 import { formatYearMonthLabel } from '~/utils/month'
 import { parseWorkHoursText } from './+ai-parse.server'
@@ -198,22 +196,14 @@ export default function ClientWorkHours({
 }: Route.ComponentProps) {
   return (
     <div className="grid gap-4">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" asChild>
-            <Link to={`/org/${orgSlug}/work-hours?year=${year}&month=${month}`}>
-              <ArrowLeftIcon className="h-4 w-4" />
-            </Link>
-          </Button>
-          <div>
-            <h2 className="text-lg font-semibold">{clientEntry.clientName}</h2>
-            <p className="text-muted-foreground text-sm">
-              セルをクリックして編集 · Tab/Enterで移動
-            </p>
-          </div>
-        </div>
-        <TextImportDialog clientId={clientId} year={year} month={month} />
-      </div>
+      <PageHeader
+        title={clientEntry.clientName}
+        subtitle="セルをクリックして編集 · Tab/Enterで移動"
+        backTo={`/org/${orgSlug}/work-hours?year=${year}&month=${month}`}
+        actions={
+          <TextImportDialog clientId={clientId} year={year} month={month} />
+        }
+      />
 
       <WorkHoursTimesheet
         clientId={clientId}

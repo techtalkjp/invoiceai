@@ -1,17 +1,14 @@
 import { parseWithZod } from '@conform-to/zod/v4'
-import { ChevronLeftIcon, ChevronRightIcon, FilterIcon } from 'lucide-react'
+import { FilterIcon } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router'
-import { formatMinutesToDuration } from '~/components/time-utils'
+import { ContentPanel } from '~/components/content-panel'
+import { ControlBar } from '~/components/control-bar'
+import { DurationDisplay } from '~/components/duration-display'
+import { MonthNav } from '~/components/month-nav'
+import { PageHeader } from '~/components/page-header'
 import { getMonthDates } from '~/components/timesheet'
 import { Button } from '~/components/ui/button'
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '~/components/ui/card'
 import { requireOrgMember } from '~/lib/auth-helpers.server'
 import { formatYearMonthLabel } from '~/utils/month'
 import { TimesheetGrid } from './+components/timesheet-grid'
@@ -140,67 +137,56 @@ export default function WorkHours({
 
   if (clients.length === 0) {
     return (
-      <div className="grid gap-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>稼働時間入力</CardTitle>
-            <CardDescription>
-              クライアントが登録されていません。まず設定からクライアントを追加してください。
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button asChild>
-              <Link to={`/org/${orgSlug}/clients`}>クライアント設定を開く</Link>
-            </Button>
-          </CardContent>
-        </Card>
+      <div className="grid gap-4">
+        <PageHeader
+          title="稼働時間入力"
+          subtitle="クライアントが登録されていません。まず設定からクライアントを追加してください。"
+        />
+        <Button asChild>
+          <Link to={`/org/${orgSlug}/clients`}>クライアント設定を開く</Link>
+        </Button>
       </div>
     )
   }
 
   const totalMinutes = computeMonthTotalMinutes(monthEntries, monthDates)
-  const totalLabel =
-    totalMinutes > 0 ? formatMinutesToDuration(totalMinutes) : '0h'
 
   return (
     <div className="grid gap-4">
-      <div className="flex items-center justify-center gap-2">
-        <Button variant="outline" size="icon" asChild>
-          <Link
-            to={`/org/${orgSlug}/work-hours?year=${prevYear}&month=${prevMonth}`}
+      <PageHeader
+        title="稼働時間入力"
+        subtitle="クライアントごとの稼働時間を記録・確認"
+      />
+      <ControlBar
+        left={
+          <>
+            <MonthNav
+              label={monthLabel}
+              prevUrl={`/org/${orgSlug}/work-hours?year=${prevYear}&month=${prevMonth}`}
+              nextUrl={`/org/${orgSlug}/work-hours?year=${nextYear}&month=${nextMonth}`}
+            />
+            <span className="text-muted-foreground text-sm">
+              合計:{' '}
+              <span className="text-foreground font-medium">
+                <DurationDisplay minutes={totalMinutes} />
+              </span>
+            </span>
+          </>
+        }
+        right={
+          <Button
+            variant={showOnlyFilled ? 'secondary' : 'ghost'}
+            size="sm"
+            onClick={() => setShowOnlyFilled((v) => !v)}
+            className="text-muted-foreground text-xs"
           >
-            <ChevronLeftIcon className="h-4 w-4" />
-          </Link>
-        </Button>
-        <span className="min-w-32 text-center text-lg font-medium">
-          {monthLabel}
-        </span>
-        <Button variant="outline" size="icon" asChild>
-          <Link
-            to={`/org/${orgSlug}/work-hours?year=${nextYear}&month=${nextMonth}`}
-          >
-            <ChevronRightIcon className="h-4 w-4" />
-          </Link>
-        </Button>
-      </div>
+            <FilterIcon className="size-3.5" />
+            入力済みのみ
+          </Button>
+        }
+      />
 
-      <div className="flex items-center justify-between">
-        <Button
-          variant={showOnlyFilled ? 'secondary' : 'ghost'}
-          size="sm"
-          onClick={() => setShowOnlyFilled((v) => !v)}
-          className="text-muted-foreground text-xs"
-        >
-          <FilterIcon className="size-3.5" />
-          入力済みのみ
-        </Button>
-        <span className="text-muted-foreground text-sm">
-          合計:{' '}
-          <span className="text-foreground font-medium">{totalLabel}</span>
-        </span>
-      </div>
-
-      <div className="overflow-hidden rounded-md border">
+      <ContentPanel>
         <TimesheetGrid
           orgSlug={orgSlug}
           year={year}
@@ -208,7 +194,7 @@ export default function WorkHours({
           monthDates={filteredDates}
           monthEntries={monthEntries}
         />
-      </div>
+      </ContentPanel>
     </div>
   )
 }

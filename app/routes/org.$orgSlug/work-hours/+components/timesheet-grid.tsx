@@ -1,6 +1,6 @@
 import { ArrowRightIcon } from 'lucide-react'
 import { Link } from 'react-router'
-import { formatMinutesToDuration } from '~/components/time-utils'
+import { HoursDurationDisplay } from '~/components/duration-display'
 import {
   formatDateRow,
   getHolidayName,
@@ -53,33 +53,49 @@ export function TimesheetGrid({
   // 月の総合計
   const monthTotal = dailyTotals.reduce((sum, total) => sum + total, 0)
 
+  // クライアント列の均等幅を計算（日付列とヘッダーの合計列を除いた残り）
+  const clientCount = monthEntries.length
+
   return (
     <div className="overflow-x-auto">
-      <Table>
+      <Table className="table-fixed">
+        <colgroup>
+          <col className="w-20" />
+          {monthEntries.map((entry) => (
+            <col
+              key={entry.clientId}
+              style={{
+                width:
+                  clientCount > 0
+                    ? `${Math.max(80, (100 - 10 - 8) / clientCount)}%`
+                    : undefined,
+              }}
+            />
+          ))}
+          <col className="w-16" />
+        </colgroup>
         <TableHeader>
           <TableRow>
-            <TableHead className="bg-background sticky left-0 z-10 w-24">
+            <TableHead className="bg-background sticky left-0 z-10">
               日付
             </TableHead>
             {monthEntries.map((entry, idx) => (
-              <TableHead key={entry.clientId} className="text-center">
+              <TableHead key={entry.clientId} className="truncate text-center">
                 <Link
                   to={`/org/${orgSlug}/work-hours/${entry.clientId}?year=${year}&month=${month}`}
-                  className="hover:bg-accent inline-flex items-center gap-1 rounded-md px-2 py-1 text-sm font-medium transition-colors"
+                  className="hover:bg-accent inline-flex items-center gap-1 truncate rounded-md px-2 py-1 text-sm font-medium transition-colors"
                 >
-                  {entry.clientName}
-                  <ArrowRightIcon className="h-3 w-3 opacity-50" />
+                  <span className="truncate">{entry.clientName}</span>
+                  <ArrowRightIcon className="h-3 w-3 shrink-0 opacity-50" />
                 </Link>
-                <div className="text-muted-foreground text-[10px]">
-                  {(clientTotals[idx] ?? 0) > 0
-                    ? formatMinutesToDuration(
-                        Math.round((clientTotals[idx] ?? 0) * 60),
-                      )
-                    : '-'}
-                </div>
+                {(clientTotals[idx] ?? 0) > 0 && (
+                  <div className="text-muted-foreground text-[10px]">
+                    <HoursDurationDisplay hours={clientTotals[idx] ?? 0} />
+                  </div>
+                )}
               </TableHead>
             ))}
-            <TableHead className="w-16 text-center font-bold">計</TableHead>
+            <TableHead className="text-center font-bold">計</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -97,6 +113,8 @@ export function TimesheetGrid({
                   ? 'text-blue-500'
                   : undefined
 
+            const dailyTotal = dailyTotals[dateIdx] ?? 0
+
             return (
               <TableRow
                 key={date}
@@ -107,12 +125,19 @@ export function TimesheetGrid({
                 )}
               >
                 <TableCell className="bg-background sticky left-0 z-10 font-medium">
-                  <span className={dateColorClass}>{formatDateRow(date)}</span>
-                  {holidayName && (
-                    <span className="text-muted-foreground ml-1 text-xs">
-                      {holidayName}
+                  <div className="flex flex-col">
+                    <span className={dateColorClass}>
+                      {formatDateRow(date)}
                     </span>
-                  )}
+                    {holidayName && (
+                      <span
+                        className="text-destructive/70 max-w-20 truncate text-[9px] leading-tight"
+                        title={holidayName}
+                      >
+                        {holidayName}
+                      </span>
+                    )}
+                  </div>
                 </TableCell>
                 {monthEntries.map((entry) => {
                   const dayEntry = entry.entries[date]
@@ -128,11 +153,10 @@ export function TimesheetGrid({
                     />
                   )
                 })}
-                <TableCell className="bg-muted/30 text-center font-medium">
-                  {dailyTotals[dateIdx] !== undefined &&
-                  dailyTotals[dateIdx] > 0
-                    ? dailyTotals[dateIdx].toFixed(1)
-                    : '-'}
+                <TableCell className="bg-muted/30 text-center text-sm font-medium">
+                  {dailyTotal > 0 && (
+                    <HoursDurationDisplay hours={dailyTotal} />
+                  )}
                 </TableCell>
               </TableRow>
             )
@@ -148,16 +172,18 @@ export function TimesheetGrid({
                 key={monthEntries[idx]?.clientId}
                 className="text-center font-medium"
               >
-                <Link
-                  to={`/org/${orgSlug}/work-hours/${monthEntries[idx]?.clientId}?year=${year}&month=${month}`}
-                  className="hover:text-primary transition-colors"
-                >
-                  {total > 0 ? total.toFixed(1) : '-'}
-                </Link>
+                {total > 0 && (
+                  <Link
+                    to={`/org/${orgSlug}/work-hours/${monthEntries[idx]?.clientId}?year=${year}&month=${month}`}
+                    className="hover:text-primary transition-colors"
+                  >
+                    <HoursDurationDisplay hours={total} />
+                  </Link>
+                )}
               </TableCell>
             ))}
             <TableCell className="bg-primary/10 text-center font-bold">
-              {monthTotal > 0 ? monthTotal.toFixed(1) : '-'}
+              {monthTotal > 0 && <HoursDurationDisplay hours={monthTotal} />}
             </TableCell>
           </TableRow>
         </TableBody>

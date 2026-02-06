@@ -7,14 +7,12 @@ import {
   Undo2Icon,
 } from 'lucide-react'
 import { Form, Link } from 'react-router'
+import { BillingTypeBadge } from '~/components/billing-type-badge'
+import { ContentPanel } from '~/components/content-panel'
+import { ControlBar } from '~/components/control-bar'
+import { PageHeader } from '~/components/page-header'
 import { Badge } from '~/components/ui/badge'
 import { Button } from '~/components/ui/button'
-import {
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '~/components/ui/card'
 import {
   Table,
   TableBody,
@@ -77,15 +75,11 @@ export default function ClientsIndex({
   const inactiveClients = clients.filter((c) => c.isActive === 0)
 
   return (
-    <>
-      <CardHeader>
-        <div className="flex items-center justify-between">
-          <div>
-            <CardTitle>クライアント管理</CardTitle>
-            <CardDescription>
-              請求書を発行するクライアントを管理します
-            </CardDescription>
-          </div>
+    <div className="grid gap-4">
+      <PageHeader
+        title="クライアント管理"
+        subtitle="請求書を発行するクライアントを管理します"
+        actions={
           <div className="flex gap-2">
             <Button variant="outline" asChild>
               <Link to={`${baseUrl}/import`}>
@@ -100,26 +94,30 @@ export default function ClientsIndex({
               </Link>
             </Button>
           </div>
-        </div>
-      </CardHeader>
-      <CardContent>
-        <Tabs defaultValue="active">
-          <TabsList>
-            <TabsTrigger value="active">
-              有効
-              <Badge variant="secondary" className="ml-1.5">
-                {activeClients.length}
-              </Badge>
-            </TabsTrigger>
-            <TabsTrigger value="inactive">
-              無効
-              <Badge variant="secondary" className="ml-1.5">
-                {inactiveClients.length}
-              </Badge>
-            </TabsTrigger>
-          </TabsList>
+        }
+      />
+      <Tabs defaultValue="active">
+        <ControlBar
+          left={
+            <TabsList>
+              <TabsTrigger value="active">
+                有効
+                <Badge variant="secondary" className="ml-1.5">
+                  {activeClients.length}
+                </Badge>
+              </TabsTrigger>
+              <TabsTrigger value="inactive">
+                無効
+                <Badge variant="secondary" className="ml-1.5">
+                  {inactiveClients.length}
+                </Badge>
+              </TabsTrigger>
+            </TabsList>
+          }
+        />
 
-          <TabsContent value="active">
+        <TabsContent value="active">
+          <ContentPanel>
             {activeClients.length === 0 ? (
               <p className="text-muted-foreground py-8 text-center text-sm">
                 クライアントが登録されていません
@@ -142,9 +140,7 @@ export default function ClientsIndex({
                         {client.name}
                       </TableCell>
                       <TableCell>
-                        {client.billingType === 'time'
-                          ? 'タイムチャージ'
-                          : '固定'}
+                        <BillingTypeBadge billingType={client.billingType} />
                       </TableCell>
                       <TableCell>
                         {client.billingType === 'time'
@@ -200,9 +196,11 @@ export default function ClientsIndex({
                 </TableBody>
               </Table>
             )}
-          </TabsContent>
+          </ContentPanel>
+        </TabsContent>
 
-          <TabsContent value="inactive">
+        <TabsContent value="inactive">
+          <ContentPanel>
             {inactiveClients.length === 0 ? (
               <p className="text-muted-foreground py-8 text-center text-sm">
                 無効なクライアントはありません
@@ -223,9 +221,7 @@ export default function ClientsIndex({
                         {client.name}
                       </TableCell>
                       <TableCell>
-                        {client.billingType === 'time'
-                          ? 'タイムチャージ'
-                          : '固定'}
+                        <BillingTypeBadge billingType={client.billingType} />
                       </TableCell>
                       <TableCell>
                         <Form method="POST" className="inline">
@@ -246,9 +242,9 @@ export default function ClientsIndex({
                 </TableBody>
               </Table>
             )}
-          </TabsContent>
-        </Tabs>
-      </CardContent>
-    </>
+          </ContentPanel>
+        </TabsContent>
+      </Tabs>
+    </div>
   )
 }

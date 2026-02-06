@@ -1,14 +1,10 @@
 import { getFormProps, getInputProps, useForm } from '@conform-to/react'
 import { parseWithZod } from '@conform-to/zod/v4'
-import { ArrowLeftIcon, ChevronRightIcon, RefreshCwIcon } from 'lucide-react'
+import { RefreshCwIcon } from 'lucide-react'
 import { Form, Link, useFetcher, useNavigation } from 'react-router'
+import { ContentPanel } from '~/components/content-panel'
+import { PageHeader } from '~/components/page-header'
 import { Button } from '~/components/ui/button'
-import {
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '~/components/ui/card'
 import { Input } from '~/components/ui/input'
 import { Label } from '~/components/ui/label'
 import {
@@ -80,38 +76,14 @@ export function ClientForm({
   const isEditing = !!defaultValue?.id
 
   return (
-    <>
-      <CardHeader>
-        {/* パンくずリスト */}
-        <nav className="text-muted-foreground mb-2 flex items-center gap-1 text-sm">
-          <Link to={backTo} className="hover:text-foreground transition-colors">
-            クライアント
-          </Link>
-          <ChevronRightIcon className="h-4 w-4" />
-          <span className="text-foreground">
-            {isEditing ? '編集' : '新規作成'}
-          </span>
-        </nav>
+    <div className="grid gap-4">
+      <PageHeader
+        title={isEditing ? 'クライアントを編集' : 'クライアントを追加'}
+        subtitle="クライアント情報を入力してください"
+        backTo={backTo}
+      />
 
-        {/* 戻るボタン付きタイトル */}
-        <div className="flex items-center gap-3">
-          <Button variant="ghost" size="icon" asChild className="shrink-0">
-            <Link to={backTo}>
-              <ArrowLeftIcon className="h-4 w-4" />
-            </Link>
-          </Button>
-          <div>
-            <CardTitle>
-              {isEditing ? 'クライアントを編集' : 'クライアントを追加'}
-            </CardTitle>
-            <CardDescription>
-              クライアント情報を入力してください
-            </CardDescription>
-          </div>
-        </div>
-      </CardHeader>
-
-      <CardContent>
+      <ContentPanel className="p-6">
         <Form method="POST" {...getFormProps(form)} className="space-y-6">
           {defaultValue?.id && (
             <input type="hidden" name="id" value={defaultValue.id} />
@@ -297,7 +269,7 @@ export function ClientForm({
             </Button>
           </div>
         </Form>
-      </CardContent>
-    </>
+      </ContentPanel>
+    </div>
   )
 }

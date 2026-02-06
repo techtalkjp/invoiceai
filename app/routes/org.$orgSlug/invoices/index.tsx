@@ -1,14 +1,12 @@
 import { CheckIcon, CopyIcon, ExternalLinkIcon } from 'lucide-react'
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router'
+import { BillingTypeBadge } from '~/components/billing-type-badge'
+import { ContentPanel } from '~/components/content-panel'
+import { ControlBar } from '~/components/control-bar'
+import { PageHeader } from '~/components/page-header'
 import { Badge } from '~/components/ui/badge'
 import { Button } from '~/components/ui/button'
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-} from '~/components/ui/card'
 import {
   Dialog,
   DialogContent,
@@ -32,6 +30,7 @@ import {
   TableRow,
 } from '~/components/ui/table'
 import { Textarea } from '~/components/ui/textarea'
+import { useSmartNavigation } from '~/hooks/use-smart-navigation'
 import { requireOrgMember } from '~/lib/auth-helpers.server'
 import { db } from '~/lib/db/kysely'
 import { buildInvoiceEmail } from '~/utils/email-template'
@@ -208,10 +207,11 @@ export default function MonthlyInvoices({
   },
 }: Route.ComponentProps) {
   const navigate = useNavigate()
+  const orgSlug = organization.slug
+  const baseUrl = `/org/${orgSlug}/invoices`
+  useSmartNavigation({ autoSave: true, baseUrl })
   const { year, month } = parseYearMonthId(selectedMonth)
   const isPrevMonth = selectedMonth === prevMonthId
-  const monthLabel = formatYearMonthLabel(year, month)
-  const orgSlug = organization.slug
 
   function handleMonthChange(value: string) {
     navigate(`?month=${encodeURIComponent(value)}`)
@@ -219,35 +219,28 @@ export default function MonthlyInvoices({
 
   if (clients.length === 0) {
     return (
-      <div className="grid gap-6">
-        <Card>
-          <CardHeader>
-            <div className="text-3xl font-semibold tracking-tight">
-              月次請求
-            </div>
-            <CardDescription>
-              クライアントが登録されていません。まず設定からクライアントを追加してください。
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button asChild>
-              <Link to={`/org/${orgSlug}/settings`}>設定を開く</Link>
-            </Button>
-          </CardContent>
-        </Card>
+      <div className="grid gap-4">
+        <PageHeader
+          title="月次請求"
+          subtitle="クライアントが登録されていません。まず設定からクライアントを追加してください。"
+        />
+        <Button asChild>
+          <Link to={`/org/${orgSlug}/settings`}>設定を開く</Link>
+        </Button>
       </div>
     )
   }
 
   return (
-    <div className="grid gap-6">
-      {/* ヘッダー：月選択と進捗 */}
-      <Card>
-        <CardHeader>
-          <div className="text-3xl font-semibold tracking-tight">月次請求</div>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-wrap items-center gap-4">
+    <div className="grid gap-4">
+      <PageHeader
+        title="月次請求"
+        subtitle="クライアントごとの請求書作成状況"
+      />
+
+      <ControlBar
+        left={
+          <>
             <Select value={selectedMonth} onValueChange={handleMonthChange}>
               <SelectTrigger className="w-48">
                 <SelectValue />
@@ -272,128 +265,119 @@ export default function MonthlyInvoices({
             >
               {progress.created}/{progress.total} 作成済み
             </Badge>
-          </div>
-        </CardContent>
-      </Card>
+          </>
+        }
+      />
 
-      {/* クライアント一覧テーブル */}
-      <Card>
-        <CardHeader>
-          <div className="text-xl font-semibold">{monthLabel}</div>
-          <CardDescription>クライアントごとの請求書作成状況</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>クライアント</TableHead>
-                <TableHead>種別</TableHead>
-                <TableHead>稼働時間</TableHead>
-                <TableHead>タイムシート</TableHead>
-                <TableHead>請求書</TableHead>
-                <TableHead>メール</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {clients.map((client) => {
-                const existingInvoice = invoicesByClient[client.id]
-                const staffHours = workHoursByClient[client.id] ?? []
-                const totalHours = staffHours.reduce(
-                  (sum, s) => sum + s.totalHours,
-                  0,
-                )
-                const invoiceLink = `/org/${orgSlug}/invoices/create?clientId=${encodeURIComponent(
-                  client.id,
-                )}&yearMonth=${encodeURIComponent(selectedMonth)}`
-                const timesheetPdfLink = `/org/${orgSlug}/invoices/timesheet-pdf/${encodeURIComponent(
-                  client.id,
-                )}/${encodeURIComponent(selectedMonth)}`
-                const freeeInvoiceLink = existingInvoice?.freeeInvoiceId
-                  ? `https://invoice.secure.freee.co.jp/reports/invoices/${existingInvoice.freeeInvoiceId}`
-                  : null
+      <ContentPanel>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>クライアント</TableHead>
+              <TableHead>種別</TableHead>
+              <TableHead>稼働時間</TableHead>
+              <TableHead>タイムシート</TableHead>
+              <TableHead>請求書</TableHead>
+              <TableHead>メール</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {clients.map((client) => {
+              const existingInvoice = invoicesByClient[client.id]
+              const staffHours = workHoursByClient[client.id] ?? []
+              const totalHours = staffHours.reduce(
+                (sum, s) => sum + s.totalHours,
+                0,
+              )
+              const invoiceLink = `/org/${orgSlug}/invoices/create?clientId=${encodeURIComponent(
+                client.id,
+              )}&yearMonth=${encodeURIComponent(selectedMonth)}`
+              const timesheetPdfLink = `/org/${orgSlug}/invoices/timesheet-pdf/${encodeURIComponent(
+                client.id,
+              )}/${encodeURIComponent(selectedMonth)}`
+              const freeeInvoiceLink = existingInvoice?.freeeInvoiceId
+                ? `https://invoice.secure.freee.co.jp/reports/invoices/${existingInvoice.freeeInvoiceId}`
+                : null
 
-                return (
-                  <TableRow key={client.id}>
-                    <TableCell className="font-medium">{client.name}</TableCell>
-                    <TableCell>
-                      <Badge variant="outline">
-                        {client.billingType === 'time' ? '時間制' : '固定'}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      {client.billingType === 'time' ? (
-                        <div className="text-sm">
-                          <div className="font-medium">{totalHours}h</div>
-                          {staffHours.length > 0 && (
-                            <div className="text-muted-foreground text-xs">
-                              {staffHours
-                                .map((s) => `${s.userName} ${s.totalHours}h`)
-                                .join(', ')}
-                            </div>
-                          )}
-                        </div>
-                      ) : (
-                        <span className="text-muted-foreground">-</span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      {client.billingType === 'time' && totalHours > 0 && (
-                        <Button asChild variant="outline" size="sm">
-                          <a href={timesheetPdfLink} download>
-                            PDF
-                          </a>
-                        </Button>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      {existingInvoice ? (
-                        <div className="flex items-center gap-2">
-                          <Badge variant="secondary">
-                            {existingInvoice.freeeInvoiceNumber ?? '作成済'}
-                          </Badge>
-                          {freeeInvoiceLink && (
-                            <Button
-                              asChild
-                              variant="ghost"
-                              size="icon"
-                              className="h-7 w-7"
+              return (
+                <TableRow key={client.id}>
+                  <TableCell className="font-medium">{client.name}</TableCell>
+                  <TableCell>
+                    <BillingTypeBadge billingType={client.billingType} />
+                  </TableCell>
+                  <TableCell>
+                    {client.billingType === 'time' ? (
+                      <div className="text-sm">
+                        <div className="font-medium">{totalHours}h</div>
+                        {staffHours.length > 0 && (
+                          <div className="text-muted-foreground text-xs">
+                            {staffHours
+                              .map((s) => `${s.userName} ${s.totalHours}h`)
+                              .join(', ')}
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <span className="text-muted-foreground">-</span>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    {client.billingType === 'time' && totalHours > 0 && (
+                      <Button asChild variant="outline" size="sm">
+                        <a href={timesheetPdfLink} download>
+                          PDF
+                        </a>
+                      </Button>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    {existingInvoice ? (
+                      <div className="flex items-center gap-2">
+                        <Badge variant="secondary">
+                          {existingInvoice.freeeInvoiceNumber ?? '作成済'}
+                        </Badge>
+                        {freeeInvoiceLink && (
+                          <Button
+                            asChild
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7"
+                          >
+                            <a
+                              href={freeeInvoiceLink}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              title="freeeで開く"
                             >
-                              <a
-                                href={freeeInvoiceLink}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                title="freeeで開く"
-                              >
-                                <ExternalLinkIcon className="h-4 w-4" />
-                              </a>
-                            </Button>
-                          )}
-                          <Button asChild variant="ghost" size="sm">
-                            <Link to={invoiceLink}>編集</Link>
+                              <ExternalLinkIcon className="h-4 w-4" />
+                            </a>
                           </Button>
-                        </div>
-                      ) : (
-                        <Button asChild size="sm">
-                          <Link to={invoiceLink}>作成</Link>
+                        )}
+                        <Button asChild variant="ghost" size="sm">
+                          <Link to={invoiceLink}>編集</Link>
                         </Button>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      {existingInvoice && (
-                        <EmailDialog
-                          clientName={client.name}
-                          year={year}
-                          month={month}
-                        />
-                      )}
-                    </TableCell>
-                  </TableRow>
-                )
-              })}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+                      </div>
+                    ) : (
+                      <Button asChild size="sm">
+                        <Link to={invoiceLink}>作成</Link>
+                      </Button>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    {existingInvoice && (
+                      <EmailDialog
+                        clientName={client.name}
+                        year={year}
+                        month={month}
+                      />
+                    )}
+                  </TableCell>
+                </TableRow>
+              )
+            })}
+          </TableBody>
+        </Table>
+      </ContentPanel>
     </div>
   )
 }

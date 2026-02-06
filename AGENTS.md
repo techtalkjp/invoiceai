@@ -60,6 +60,28 @@ org.$orgSlug/
 │   └── +components/        # ← ルートにならない
 ```
 
+## Page Layout Convention
+
+すべてのルートページは以下の構造に従う:
+
+```tsx
+<div className="grid gap-4">
+  <PageHeader title="..." subtitle="..." backTo="..." actions={...} />
+  <ControlBar left={<MonthNav ... />} right={<FilterButton />} />  {/* optional */}
+  <ContentPanel>
+    {/* テーブル / フォーム / メインコンテンツ */}
+  </ContentPanel>
+</div>
+```
+
+- ルートコンポーネントの最外部は `<div className="grid gap-4">` (または `gap-6`)
+- ページヘッダーは必ず `<PageHeader>` を使用
+- 戻るボタンが必要なサブページは `backTo` prop を指定
+- 月切替が必要なページは `<MonthNav>` を使用
+- フィルタやアクションボタンがある場合は `<ControlBar>` を使用
+- テーブルやリストは `<ContentPanel>` で囲む
+- 共通コンポーネント: `~/components/page-header`, `~/components/control-bar`, `~/components/month-nav`, `~/components/content-panel`
+
 ## Navigation
 
 - Parent nav stays active on subroutes.

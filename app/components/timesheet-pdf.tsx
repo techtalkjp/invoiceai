@@ -7,7 +7,10 @@ import {
   View,
   pdf,
 } from '@react-pdf/renderer'
-import { calculateWorkDuration } from '~/components/time-utils'
+import {
+  calculateWorkDuration,
+  splitHoursMinutes,
+} from '~/components/time-utils'
 import type { TimesheetEntry } from '~/components/timesheet'
 import { getHolidayName } from '~/components/timesheet'
 
@@ -270,47 +273,61 @@ function truncateDescription(text: string | undefined, maxLines = 3): string {
 
 // --- 時間/分の表示ヘルパー ---
 
-function HoursMinutesDisplay({ value }: { value: number }) {
+function HoursDisplay({ value }: { value: number }) {
   if (value <= 0) return <Text>-</Text>
-
-  const wholeHours = Math.floor(value)
-  const mins = Math.round((value % 1) * 60)
-
+  const totalMinutes = Math.round(value * 60)
+  const { hours, minutes } = splitHoursMinutes(totalMinutes)
+  if (minutes === 0) {
+    return (
+      <>
+        <Text>{hours}</Text>
+        <Text style={styles.unit}>時間</Text>
+      </>
+    )
+  }
+  if (hours === 0) {
+    return (
+      <>
+        <Text>{minutes}</Text>
+        <Text style={styles.unit}>分</Text>
+      </>
+    )
+  }
   return (
     <>
-      {wholeHours > 0 && (
-        <>
-          <Text>{wholeHours}</Text>
-          <Text style={styles.unit}>時間</Text>
-        </>
-      )}
-      {mins > 0 && (
-        <>
-          <Text>{mins}</Text>
-          <Text style={styles.unit}>分</Text>
-        </>
-      )}
+      <Text>{hours}</Text>
+      <Text style={styles.unit}>時間</Text>
+      <Text>{minutes}</Text>
+      <Text style={styles.unit}>分</Text>
     </>
   )
 }
 
-function BreakDisplay({ minutes }: { minutes: number }) {
-  if (minutes <= 0) return <Text>-</Text>
-
+function BreakDisplay({ minutes: totalMinutes }: { minutes: number }) {
+  if (totalMinutes <= 0) return <Text>-</Text>
+  const { hours, minutes } = splitHoursMinutes(totalMinutes)
+  if (minutes === 0) {
+    return (
+      <>
+        <Text>{hours}</Text>
+        <Text style={styles.unit}>時間</Text>
+      </>
+    )
+  }
+  if (hours === 0) {
+    return (
+      <>
+        <Text>{minutes}</Text>
+        <Text style={styles.unit}>分</Text>
+      </>
+    )
+  }
   return (
     <>
-      {minutes >= 60 && (
-        <>
-          <Text>{Math.floor(minutes / 60)}</Text>
-          <Text style={styles.unit}>時間</Text>
-        </>
-      )}
-      {minutes % 60 > 0 && (
-        <>
-          <Text>{minutes % 60}</Text>
-          <Text style={styles.unit}>分</Text>
-        </>
-      )}
+      <Text>{hours}</Text>
+      <Text style={styles.unit}>時間</Text>
+      <Text>{minutes}</Text>
+      <Text style={styles.unit}>分</Text>
     </>
   )
 }
@@ -373,7 +390,7 @@ function TimesheetPdfPage({ data }: { data: PdfTimesheetData }) {
                 <BreakDisplay minutes={entry.breakMinutes} />
               </View>
               <View style={styles.tableColHoursData}>
-                <HoursMinutesDisplay value={entry.hours} />
+                <HoursDisplay value={entry.hours} />
               </View>
               <Text style={styles.tableColDescriptionData}>
                 {truncateDescription(entry.description)}
@@ -386,7 +403,7 @@ function TimesheetPdfPage({ data }: { data: PdfTimesheetData }) {
       <View style={styles.totalRow}>
         <Text style={styles.totalLabel}>合計稼働時間:</Text>
         <View style={styles.totalValue}>
-          <HoursMinutesDisplay value={data.totalHours} />
+          <HoursDisplay value={data.totalHours} />
           {data.totalHours === 0 && <Text>0時間</Text>}
         </View>
       </View>

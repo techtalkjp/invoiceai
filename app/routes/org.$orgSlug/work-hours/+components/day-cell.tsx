@@ -2,6 +2,7 @@ import { MessageSquareIcon } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useFetcher } from 'react-router'
 import { BreakGridPicker } from '~/components/break-grid-picker'
+import { HoursDurationDisplay } from '~/components/duration-display'
 import { TimeGridPicker } from '~/components/time-grid-picker'
 import { formatTime, parseTimeInput } from '~/components/time-utils'
 import {
@@ -150,7 +151,10 @@ function CompactEditor({
         <div className="flex items-end pb-0.5">
           {hours > 0 && (
             <span className="text-muted-foreground text-sm">
-              稼働: <span className="font-medium">{hours.toFixed(1)}h</span>
+              稼働:{' '}
+              <span className="font-medium">
+                <HoursDurationDisplay hours={hours} />
+              </span>
             </span>
           )}
         </div>
@@ -222,7 +226,10 @@ function RichEditor({
       </div>
       {hours > 0 && (
         <div className="text-muted-foreground border-t pt-2 text-sm">
-          稼働時間: <span className="font-medium">{hours.toFixed(1)}h</span>
+          稼働時間:{' '}
+          <span className="font-medium">
+            <HoursDurationDisplay hours={hours} />
+          </span>
         </div>
       )}
     </div>
@@ -333,11 +340,10 @@ export function DayCell({
       className={cn(
         'relative flex min-h-8 cursor-pointer flex-col items-center justify-center rounded border border-transparent px-1 transition-colors',
         'hover:border-border hover:bg-accent',
-        displayHours === 0 && 'text-muted-foreground',
       )}
     >
       <span className="text-sm leading-tight font-medium">
-        {displayHours > 0 ? displayHours.toFixed(1) : '-'}
+        {displayHours > 0 && <HoursDurationDisplay hours={displayHours} />}
       </span>
       {hasTimeRange && (
         <span className="text-muted-foreground hidden text-[10px] leading-tight md:block">

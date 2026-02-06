@@ -149,15 +149,25 @@ function minutesToParsedTime(totalMinutes: number): ParsedTime {
 }
 
 /**
- * 分を時間フォーマットに変換
+ * 分を { hours, minutes } に分解する
+ */
+export function splitHoursMinutes(totalMinutes: number): {
+  hours: number
+  minutes: number
+} {
+  const h = Math.floor(totalMinutes / 60)
+  const m = Math.round(totalMinutes % 60)
+  return { hours: h, minutes: m }
+}
+
+/**
+ * 分を「X時間Y分」フォーマットに変換（プレーンテキスト用）
  */
 export function formatMinutesToDuration(minutes: number): string {
-  const hours = Math.floor(minutes / 60)
-  const mins = minutes % 60
-  if (mins === 0) {
-    return `${hours}h`
-  }
-  return `${hours}h${mins}m`
+  const { hours, minutes: mins } = splitHoursMinutes(minutes)
+  if (mins === 0) return `${hours}時間`
+  if (hours === 0) return `${mins}分`
+  return `${hours}時間${mins}分`
 }
 
 /**

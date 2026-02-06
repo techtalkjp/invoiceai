@@ -10,14 +10,11 @@ import {
   updateClientInvoice,
 } from '@shared/services/invoice-service'
 import { Form, Link, useActionData, useNavigation } from 'react-router'
+import { BillingTypeBadge } from '~/components/billing-type-badge'
+import { ContentPanel } from '~/components/content-panel'
+import { PageHeader } from '~/components/page-header'
 import { Badge } from '~/components/ui/badge'
 import { Button } from '~/components/ui/button'
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-} from '~/components/ui/card'
 import { Label } from '~/components/ui/label'
 import {
   Select,
@@ -27,6 +24,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '~/components/ui/select'
+import { useSmartNavigation } from '~/hooks/use-smart-navigation'
 import { requireOrgMember } from '~/lib/auth-helpers.server'
 import { db } from '~/lib/db/kysely'
 import { getFreeeClientForOrganization } from '~/utils/freee.server'
@@ -310,6 +308,8 @@ export default function InvoiceCreate({
   const navigation = useNavigation()
   const isSubmitting = navigation.state === 'submitting'
   const isEditMode = existingInvoice != null
+  const baseUrl = `/org/${orgSlug}/invoices`
+  const { backUrl } = useSmartNavigation({ baseUrl })
   const [form, fields] = useForm({
     lastResult:
       actionData && 'lastResult' in actionData
@@ -332,39 +332,31 @@ export default function InvoiceCreate({
 
   if (clients.length === 0) {
     return (
-      <div className="grid gap-6">
-        <Card>
-          <CardHeader>
-            <div className="text-2xl font-semibold tracking-tight">
-              請求書作成
-            </div>
-            <CardDescription>
-              クライアントが登録されていません。まず設定からクライアントを追加してください。
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button asChild>
-              <Link to={`/org/${orgSlug}/settings`}>設定を開く</Link>
-            </Button>
-          </CardContent>
-        </Card>
+      <div className="grid gap-4">
+        <PageHeader
+          title="請求書作成"
+          subtitle="クライアントが登録されていません。まず設定からクライアントを追加してください。"
+          backTo={backUrl}
+        />
+        <Button asChild>
+          <Link to={`/org/${orgSlug}/settings`}>設定を開く</Link>
+        </Button>
       </div>
     )
   }
 
   return (
-    <div className="grid gap-6">
-      <Card>
-        <CardHeader>
-          <div className="text-2xl font-semibold tracking-tight">
-            {isEditMode ? '請求書編集' : '請求書作成'}
-          </div>
-          <CardDescription>
-            {isEditMode
-              ? '既存の請求書を更新します。'
-              : '対象クライアントと月を指定して請求書を作成します。'}
-          </CardDescription>
-          <div className="mt-2 flex flex-wrap items-center gap-2 text-sm">
+    <div className="grid gap-4">
+      <PageHeader
+        title={isEditMode ? '請求書編集' : '請求書作成'}
+        subtitle={
+          isEditMode
+            ? '既存の請求書を更新します。'
+            : '対象クライアントと月を指定して請求書を作成します。'
+        }
+        backTo={backUrl}
+        actions={
+          <div className="flex flex-wrap items-center gap-2 text-sm">
             <Badge variant={isPrevMonth ? 'default' : 'outline'}>
               {isPrevMonth ? '前月' : '前月から変更'}
             </Badge>
@@ -384,134 +376,124 @@ export default function InvoiceCreate({
               </a>
             )}
           </div>
-        </CardHeader>
-      </Card>
-      <Card>
-        <CardContent>
-          <Form
-            method="post"
-            {...getFormProps(form)}
-            className="grid gap-4 md:grid-cols-2"
-          >
-            <div className="grid gap-2">
-              <Label htmlFor={fields.clientId.id}>クライアント</Label>
-              <Select
-                key={fields.clientId.key}
-                name={fields.clientId.name}
-                defaultValue={defaultClientId}
-              >
-                <SelectTrigger id={fields.clientId.id} className="w-full">
-                  <SelectValue placeholder="選択してください" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectGroup>
-                    {clients.map((client) => (
-                      <SelectItem key={client.id} value={client.id}>
-                        <span className="flex items-center gap-2">
-                          {client.name}
-                          <Badge variant="outline" className="text-xs">
-                            {client.billingType === 'time'
-                              ? 'タイムチャージ'
-                              : '固定月額'}
-                          </Badge>
-                        </span>
-                      </SelectItem>
-                    ))}
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
-              <div className="text-destructive text-sm empty:hidden">
-                {fields.clientId.errors}
-              </div>
-              {selectedClient && (
-                <div className="text-muted-foreground text-sm">
-                  {selectedClient.billingType === 'time'
-                    ? `時間単価: ¥${selectedClient.hourlyRate?.toLocaleString() ?? '未設定'}/h`
-                    : `月額: ¥${selectedClient.monthlyFee?.toLocaleString() ?? '未設定'}`}
-                </div>
-              )}
+        }
+      />
+      <ContentPanel className="p-6">
+        <Form
+          method="post"
+          {...getFormProps(form)}
+          className="grid gap-4 md:grid-cols-2"
+        >
+          <div className="grid gap-2">
+            <Label htmlFor={fields.clientId.id}>クライアント</Label>
+            <Select
+              key={fields.clientId.key}
+              name={fields.clientId.name}
+              defaultValue={defaultClientId}
+            >
+              <SelectTrigger id={fields.clientId.id} className="w-full">
+                <SelectValue placeholder="選択してください" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectGroup>
+                  {clients.map((client) => (
+                    <SelectItem key={client.id} value={client.id}>
+                      <span className="flex items-center gap-2">
+                        {client.name}
+                        <BillingTypeBadge billingType={client.billingType} />
+                      </span>
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+              </SelectContent>
+            </Select>
+            <div className="text-destructive text-sm empty:hidden">
+              {fields.clientId.errors}
             </div>
-            <div className="grid gap-2">
-              <Label htmlFor={fields.yearMonth.id}>対象月</Label>
-              <Select
-                key={fields.yearMonth.key}
-                name={fields.yearMonth.name}
-                defaultValue={defaultYearMonth}
-              >
-                <SelectTrigger id={fields.yearMonth.id} className="w-full">
-                  <SelectValue placeholder="対象月を選択" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectGroup>
-                    {months.map((monthItem) => (
-                      <SelectItem key={monthItem.id} value={monthItem.id}>
-                        {monthItem.label}
-                      </SelectItem>
-                    ))}
-                  </SelectGroup>
-                </SelectContent>
-              </Select>
-              <div className="text-destructive text-sm empty:hidden">
-                {fields.yearMonth.errors}
-              </div>
-            </div>
-            {form.errors && (
-              <div className="bg-destructive/10 text-destructive col-span-full rounded-md p-3 text-sm">
-                {form.errors}
+            {selectedClient && (
+              <div className="text-muted-foreground text-sm">
+                {selectedClient.billingType === 'time'
+                  ? `時間単価: ¥${selectedClient.hourlyRate?.toLocaleString() ?? '未設定'}/h`
+                  : `月額: ¥${selectedClient.monthlyFee?.toLocaleString() ?? '未設定'}`}
               </div>
             )}
-            {isEditMode && existingInvoice?.freeeInvoiceId && (
-              <input
-                type="hidden"
-                name="freeeInvoiceId"
-                value={existingInvoice.freeeInvoiceId}
-              />
-            )}
-            <div className="md:col-span-2">
-              <Button type="submit" disabled={isSubmitting}>
-                {isSubmitting
-                  ? isEditMode
-                    ? '更新中...'
-                    : '作成中...'
-                  : isEditMode
-                    ? '更新'
-                    : '作成'}
-              </Button>
+          </div>
+          <div className="grid gap-2">
+            <Label htmlFor={fields.yearMonth.id}>対象月</Label>
+            <Select
+              key={fields.yearMonth.key}
+              name={fields.yearMonth.name}
+              defaultValue={defaultYearMonth}
+            >
+              <SelectTrigger id={fields.yearMonth.id} className="w-full">
+                <SelectValue placeholder="対象月を選択" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectGroup>
+                  {months.map((monthItem) => (
+                    <SelectItem key={monthItem.id} value={monthItem.id}>
+                      {monthItem.label}
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+              </SelectContent>
+            </Select>
+            <div className="text-destructive text-sm empty:hidden">
+              {fields.yearMonth.errors}
             </div>
-          </Form>
-        </CardContent>
-      </Card>
+          </div>
+          {form.errors && (
+            <div className="bg-destructive/10 text-destructive col-span-full rounded-md p-3 text-sm">
+              {form.errors}
+            </div>
+          )}
+          {isEditMode && existingInvoice?.freeeInvoiceId && (
+            <input
+              type="hidden"
+              name="freeeInvoiceId"
+              value={existingInvoice.freeeInvoiceId}
+            />
+          )}
+          <div className="md:col-span-2">
+            <Button type="submit" disabled={isSubmitting}>
+              {isSubmitting
+                ? isEditMode
+                  ? '更新中...'
+                  : '作成中...'
+                : isEditMode
+                  ? '更新'
+                  : '作成'}
+            </Button>
+          </div>
+        </Form>
+      </ContentPanel>
       {actionData && 'ok' in actionData && actionData.ok && (
-        <Card>
-          <CardContent className="space-y-1">
-            <div className="text-lg font-semibold">
-              {actionData.isUpdate ? '更新完了' : '作成完了'}
-            </div>
-            {actionData.billingType === 'time' && (
-              <p className="text-sm">稼働時間: {actionData.totalHours} 時間</p>
-            )}
-            <p className="text-sm">
-              金額: ¥{actionData.amount.toLocaleString()}（税抜）
-            </p>
-            {actionData.invoice && (
-              <>
-                <p className="text-sm">
-                  請求書番号: {actionData.invoice.number}
-                </p>
-                <p className="text-sm">
-                  <a
-                    href={`https://invoice.secure.freee.co.jp/reports/invoices/${actionData.invoice.id}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-primary underline hover:no-underline"
-                  >
-                    freee で確認 ↗
-                  </a>
-                </p>
-              </>
-            )}
-          </CardContent>
-        </Card>
+        <ContentPanel className="space-y-1 p-6">
+          <div className="text-lg font-semibold">
+            {actionData.isUpdate ? '更新完了' : '作成完了'}
+          </div>
+          {actionData.billingType === 'time' && (
+            <p className="text-sm">稼働時間: {actionData.totalHours} 時間</p>
+          )}
+          <p className="text-sm">
+            金額: ¥{actionData.amount.toLocaleString()}（税抜）
+          </p>
+          {actionData.invoice && (
+            <>
+              <p className="text-sm">請求書番号: {actionData.invoice.number}</p>
+              <p className="text-sm">
+                <a
+                  href={`https://invoice.secure.freee.co.jp/reports/invoices/${actionData.invoice.id}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-primary underline hover:no-underline"
+                >
+                  freee で確認 ↗
+                </a>
+              </p>
+            </>
+          )}
+        </ContentPanel>
       )}
     </div>
   )

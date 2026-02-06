@@ -5,6 +5,7 @@ import {
   SettingsIcon,
 } from 'lucide-react'
 import { Link } from 'react-router'
+import { PageHeader } from '~/components/page-header'
 import {
   Card,
   CardDescription,
@@ -30,18 +31,10 @@ export default function OrgIndex({
 
   return (
     <div className="grid gap-6">
-      <div>
-        <h1 className="text-2xl font-bold">{organization.name}</h1>
-        <p className="text-muted-foreground">
-          ようこそ、
-          {membership.role === 'owner'
-            ? 'オーナー'
-            : membership.role === 'admin'
-              ? '管理者'
-              : 'スタッフ'}
-          としてログインしています
-        </p>
-      </div>
+      <PageHeader
+        title={organization.name}
+        subtitle={`ようこそ、${membership.role === 'owner' ? 'オーナー' : membership.role === 'admin' ? '管理者' : 'スタッフ'}としてログインしています`}
+      />
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {/* 全スタッフ向け */}

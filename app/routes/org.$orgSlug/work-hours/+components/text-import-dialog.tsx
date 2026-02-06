@@ -1,6 +1,7 @@
 import { LoaderIcon, SparklesIcon } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useFetcher } from 'react-router'
+import { formatMinutesToDuration } from '~/components/time-utils'
 import { useTimesheetStore } from '~/components/timesheet/store'
 import { Button } from '~/components/ui/button'
 import {
@@ -99,7 +100,7 @@ export function TextImportDialog({ clientId, year, month }: Props) {
 
   const formatBreak = (minutes: number | undefined) => {
     if (!minutes) return '-'
-    return `${(minutes / 60).toFixed(1)}h`
+    return formatMinutesToDuration(minutes)
   }
 
   return (

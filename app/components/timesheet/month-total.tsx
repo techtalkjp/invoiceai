@@ -1,3 +1,4 @@
+import { DurationDisplay } from '~/components/duration-display'
 import { calculateWorkDuration } from '~/components/time-utils'
 import { useTimesheetStore } from './store'
 
@@ -24,14 +25,7 @@ export function MonthTotalDisplay({ monthDates }: MonthTotalDisplayProps) {
     <div className="text-muted-foreground text-sm">
       合計:{' '}
       <span className="font-bold">
-        {Math.floor(monthTotal / 60)}
-        <span className="text-[0.8em]">時間</span>
-        {monthTotal % 60 > 0 && (
-          <>
-            {monthTotal % 60}
-            <span className="text-[0.8em]">分</span>
-          </>
-        )}
+        <DurationDisplay minutes={monthTotal} />
       </span>
     </div>
   )
