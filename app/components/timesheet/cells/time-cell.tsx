@@ -1,4 +1,6 @@
 import { useState } from 'react'
+import { TimeGridPicker } from '~/components/time-grid-picker'
+import { TimeInput } from '~/components/time-input'
 import {
   Popover,
   PopoverArrow,
@@ -7,8 +9,6 @@ import {
 } from '~/components/ui/popover'
 import { TableCell } from '~/components/ui/table'
 import { cn } from '~/lib/utils'
-import { TimeGridPicker } from '../../time-grid-picker'
-import { TimeInput } from '../../time-input'
 import { useEntryField, useTimesheetStore } from '../store'
 import { navigateToCell } from '../utils'
 

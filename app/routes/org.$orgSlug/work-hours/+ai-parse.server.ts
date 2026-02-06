@@ -1,4 +1,5 @@
 import { google } from '@ai-sdk/google'
+import holidayJp from '@holiday-jp/holiday_jp'
 import { Output, generateText } from 'ai'
 import { z } from 'zod'
 
@@ -25,6 +26,40 @@ const parseResultSchema = z.object({
 export type ParsedWorkEntry = z.infer<typeof workEntrySchema>
 export type ParseResult = z.infer<typeof parseResultSchema>
 
+const DAY_LABELS = ['日', '月', '火', '水', '木', '金', '土']
+
+/**
+ * 指定年月のカレンダー情報（曜日・祝日）を生成
+ */
+function buildCalendarContext(year: number, month: number): string {
+  const daysInMonth = new Date(year, month, 0).getDate()
+  const start = new Date(year, month - 1, 1)
+  const end = new Date(year, month - 1, daysInMonth)
+  const holidays = holidayJp.between(start, end)
+  const holidayMap = new Map(
+    holidays.map((h) => {
+      const d = new Date(h.date)
+      return [d.getDate(), h.name]
+    }),
+  )
+
+  const lines: string[] = []
+  for (let day = 1; day <= daysInMonth; day++) {
+    const date = new Date(year, month - 1, day)
+    const dow = DAY_LABELS[date.getDay()]
+    const holiday = holidayMap.get(day)
+    const isWeekend = date.getDay() === 0 || date.getDay() === 6
+    let label = `${month}/${day}(${dow})`
+    if (holiday) {
+      label += ` 祝日:${holiday}`
+    } else if (isWeekend) {
+      label += ' 休日'
+    }
+    lines.push(label)
+  }
+  return lines.join('\n')
+}
+
 /**
  * テキストから稼働時間を抽出する
  */
@@ -33,16 +68,21 @@ export async function parseWorkHoursText(
   year: number,
   month: number,
 ): Promise<ParseResult> {
+  const calendarContext = buildCalendarContext(year, month)
+
   const { output } = await generateText({
     model: google('gemini-flash-latest'),
     output: Output.object({ schema: parseResultSchema }),
     system: `あなたは稼働報告テキストから稼働時間情報を抽出するアシスタントです。
 
-以下のルールに従って情報を抽出してください：
+## ${year}年${month}月のカレンダー
+${calendarContext}
+
+## 抽出ルール
 
 1. 日付の解釈:
    - 「1/15」「1月15日」「15日」などの日付表記を見つけたら、指定された年月（${year}年${month}月）のYYYY-MM-DD形式に変換
-   - 曜日表記（月曜、火曜など）がある場合も参考にする
+   - 曜日表記（月曜、火曜など）がある場合は、上記カレンダーと照合して正しい日付を特定する
    - 日付が明示されていない場合は、前後の文脈から推測
 
 2. 時間の解釈:

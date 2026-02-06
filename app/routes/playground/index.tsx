@@ -1,9 +1,9 @@
 import { Link, useLoaderData } from 'react-router'
 import { z } from 'zod'
+import type { MonthData } from '~/components/timesheet'
+import { monthDataSchema } from '~/components/timesheet/schema'
 import { Button } from '~/components/ui/button'
-import type { MonthData } from './+components/timesheet'
 import { TimesheetDemo } from './+components/timesheet-demo'
-import { monthDataSchema } from './+components/timesheet/schema'
 
 const STORAGE_KEY = 'invoiceai-playground-timesheet'
 

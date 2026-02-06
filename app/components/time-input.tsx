@@ -6,9 +6,9 @@ import {
   type FocusEvent,
   type KeyboardEvent,
 } from 'react'
+import { formatTime, parseTimeInput } from '~/components/time-utils'
 import { Input } from '~/components/ui/input'
 import { cn } from '~/lib/utils'
-import { formatTime, parseTimeInput } from './time-utils'
 
 export interface TimeInputProps {
   value: string

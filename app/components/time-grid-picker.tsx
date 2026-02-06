@@ -1,7 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import {
+  formatTime,
+  getTimeCategory,
+  type TimeCategory,
+} from '~/components/time-utils'
 import { Button } from '~/components/ui/button'
 import { cn } from '~/lib/utils'
-import { formatTime, getTimeCategory, type TimeCategory } from './time-utils'
 
 type IntervalOption = 10 | 15 | 30
 

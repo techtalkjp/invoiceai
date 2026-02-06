@@ -1,21 +1,18 @@
 import {
-  ChevronLeft,
-  ChevronRight,
+  CheckIcon,
   ClipboardPaste,
   Copy,
   Download,
-  Shuffle,
+  LoaderIcon,
   Trash2,
 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   type Clipboard,
-  type MonthData,
   type TimesheetEntry,
   FloatingToolbar,
   MonthTotalDisplay,
   TimesheetTable,
-  generateSampleData,
   getHolidayName,
   getMonthDates,
   isWeekday,
@@ -52,18 +49,32 @@ import {
 } from '~/components/ui/dialog'
 import { Input } from '~/components/ui/input'
 import { Label } from '~/components/ui/label'
-import { useAutoSave, useSaveAction } from './use-auto-save'
+import type { MonthEntry } from '../+schema'
+import { toMonthData } from './data-mapping'
+import { useWorkHoursAutoSave } from './use-work-hours-auto-save'
 
-interface TimesheetDemoProps {
-  initialData?: Record<string, MonthData>
+interface WorkHoursTimesheetProps {
+  clientId: string
+  clientEntry: MonthEntry
+  year: number
+  month: number
+  organizationName: string
+  clientName: string
+  staffName: string
 }
 
-export function TimesheetDemo({ initialData }: TimesheetDemoProps) {
-  const now = new Date()
-  const [year, setYear] = useState(now.getFullYear())
-  const [month, setMonth] = useState(now.getMonth() + 1)
+export function WorkHoursTimesheet({
+  clientId,
+  clientEntry,
+  year,
+  month,
+  organizationName,
+  clientName,
+  staffName,
+}: WorkHoursTimesheetProps) {
+  const monthDates = useMemo(() => getMonthDates(year, month), [year, month])
 
-  // 選択状態（length のみ subscribe - 配列全体を subscribe すると全行が再レンダリングされる）
+  // 選択状態（length のみ subscribe）
   const selectedCount = useTimesheetStore((s) => s.selectedDates.length)
 
   // クリップボード
@@ -72,25 +83,24 @@ export function TimesheetDemo({ initialData }: TimesheetDemoProps) {
   // PDFダウンロードダイアログ
   const [pdfDialogOpen, setPdfDialogOpen] = useState(false)
   const [pdfInfo, setPdfInfo] = useState({
-    organizationName: '',
-    clientName: '',
-    staffName: '',
+    organizationName,
+    clientName,
+    staffName,
   })
 
-  const monthDates = useMemo(() => getMonthDates(year, month), [year, month])
-  const monthKey = `${year}-${String(month).padStart(2, '0')}`
+  // 自動保存
+  const { initializeLastSaved, status: saveStatus } =
+    useWorkHoursAutoSave(clientId)
 
-  // 自動保存（debounce 付き）
-  useAutoSave(monthKey)
-  const { clearAll } = useSaveAction()
-
-  // 月切り替え時に initialData から store にセット
+  // サーバーデータを store にセット
   useEffect(() => {
-    const data = initialData?.[monthKey] ?? {}
+    const data = toMonthData(clientEntry.entries)
     useTimesheetStore.getState().setMonthData(data)
-  }, [initialData, monthKey])
+    // 初期データを lastSaved に設定して無駄な保存を防ぐ
+    initializeLastSaved(JSON.stringify(data))
+  }, [clientEntry, initializeLastSaved])
 
-  // monthDates を store にセット（範囲選択で使用）
+  // monthDates を store にセット
   useEffect(() => {
     useTimesheetStore.getState().setMonthDates(monthDates)
   }, [monthDates])
@@ -100,7 +110,7 @@ export function TimesheetDemo({ initialData }: TimesheetDemoProps) {
     useTimesheetStore.getState().setIsDragging(false)
   }, [])
 
-  // グローバルなmouseup/mousemoveをリッスン + 自動スクロール
+  // グローバルなmouseup/mousemove/touchイベント + 自動スクロール
   useEffect(() => {
     let scrollAnimationId: number | null = null
 
@@ -110,53 +120,6 @@ export function TimesheetDemo({ initialData }: TimesheetDemoProps) {
         cancelAnimationFrame(scrollAnimationId)
         scrollAnimationId = null
       }
-    }
-
-    const handleGlobalMouseMove = (e: MouseEvent) => {
-      const { isDragging: dragging, dragStartDate: startDate } =
-        useTimesheetStore.getState()
-      if (!dragging || !startDate) return
-
-      const mouseY = e.clientY
-      const viewportHeight = window.innerHeight
-      const scrollThreshold = 80 // 画面端からこのpx以内で自動スクロール開始
-      const scrollSpeed = 15
-
-      // 自動スクロール処理
-      if (scrollAnimationId) {
-        cancelAnimationFrame(scrollAnimationId)
-        scrollAnimationId = null
-      }
-
-      const autoScroll = () => {
-        let scrolled = false
-        if (mouseY < scrollThreshold) {
-          // 上端に近い: 上にスクロール
-          window.scrollBy(0, -scrollSpeed)
-          scrolled = true
-        } else if (mouseY > viewportHeight - scrollThreshold) {
-          // 下端に近い: 下にスクロール
-          window.scrollBy(0, scrollSpeed)
-          scrolled = true
-        }
-
-        if (scrolled && useTimesheetStore.getState().isDragging) {
-          // スクロール後に選択を更新
-          updateSelectionFromMouseY(mouseY)
-          scrollAnimationId = requestAnimationFrame(autoScroll)
-        }
-      }
-
-      // 端に近ければ自動スクロール開始
-      if (
-        mouseY < scrollThreshold ||
-        mouseY > viewportHeight - scrollThreshold
-      ) {
-        scrollAnimationId = requestAnimationFrame(autoScroll)
-      }
-
-      // 選択を更新
-      updateSelectionFromMouseY(mouseY)
     }
 
     const updateSelectionFromMouseY = (mouseY: number) => {
@@ -173,7 +136,6 @@ export function TimesheetDemo({ initialData }: TimesheetDemoProps) {
         const rowCenterY = rect.top + rect.height / 2
         const distance = Math.abs(mouseY - rowCenterY)
 
-        // マウスが行より上にある場合は最初の行、下にある場合は最後の行を選択
         if (mouseY < rect.top && rows.indexOf(row) === 0) {
           closestRow = row
           break
@@ -194,6 +156,47 @@ export function TimesheetDemo({ initialData }: TimesheetDemoProps) {
           useTimesheetStore.getState().extendSelection(date)
         }
       }
+    }
+
+    const handleGlobalMouseMove = (e: MouseEvent) => {
+      const { isDragging: dragging, dragStartDate: startDate } =
+        useTimesheetStore.getState()
+      if (!dragging || !startDate) return
+
+      const mouseY = e.clientY
+      const viewportHeight = window.innerHeight
+      const scrollThreshold = 80
+      const scrollSpeed = 15
+
+      if (scrollAnimationId) {
+        cancelAnimationFrame(scrollAnimationId)
+        scrollAnimationId = null
+      }
+
+      const autoScroll = () => {
+        let scrolled = false
+        if (mouseY < scrollThreshold) {
+          window.scrollBy(0, -scrollSpeed)
+          scrolled = true
+        } else if (mouseY > viewportHeight - scrollThreshold) {
+          window.scrollBy(0, scrollSpeed)
+          scrolled = true
+        }
+
+        if (scrolled && useTimesheetStore.getState().isDragging) {
+          updateSelectionFromMouseY(mouseY)
+          scrollAnimationId = requestAnimationFrame(autoScroll)
+        }
+      }
+
+      if (
+        mouseY < scrollThreshold ||
+        mouseY > viewportHeight - scrollThreshold
+      ) {
+        scrollAnimationId = requestAnimationFrame(autoScroll)
+      }
+
+      updateSelectionFromMouseY(mouseY)
     }
 
     const handleGlobalTouchEnd = () => {
@@ -246,7 +249,6 @@ export function TimesheetDemo({ initialData }: TimesheetDemoProps) {
       }
 
       updateSelectionFromMouseY(touchY)
-      // タッチ中のスクロールを防止（選択操作を優先）
       e.preventDefault()
     }
 
@@ -267,7 +269,7 @@ export function TimesheetDemo({ initialData }: TimesheetDemoProps) {
     }
   }, [])
 
-  // 選択解除（テーブル外クリック）
+  // 選択解除
   const handleClearSelection = useCallback(() => {
     const { selectedDates, setSelectedDates } = useTimesheetStore.getState()
     if (selectedDates.length > 0) {
@@ -296,7 +298,6 @@ export function TimesheetDemo({ initialData }: TimesheetDemoProps) {
     setMonthData((prev) => {
       const newData = { ...prev }
       selectedDates.forEach((date: string, idx: number) => {
-        // クリップボードの内容を繰り返し適用
         const entry = clipboard[idx % clipboard.length]
         if (entry) {
           newData[date] = { ...entry }
@@ -346,68 +347,18 @@ export function TimesheetDemo({ initialData }: TimesheetDemoProps) {
   // 全クリア
   const handleClearAll = useCallback(() => {
     useTimesheetStore.getState().clearAllData()
-    clearAll() // LocalStorage からも削除
-  }, [clearAll])
-
-  const handlePrevMonth = () => {
-    if (month === 1) {
-      setYear(year - 1)
-      setMonth(12)
-    } else {
-      setMonth(month - 1)
-    }
-    // 月切り替え時は useEffect で initialData から読み込む
-  }
-
-  const handleNextMonth = () => {
-    if (month === 12) {
-      setYear(year + 1)
-      setMonth(1)
-    } else {
-      setMonth(month + 1)
-    }
-    // 月切り替え時は useEffect で initialData から読み込む
-  }
+  }, [])
 
   return (
     // biome-ignore lint/a11y/useKeyWithClickEvents lint/a11y/noStaticElementInteractions: selection clear on background click
     <div className="space-y-4" onClick={handleClearSelection}>
-      {/* ヘッダー */}
+      {/* ヘッダー: アクション + 保存状態 + 合計 */}
       {/* biome-ignore lint/a11y/useKeyWithClickEvents lint/a11y/noStaticElementInteractions: stop propagation only */}
       <div
-        className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between"
+        className="flex items-center justify-between gap-3"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* 上段: 月切替 + 合計 */}
-        <div className="flex items-center justify-between gap-4 sm:justify-start">
-          <div className="flex items-center gap-2">
-            <Button variant="outline" size="icon" onClick={handlePrevMonth}>
-              <ChevronLeft className="size-4" />
-            </Button>
-            <span className="min-w-32 text-center text-lg font-medium">
-              {year}年{month}月
-            </span>
-            <Button variant="outline" size="icon" onClick={handleNextMonth}>
-              <ChevronRight className="size-4" />
-            </Button>
-          </div>
-          <MonthTotalDisplay monthDates={monthDates} />
-        </div>
-        {/* 下段: アクションボタン群 */}
-        <div className="flex items-center justify-end gap-2 sm:gap-4">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() =>
-              useTimesheetStore
-                .getState()
-                .setMonthData(generateSampleData(year, month))
-            }
-            className="text-muted-foreground"
-          >
-            <Shuffle className="size-4" />
-            サンプル
-          </Button>
+        <div className="flex items-center gap-2">
           <Dialog open={pdfDialogOpen} onOpenChange={setPdfDialogOpen}>
             <DialogTrigger asChild>
               <Button
@@ -521,6 +472,21 @@ export function TimesheetDemo({ initialData }: TimesheetDemoProps) {
               </AlertDialogFooter>
             </AlertDialogContent>
           </AlertDialog>
+        </div>
+        <div className="flex items-center gap-3">
+          {saveStatus === 'saving' && (
+            <span className="text-muted-foreground flex items-center gap-1 text-xs">
+              <LoaderIcon className="size-3 animate-spin" />
+              保存中…
+            </span>
+          )}
+          {saveStatus === 'saved' && (
+            <span className="text-muted-foreground animate-in fade-in flex items-center gap-1 text-xs">
+              <CheckIcon className="size-3" />
+              保存済み
+            </span>
+          )}
+          <MonthTotalDisplay monthDates={monthDates} />
         </div>
       </div>
 

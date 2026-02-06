@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { useFetcher } from 'react-router'
-import { useTimesheetStore } from './store'
-import type { MonthData } from './types'
+import { useTimesheetStore } from '~/components/timesheet/store'
+import type { MonthData } from '~/components/timesheet/types'
 
 /**
  * store の monthData を監視し、変更があれば clientAction に保存を依頼する

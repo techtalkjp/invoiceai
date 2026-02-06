@@ -37,12 +37,20 @@ export const parseTextSchema = z.object({
   month: z.coerce.number().int().min(1).max(12),
 })
 
+// 月データ一括保存スキーマ
+export const saveMonthDataSchema = z.object({
+  intent: z.literal('saveMonthData'),
+  clientId: z.string().min(1),
+  monthData: z.string(), // JSON string of MonthData
+})
+
 // フォームスキーマ（discriminated union）
 export const formSchema = z.discriminatedUnion('intent', [
   saveEntrySchema,
   saveEntriesSchema,
   deleteEntrySchema,
   parseTextSchema,
+  saveMonthDataSchema,
 ])
 
 // 型定義

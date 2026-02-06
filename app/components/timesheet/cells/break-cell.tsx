@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { BreakGridPicker } from '~/components/break-grid-picker'
 import {
   Popover,
   PopoverArrow,
@@ -7,7 +8,6 @@ import {
 } from '~/components/ui/popover'
 import { TableCell } from '~/components/ui/table'
 import { cn } from '~/lib/utils'
-import { BreakGridPicker } from '../../break-grid-picker'
 import { useEntryField, useTimesheetStore } from '../store'
 import { navigateToCell } from '../utils'
 

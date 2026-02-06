@@ -1,5 +1,5 @@
+import { calculateWorkDuration } from '~/components/time-utils'
 import { TableCell } from '~/components/ui/table'
-import { calculateWorkDuration } from '../../time-utils'
 import { useEntryField } from '../store'
 
 interface TimesheetWorkCellProps {

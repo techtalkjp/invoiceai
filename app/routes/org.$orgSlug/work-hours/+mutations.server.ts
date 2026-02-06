@@ -98,6 +98,61 @@ export async function saveEntries(
 }
 
 /**
+ * 月データを一括同期（full month sync）
+ * クライアントの MonthData を正として、DB の該当月のエントリを同期する
+ */
+export async function syncMonthEntries(
+  organizationId: string,
+  userId: string,
+  clientId: string,
+  entries: EntryInput[],
+) {
+  // 送信されたエントリの日付セットを作成
+  const submittedDates = new Set(entries.map((e) => e.workDate))
+
+  // エントリの upsert（空エントリは saveEntry 内で自動削除される）
+  await Promise.all(
+    entries.map((entry) => saveEntry(organizationId, userId, entry)),
+  )
+
+  // 送信に含まれていない日付の既存エントリを取得して削除
+  // （ユーザーがクリアした日のエントリ）
+  if (submittedDates.size > 0) {
+    // 送信されたエントリの最小・最大日付を取得して月の範囲を推定
+    const dates = [...submittedDates].sort()
+    const firstDate = dates[0]
+    const lastDate = dates[dates.length - 1]
+    if (firstDate && lastDate) {
+      const existingEntries = await db
+        .selectFrom('workEntry')
+        .select(['id', 'workDate'])
+        .where('organizationId', '=', organizationId)
+        .where('userId', '=', userId)
+        .where('clientId', '=', clientId)
+        .where('workDate', '>=', firstDate)
+        .where('workDate', '<=', lastDate)
+        .execute()
+
+      const toDelete = existingEntries.filter(
+        (e) => !submittedDates.has(e.workDate),
+      )
+      if (toDelete.length > 0) {
+        await db
+          .deleteFrom('workEntry')
+          .where(
+            'id',
+            'in',
+            toDelete.map((e) => e.id),
+          )
+          .execute()
+      }
+    }
+  }
+
+  return { synced: true }
+}
+
+/**
  * エントリを削除
  */
 export async function deleteEntry(

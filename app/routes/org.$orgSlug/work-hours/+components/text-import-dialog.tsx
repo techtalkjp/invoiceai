@@ -1,6 +1,7 @@
 import { ClipboardPasteIcon, LoaderIcon, SparklesIcon } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useFetcher } from 'react-router'
+import { useTimesheetStore } from '~/components/timesheet/store'
 import { Button } from '~/components/ui/button'
 import {
   Dialog,
@@ -41,10 +42,7 @@ export function TextImportDialog({ clientId, year, month }: Props) {
     error?: string
   }>({ key: `parse-text-${clientId}` })
 
-  const saveFetcher = useFetcher({ key: `save-entries-${clientId}` })
-
   const isParsing = parseFetcher.state !== 'idle'
-  const isSaving = saveFetcher.state !== 'idle'
 
   // 解析結果を受け取ったら表示
   useEffect(() => {
@@ -53,16 +51,6 @@ export function TextImportDialog({ clientId, year, month }: Props) {
       setParseErrors(parseFetcher.data.parseErrors ?? [])
     }
   }, [parseFetcher.data])
-
-  // 保存完了したらダイアログを閉じる
-  useEffect(() => {
-    if (saveFetcher.state === 'idle' && saveFetcher.data) {
-      setIsOpen(false)
-      setInputText('')
-      setParsedEntries([])
-      setParseErrors([])
-    }
-  }, [saveFetcher.state, saveFetcher.data])
 
   const handleParse = () => {
     if (!inputText.trim()) return
@@ -81,19 +69,24 @@ export function TextImportDialog({ clientId, year, month }: Props) {
   const handleSave = () => {
     if (parsedEntries.length === 0) return
 
-    // entriesをJSON文字列に変換して送信
-    const entriesWithClient = parsedEntries.map((entry) => ({
-      ...entry,
-      clientId,
-    }))
+    // store にマージ（auto-save が自動的にサーバーに保存する）
+    useTimesheetStore.getState().setMonthData((prev) => {
+      const newData = { ...prev }
+      for (const entry of parsedEntries) {
+        newData[entry.workDate] = {
+          startTime: entry.startTime ?? '',
+          endTime: entry.endTime ?? '',
+          breakMinutes: entry.breakMinutes ?? 0,
+          description: entry.description ?? '',
+        }
+      }
+      return newData
+    })
 
-    saveFetcher.submit(
-      {
-        intent: 'saveEntries',
-        entries: JSON.stringify(entriesWithClient),
-      },
-      { method: 'POST' },
-    )
+    setIsOpen(false)
+    setInputText('')
+    setParsedEntries([])
+    setParseErrors([])
   }
 
   const handleRemoveEntry = (index: number) => {
@@ -234,25 +227,11 @@ MTG、ドキュメント作成`}
         </div>
 
         <DialogFooter className="shrink-0">
-          <Button
-            variant="outline"
-            onClick={() => setIsOpen(false)}
-            disabled={isSaving}
-          >
+          <Button variant="outline" onClick={() => setIsOpen(false)}>
             キャンセル
           </Button>
-          <Button
-            onClick={handleSave}
-            disabled={parsedEntries.length === 0 || isSaving}
-          >
-            {isSaving ? (
-              <>
-                <LoaderIcon className="mr-2 h-4 w-4 animate-spin" />
-                保存中...
-              </>
-            ) : (
-              `${parsedEntries.length}件を保存`
-            )}
+          <Button onClick={handleSave} disabled={parsedEntries.length === 0}>
+            {`${parsedEntries.length}件を反映`}
           </Button>
         </DialogFooter>
       </DialogContent>

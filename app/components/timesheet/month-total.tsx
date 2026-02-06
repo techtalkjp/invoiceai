@@ -1,4 +1,4 @@
-import { calculateWorkDuration } from '../time-utils'
+import { calculateWorkDuration } from '~/components/time-utils'
 import { useTimesheetStore } from './store'
 
 interface MonthTotalDisplayProps {
