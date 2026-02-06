@@ -106,6 +106,7 @@ export async function syncMonthEntries(
   userId: string,
   clientId: string,
   entries: EntryInput[],
+  yearMonth?: string,
 ) {
   // 送信されたエントリの日付セットを作成
   const submittedDates = new Set(entries.map((e) => e.workDate))
@@ -115,37 +116,48 @@ export async function syncMonthEntries(
     entries.map((entry) => saveEntry(organizationId, userId, entry)),
   )
 
-  // 送信に含まれていない日付の既存エントリを取得して削除
-  // （ユーザーがクリアした日のエントリ）
-  if (submittedDates.size > 0) {
-    // 送信されたエントリの最小・最大日付を取得して月の範囲を推定
-    const dates = [...submittedDates].sort()
-    const firstDate = dates[0]
-    const lastDate = dates[dates.length - 1]
-    if (firstDate && lastDate) {
-      const existingEntries = await db
-        .selectFrom('workEntry')
-        .select(['id', 'workDate'])
-        .where('organizationId', '=', organizationId)
-        .where('userId', '=', userId)
-        .where('clientId', '=', clientId)
-        .where('workDate', '>=', firstDate)
-        .where('workDate', '<=', lastDate)
-        .execute()
+  // 月の範囲を決定（yearMonth が渡されなければ entries から推定）
+  let firstDate: string | undefined
+  let lastDate: string | undefined
 
-      const toDelete = existingEntries.filter(
-        (e) => !submittedDates.has(e.workDate),
-      )
-      if (toDelete.length > 0) {
-        await db
-          .deleteFrom('workEntry')
-          .where(
-            'id',
-            'in',
-            toDelete.map((e) => e.id),
-          )
-          .execute()
-      }
+  if (yearMonth) {
+    // "YYYY-MM" 形式から月初・月末を計算
+    const [y, m] = yearMonth.split('-').map(Number)
+    if (y && m) {
+      firstDate = `${y}-${String(m).padStart(2, '0')}-01`
+      const lastDay = new Date(y, m, 0).getDate()
+      lastDate = `${y}-${String(m).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`
+    }
+  } else if (submittedDates.size > 0) {
+    const dates = [...submittedDates].sort()
+    firstDate = dates[0]
+    lastDate = dates[dates.length - 1]
+  }
+
+  // 送信に含まれていない日付の既存エントリを削除
+  if (firstDate && lastDate) {
+    const existingEntries = await db
+      .selectFrom('workEntry')
+      .select(['id', 'workDate'])
+      .where('organizationId', '=', organizationId)
+      .where('userId', '=', userId)
+      .where('clientId', '=', clientId)
+      .where('workDate', '>=', firstDate)
+      .where('workDate', '<=', lastDate)
+      .execute()
+
+    const toDelete = existingEntries.filter(
+      (e) => !submittedDates.has(e.workDate),
+    )
+    if (toDelete.length > 0) {
+      await db
+        .deleteFrom('workEntry')
+        .where(
+          'id',
+          'in',
+          toDelete.map((e) => e.id),
+        )
+        .execute()
     }
   }
 

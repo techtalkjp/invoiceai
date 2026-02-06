@@ -4,6 +4,7 @@ import {
   ClipboardPaste,
   Copy,
   Download,
+  FilterIcon,
   Shuffle,
   Trash2,
 } from 'lucide-react'
@@ -78,6 +79,15 @@ export function TimesheetDemo({ initialData }: TimesheetDemoProps) {
   })
 
   const monthDates = useMemo(() => getMonthDates(year, month), [year, month])
+  const [showOnlyFilled, setShowOnlyFilled] = useState(false)
+  const monthData = useTimesheetStore((s) => s.monthData)
+  const filteredDates = useMemo(() => {
+    if (!showOnlyFilled) return monthDates
+    return monthDates.filter((date) => {
+      const entry = monthData[date]
+      return entry?.startTime || entry?.endTime
+    })
+  }, [showOnlyFilled, monthDates, monthData])
   const monthKey = `${year}-${String(month).padStart(2, '0')}`
 
   // 自動保存（debounce 付き）
@@ -396,6 +406,15 @@ export function TimesheetDemo({ initialData }: TimesheetDemoProps) {
         {/* 下段: アクションボタン群 */}
         <div className="flex items-center justify-end gap-2 sm:gap-4">
           <Button
+            variant={showOnlyFilled ? 'secondary' : 'ghost'}
+            size="sm"
+            onClick={() => setShowOnlyFilled((v) => !v)}
+            className="text-muted-foreground text-xs"
+          >
+            <FilterIcon className="size-3.5" />
+            入力済みのみ
+          </Button>
+          <Button
             variant="ghost"
             size="sm"
             onClick={() =>
@@ -532,7 +551,10 @@ export function TimesheetDemo({ initialData }: TimesheetDemoProps) {
             className="overflow-hidden rounded-md border select-none"
             onClick={(e) => e.stopPropagation()}
           >
-            <TimesheetTable monthDates={monthDates} onMouseUp={handleMouseUp} />
+            <TimesheetTable
+              monthDates={filteredDates}
+              onMouseUp={handleMouseUp}
+            />
           </div>
         </ContextMenuTrigger>
         <ContextMenuContent>

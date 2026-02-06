@@ -1,28 +1,19 @@
-import holidayJp from '@holiday-jp/holiday_jp'
 import { renderToBuffer } from '@react-pdf/renderer'
 import { PDFDocument } from 'pdf-lib'
+import {
+  TimesheetPdfDocument,
+  buildTimesheetPdfData,
+} from '~/components/timesheet-pdf'
 import { requireOrgMember } from '~/lib/auth-helpers.server'
 import { db } from '~/lib/db/kysely'
 import { getFreeeClientForOrganization } from '~/utils/freee.server'
 import { parseYearMonthId } from '~/utils/month'
-import {
-  TimesheetDocument,
-  type TimesheetData,
-  type TimesheetEntry,
-} from './+pdf/timesheet-template'
+import { registerPdfFontServer } from './+pdf/register-font.server'
 import {
   getInvoiceByYearMonth,
   getTimesheetDataForPdf,
 } from './+queries.server'
 import type { Route } from './+types/invoice-pdf.$clientId.$yearMonth'
-
-function isHoliday(dateStr: string): { isHoliday: boolean; name?: string } {
-  const date = new Date(dateStr)
-  const holiday = holidayJp.between(date, date)[0]
-  return holiday
-    ? { isHoliday: true, name: holiday.name }
-    : { isHoliday: false }
-}
 
 export async function loader({ request, params }: Route.LoaderArgs) {
   const { orgSlug, clientId, yearMonth } = params
@@ -77,40 +68,18 @@ export async function loader({ request, params }: Route.LoaderArgs) {
     )
 
     if (timesheetData.staffTimesheets.length > 0) {
+      // PDF用データに変換
+      const timesheets = buildTimesheetPdfData({
+        ...timesheetData,
+        organizationName: organization.name,
+        year,
+        month,
+      })
+
       // タイムシート PDF を生成
-      const timesheets: TimesheetData[] = timesheetData.staffTimesheets.map(
-        (staff) => {
-          const entries: TimesheetEntry[] = staff.entries.map((entry) => {
-            const dateObj = new Date(entry.date)
-            const holidayInfo = isHoliday(entry.date)
-
-            return {
-              date: entry.date,
-              dayOfWeek: dateObj.getDay(),
-              isHoliday: holidayInfo.isHoliday,
-              holidayName: holidayInfo.name,
-              startTime: entry.startTime ?? undefined,
-              endTime: entry.endTime ?? undefined,
-              breakMinutes: entry.breakMinutes ?? 0,
-              hours: entry.hours ?? 0,
-              description: entry.description ?? undefined,
-            }
-          })
-
-          return {
-            staffName: staff.staffName,
-            clientName: timesheetData.clientName,
-            organizationName: organization.name,
-            year,
-            month,
-            entries,
-            totalHours: staff.totalHours,
-          }
-        },
-      )
-
+      registerPdfFontServer()
       const timesheetPdfBuffer = await renderToBuffer(
-        TimesheetDocument({ timesheets }),
+        TimesheetPdfDocument({ timesheets }),
       )
 
       // PDF を結合

@@ -1,12 +1,16 @@
 import {
   CheckIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
   ClipboardPaste,
   Copy,
   Download,
+  FilterIcon,
   LoaderIcon,
   Trash2,
 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Link } from 'react-router'
 import {
   type Clipboard,
   type TimesheetEntry,
@@ -61,6 +65,9 @@ interface WorkHoursTimesheetProps {
   organizationName: string
   clientName: string
   staffName: string
+  monthLabel: string
+  prevMonthUrl: string
+  nextMonthUrl: string
 }
 
 export function WorkHoursTimesheet({
@@ -71,8 +78,20 @@ export function WorkHoursTimesheet({
   organizationName,
   clientName,
   staffName,
+  monthLabel,
+  prevMonthUrl,
+  nextMonthUrl,
 }: WorkHoursTimesheetProps) {
   const monthDates = useMemo(() => getMonthDates(year, month), [year, month])
+  const [showOnlyFilled, setShowOnlyFilled] = useState(false)
+  const monthData = useTimesheetStore((s) => s.monthData)
+  const filteredDates = useMemo(() => {
+    if (!showOnlyFilled) return monthDates
+    return monthDates.filter((date) => {
+      const entry = monthData[date]
+      return entry?.startTime || entry?.endTime
+    })
+  }, [showOnlyFilled, monthDates, monthData])
 
   // 選択状態（length のみ subscribe）
   const selectedCount = useTimesheetStore((s) => s.selectedDates.length)
@@ -89,8 +108,11 @@ export function WorkHoursTimesheet({
   })
 
   // 自動保存
-  const { initializeLastSaved, status: saveStatus } =
-    useWorkHoursAutoSave(clientId)
+  const {
+    initializeLastSaved,
+    status: saveStatus,
+    flush,
+  } = useWorkHoursAutoSave(clientId, year, month)
 
   // サーバーデータを store にセット
   useEffect(() => {
@@ -305,7 +327,8 @@ export function WorkHoursTimesheet({
       })
       return newData
     })
-  }, [clipboard])
+    flush()
+  }, [clipboard, flush])
 
   // 平日のみペースト
   const handlePasteWeekdaysOnly = useCallback(() => {
@@ -326,7 +349,8 @@ export function WorkHoursTimesheet({
       })
       return newData
     })
-  }, [clipboard])
+    flush()
+  }, [clipboard, flush])
 
   // 選択行クリア
   const handleClearSelected = useCallback(() => {
@@ -342,23 +366,68 @@ export function WorkHoursTimesheet({
       return newData
     })
     setSelectedDates([])
-  }, [])
+    flush()
+  }, [flush])
 
   // 全クリア
   const handleClearAll = useCallback(() => {
     useTimesheetStore.getState().clearAllData()
-  }, [])
+    flush()
+  }, [flush])
 
   return (
     // biome-ignore lint/a11y/useKeyWithClickEvents lint/a11y/noStaticElementInteractions: selection clear on background click
     <div className="space-y-4" onClick={handleClearSelection}>
-      {/* ヘッダー: アクション + 保存状態 + 合計 */}
+      {/* ヘッダー */}
       {/* biome-ignore lint/a11y/useKeyWithClickEvents lint/a11y/noStaticElementInteractions: stop propagation only */}
       <div
-        className="flex items-center justify-between gap-3"
+        className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center gap-2">
+        {/* 上段: 月切替 + 保存状態 + 合計 */}
+        <div className="flex items-center justify-between gap-4 sm:justify-start">
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="icon" asChild>
+              <Link to={prevMonthUrl}>
+                <ChevronLeftIcon className="size-4" />
+              </Link>
+            </Button>
+            <span className="min-w-32 text-center text-lg font-medium">
+              {monthLabel}
+            </span>
+            <Button variant="outline" size="icon" asChild>
+              <Link to={nextMonthUrl}>
+                <ChevronRightIcon className="size-4" />
+              </Link>
+            </Button>
+          </div>
+          <div className="flex items-center gap-3">
+            <MonthTotalDisplay monthDates={monthDates} />
+            {saveStatus === 'saving' && (
+              <span className="text-muted-foreground flex items-center gap-1 text-xs">
+                <LoaderIcon className="size-3 animate-spin" />
+                保存中…
+              </span>
+            )}
+            {saveStatus === 'saved' && (
+              <span className="text-muted-foreground animate-in fade-in flex items-center gap-1 text-xs">
+                <CheckIcon className="size-3" />
+                保存済み
+              </span>
+            )}
+          </div>
+        </div>
+        {/* 下段: アクションボタン群 */}
+        <div className="flex items-center justify-end gap-2 sm:gap-4">
+          <Button
+            variant={showOnlyFilled ? 'secondary' : 'ghost'}
+            size="sm"
+            onClick={() => setShowOnlyFilled((v) => !v)}
+            className="text-muted-foreground text-xs"
+          >
+            <FilterIcon className="size-3.5" />
+            入力済みのみ
+          </Button>
           <Dialog open={pdfDialogOpen} onOpenChange={setPdfDialogOpen}>
             <DialogTrigger asChild>
               <Button
@@ -473,21 +542,6 @@ export function WorkHoursTimesheet({
             </AlertDialogContent>
           </AlertDialog>
         </div>
-        <div className="flex items-center gap-3">
-          {saveStatus === 'saving' && (
-            <span className="text-muted-foreground flex items-center gap-1 text-xs">
-              <LoaderIcon className="size-3 animate-spin" />
-              保存中…
-            </span>
-          )}
-          {saveStatus === 'saved' && (
-            <span className="text-muted-foreground animate-in fade-in flex items-center gap-1 text-xs">
-              <CheckIcon className="size-3" />
-              保存済み
-            </span>
-          )}
-          <MonthTotalDisplay monthDates={monthDates} />
-        </div>
       </div>
 
       {/* タイムシート */}
@@ -498,7 +552,10 @@ export function WorkHoursTimesheet({
             className="overflow-hidden rounded-md border select-none"
             onClick={(e) => e.stopPropagation()}
           >
-            <TimesheetTable monthDates={monthDates} onMouseUp={handleMouseUp} />
+            <TimesheetTable
+              monthDates={filteredDates}
+              onMouseUp={handleMouseUp}
+            />
           </div>
         </ContextMenuTrigger>
         <ContextMenuContent>

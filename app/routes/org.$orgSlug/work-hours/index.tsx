@@ -1,6 +1,9 @@
 import { parseWithZod } from '@conform-to/zod/v4'
-import { ChevronLeftIcon, ChevronRightIcon } from 'lucide-react'
+import { ChevronLeftIcon, ChevronRightIcon, FilterIcon } from 'lucide-react'
+import { useMemo, useState } from 'react'
 import { Link } from 'react-router'
+import { formatMinutesToDuration } from '~/components/time-utils'
+import { getMonthDates } from '~/components/timesheet'
 import { Button } from '~/components/ui/button'
 import {
   Card,
@@ -10,25 +13,12 @@ import {
   CardTitle,
 } from '~/components/ui/card'
 import { requireOrgMember } from '~/lib/auth-helpers.server'
+import { formatYearMonthLabel } from '~/utils/month'
 import { TimesheetGrid } from './+components/timesheet-grid'
 import { saveEntry } from './+mutations.server'
 import { getMonthEntries, getTimeBasedClients } from './+queries.server'
 import { formSchema } from './+schema'
 import type { Route } from './+types/index'
-
-function getMonthDates(year: number, month: number): string[] {
-  const dates: string[] = []
-  const daysInMonth = new Date(year, month, 0).getDate()
-  for (let day = 1; day <= daysInMonth; day++) {
-    const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
-    dates.push(dateStr)
-  }
-  return dates
-}
-
-function formatMonthLabel(year: number, month: number): string {
-  return `${year}年${month}月`
-}
 
 export async function loader({ request, params }: Route.LoaderArgs) {
   const { orgSlug } = params
@@ -57,7 +47,7 @@ export async function loader({ request, params }: Route.LoaderArgs) {
   const nextMonth = month === 12 ? 1 : month + 1
   const nextYear = month === 12 ? year + 1 : year
 
-  const monthLabel = formatMonthLabel(year, month)
+  const monthLabel = formatYearMonthLabel(year, month)
 
   return {
     organization,
@@ -111,6 +101,19 @@ export async function action({ request, params }: Route.ActionArgs) {
   return { lastResult: submission.reply(), success: false }
 }
 
+function computeMonthTotalMinutes(
+  monthEntries: Array<{ entries: Record<string, { hours: number }> }>,
+  monthDates: string[],
+): number {
+  let totalMinutes = 0
+  for (const entry of monthEntries) {
+    for (const date of monthDates) {
+      totalMinutes += Math.round((entry.entries[date]?.hours ?? 0) * 60)
+    }
+  }
+  return totalMinutes
+}
+
 export default function WorkHours({
   loaderData: {
     year,
@@ -126,6 +129,15 @@ export default function WorkHours({
   },
   params: { orgSlug },
 }: Route.ComponentProps) {
+  const [showOnlyFilled, setShowOnlyFilled] = useState(false)
+
+  const filteredDates = useMemo(() => {
+    if (!showOnlyFilled) return monthDates
+    return monthDates.filter((date) =>
+      monthEntries.some((entry) => (entry.entries[date]?.hours ?? 0) > 0),
+    )
+  }, [showOnlyFilled, monthDates, monthEntries])
+
   if (clients.length === 0) {
     return (
       <div className="grid gap-6">
@@ -146,49 +158,57 @@ export default function WorkHours({
     )
   }
 
-  return (
-    <div className="grid gap-6">
-      <Card>
-        <CardHeader>
-          <CardTitle>稼働時間入力</CardTitle>
-          <CardDescription>
-            月ごとに稼働時間を入力します。セルをクリックして時間を入力してください。
-          </CardDescription>
-        </CardHeader>
-      </Card>
+  const totalMinutes = computeMonthTotalMinutes(monthEntries, monthDates)
+  const totalLabel =
+    totalMinutes > 0 ? formatMinutesToDuration(totalMinutes) : '0h'
 
-      <Card>
-        <CardHeader className="pb-4">
-          <div className="flex items-center justify-center gap-2">
-            <Button variant="outline" size="icon" asChild>
-              <Link
-                to={`/org/${orgSlug}/work-hours?year=${prevYear}&month=${prevMonth}`}
-              >
-                <ChevronLeftIcon className="h-4 w-4" />
-              </Link>
-            </Button>
-            <span className="min-w-32 text-center text-lg font-medium">
-              {monthLabel}
-            </span>
-            <Button variant="outline" size="icon" asChild>
-              <Link
-                to={`/org/${orgSlug}/work-hours?year=${nextYear}&month=${nextMonth}`}
-              >
-                <ChevronRightIcon className="h-4 w-4" />
-              </Link>
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <TimesheetGrid
-            orgSlug={orgSlug}
-            year={year}
-            month={month}
-            monthDates={monthDates}
-            monthEntries={monthEntries}
-          />
-        </CardContent>
-      </Card>
+  return (
+    <div className="grid gap-4">
+      <div className="flex items-center justify-center gap-2">
+        <Button variant="outline" size="icon" asChild>
+          <Link
+            to={`/org/${orgSlug}/work-hours?year=${prevYear}&month=${prevMonth}`}
+          >
+            <ChevronLeftIcon className="h-4 w-4" />
+          </Link>
+        </Button>
+        <span className="min-w-32 text-center text-lg font-medium">
+          {monthLabel}
+        </span>
+        <Button variant="outline" size="icon" asChild>
+          <Link
+            to={`/org/${orgSlug}/work-hours?year=${nextYear}&month=${nextMonth}`}
+          >
+            <ChevronRightIcon className="h-4 w-4" />
+          </Link>
+        </Button>
+      </div>
+
+      <div className="flex items-center justify-between">
+        <Button
+          variant={showOnlyFilled ? 'secondary' : 'ghost'}
+          size="sm"
+          onClick={() => setShowOnlyFilled((v) => !v)}
+          className="text-muted-foreground text-xs"
+        >
+          <FilterIcon className="size-3.5" />
+          入力済みのみ
+        </Button>
+        <span className="text-muted-foreground text-sm">
+          合計:{' '}
+          <span className="text-foreground font-medium">{totalLabel}</span>
+        </span>
+      </div>
+
+      <div className="overflow-hidden rounded-md border">
+        <TimesheetGrid
+          orgSlug={orgSlug}
+          year={year}
+          month={month}
+          monthDates={filteredDates}
+          monthEntries={monthEntries}
+        />
+      </div>
     </div>
   )
 }

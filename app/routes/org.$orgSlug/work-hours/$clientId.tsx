@@ -1,14 +1,10 @@
 import { parseWithZod } from '@conform-to/zod/v4'
-import { ArrowLeftIcon, ChevronLeftIcon, ChevronRightIcon } from 'lucide-react'
+import { ArrowLeftIcon } from 'lucide-react'
 import { Link } from 'react-router'
+import { getMonthDates } from '~/components/timesheet'
 import { Button } from '~/components/ui/button'
-import {
-  Card,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '~/components/ui/card'
 import { requireOrgMember } from '~/lib/auth-helpers.server'
+import { formatYearMonthLabel } from '~/utils/month'
 import { parseWorkHoursText } from './+ai-parse.server'
 import { toServerEntries } from './+components/data-mapping'
 import { TextImportDialog } from './+components/text-import-dialog'
@@ -30,20 +26,6 @@ export function shouldRevalidate({
     return false
   }
   return defaultShouldRevalidate
-}
-
-function getMonthDates(year: number, month: number): string[] {
-  const dates: string[] = []
-  const daysInMonth = new Date(year, month, 0).getDate()
-  for (let day = 1; day <= daysInMonth; day++) {
-    const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
-    dates.push(dateStr)
-  }
-  return dates
-}
-
-function formatMonthLabel(year: number, month: number): string {
-  return `${year}年${month}月`
 }
 
 export async function loader({ request, params }: Route.LoaderArgs) {
@@ -79,7 +61,7 @@ export async function loader({ request, params }: Route.LoaderArgs) {
   const nextMonth = month === 12 ? 1 : month + 1
   const nextYear = month === 12 ? year + 1 : year
 
-  const monthLabel = formatMonthLabel(year, month)
+  const monthLabel = formatYearMonthLabel(year, month)
 
   return {
     organization,
@@ -106,6 +88,7 @@ export async function action({ request, params }: Route.ActionArgs) {
   const intent = formData.get('intent')
   if (intent === 'saveMonthData') {
     const clientId = formData.get('clientId') as string
+    const yearMonth = (formData.get('yearMonth') as string) || undefined
     const monthDataJson = formData.get('monthData') as string
     try {
       const monthData = JSON.parse(monthDataJson) as Record<
@@ -118,7 +101,13 @@ export async function action({ request, params }: Route.ActionArgs) {
         }
       >
       const entries = toServerEntries(clientId, monthData)
-      await syncMonthEntries(organization.id, user.id, clientId, entries)
+      await syncMonthEntries(
+        organization.id,
+        user.id,
+        clientId,
+        entries,
+        yearMonth,
+      )
       return { success: true }
     } catch {
       return { success: false, error: '保存に失敗しました' }
@@ -208,53 +197,23 @@ export default function ClientWorkHours({
   params: { orgSlug, clientId },
 }: Route.ComponentProps) {
   return (
-    <div className="grid gap-6">
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <Button variant="ghost" size="icon" asChild>
-                <Link
-                  to={`/org/${orgSlug}/work-hours?year=${year}&month=${month}`}
-                >
-                  <ArrowLeftIcon className="h-4 w-4" />
-                </Link>
-              </Button>
-              <div>
-                <CardTitle>{clientEntry.clientName}</CardTitle>
-                <CardDescription>
-                  セルをクリックして編集 · Tab/Enterで移動
-                </CardDescription>
-              </div>
-            </div>
-            <TextImportDialog clientId={clientId} year={year} month={month} />
+    <div className="grid gap-4">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <Button variant="ghost" size="icon" asChild>
+            <Link to={`/org/${orgSlug}/work-hours?year=${year}&month=${month}`}>
+              <ArrowLeftIcon className="h-4 w-4" />
+            </Link>
+          </Button>
+          <div>
+            <h2 className="text-lg font-semibold">{clientEntry.clientName}</h2>
+            <p className="text-muted-foreground text-sm">
+              セルをクリックして編集 · Tab/Enterで移動
+            </p>
           </div>
-        </CardHeader>
-      </Card>
-
-      <Card>
-        <CardHeader className="pb-4">
-          <div className="flex items-center justify-center gap-2">
-            <Button variant="outline" size="icon" asChild>
-              <Link
-                to={`/org/${orgSlug}/work-hours/${clientId}?year=${prevYear}&month=${prevMonth}`}
-              >
-                <ChevronLeftIcon className="h-4 w-4" />
-              </Link>
-            </Button>
-            <span className="min-w-32 text-center text-lg font-medium">
-              {monthLabel}
-            </span>
-            <Button variant="outline" size="icon" asChild>
-              <Link
-                to={`/org/${orgSlug}/work-hours/${clientId}?year=${nextYear}&month=${nextMonth}`}
-              >
-                <ChevronRightIcon className="h-4 w-4" />
-              </Link>
-            </Button>
-          </div>
-        </CardHeader>
-      </Card>
+        </div>
+        <TextImportDialog clientId={clientId} year={year} month={month} />
+      </div>
 
       <WorkHoursTimesheet
         clientId={clientId}
@@ -264,6 +223,9 @@ export default function ClientWorkHours({
         organizationName={organization.name}
         clientName={clientEntry.clientName}
         staffName={user.name}
+        monthLabel={monthLabel}
+        prevMonthUrl={`/org/${orgSlug}/work-hours/${clientId}?year=${prevYear}&month=${prevMonth}`}
+        nextMonthUrl={`/org/${orgSlug}/work-hours/${clientId}?year=${nextYear}&month=${nextMonth}`}
       />
     </div>
   )

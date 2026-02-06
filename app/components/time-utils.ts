@@ -151,7 +151,7 @@ function minutesToParsedTime(totalMinutes: number): ParsedTime {
 /**
  * 分を時間フォーマットに変換
  */
-function formatMinutesToDuration(minutes: number): string {
+export function formatMinutesToDuration(minutes: number): string {
   const hours = Math.floor(minutes / 60)
   const mins = minutes % 60
   if (mins === 0) {

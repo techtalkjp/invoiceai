@@ -11,7 +11,11 @@ import { useTimesheetStore } from '~/components/timesheet/store'
  */
 type SaveStatus = 'idle' | 'saving' | 'saved'
 
-export function useWorkHoursAutoSave(clientId: string) {
+export function useWorkHoursAutoSave(
+  clientId: string,
+  year: number,
+  month: number,
+) {
   const fetcher = useFetcher({ key: `auto-save-${clientId}` })
   const lastSavedRef = useRef<string>('')
   const dirtyRef = useRef(false)
@@ -35,9 +39,10 @@ export function useWorkHoursAutoSave(clientId: string) {
     const formData = new FormData()
     formData.append('intent', 'saveMonthData')
     formData.append('clientId', clientId)
+    formData.append('yearMonth', `${year}-${String(month).padStart(2, '0')}`)
     formData.append('monthData', serialized)
     fetcher.submit(formData, { method: 'POST' })
-  }, [clientId, fetcher])
+  }, [clientId, year, month, fetcher])
 
   // fetcher 状態に連動: saving → saved → idle
   useEffect(() => {
@@ -101,5 +106,5 @@ export function useWorkHoursAutoSave(clientId: string) {
     dirtyRef.current = false
   }, [])
 
-  return { initializeLastSaved, status }
+  return { initializeLastSaved, status, flush }
 }

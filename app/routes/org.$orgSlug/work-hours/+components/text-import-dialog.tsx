@@ -1,4 +1,4 @@
-import { ClipboardPasteIcon, LoaderIcon, SparklesIcon } from 'lucide-react'
+import { LoaderIcon, SparklesIcon } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useFetcher } from 'react-router'
 import { useTimesheetStore } from '~/components/timesheet/store'
@@ -106,8 +106,8 @@ export function TextImportDialog({ clientId, year, month }: Props) {
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
       <DialogTrigger asChild>
         <Button variant="outline" size="sm">
-          <ClipboardPasteIcon className="mr-2 h-4 w-4" />
-          テキストからインポート
+          <SparklesIcon className="mr-2 h-4 w-4" />
+          AI解析で入力
         </Button>
       </DialogTrigger>
       <DialogContent className="flex max-h-[90vh] max-w-2xl flex-col">
