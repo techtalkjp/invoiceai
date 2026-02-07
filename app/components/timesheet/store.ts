@@ -1,17 +1,20 @@
 import { create } from 'zustand'
-import type { MonthData, TimesheetEntry } from './types'
+import type { Clipboard, MonthData, TimesheetEntry } from './types'
+import { isWeekday } from './utils'
 
-// タイムシート store の状態（UI状態管理のみ、永続化は clientAction で行う）
+// タイムシート store の状態
 export interface TimesheetState {
   // 選択状態
   selectedDates: string[]
   isDragging: boolean
   dragStartDate: string | null
   monthDates: string[] // 範囲選択のため
-  // データ（メモリ上のみ - 永続化は clientAction で行う）
+  // データ
   monthData: MonthData
   // フィルタ
   showOnlyFilled: boolean
+  // クリップボード
+  clipboard: Clipboard
   // 選択操作
   setMonthDates: (dates: string[]) => void
   setSelectedDates: (dates: string[] | ((prev: string[]) => string[])) => void
@@ -29,6 +32,10 @@ export interface TimesheetState {
     value: string | number,
   ) => void
   clearAllData: () => void
+  // クリップボード操作
+  copySelection: () => void
+  pasteToSelected: (weekdaysOnly?: boolean | undefined) => void
+  clearSelectedEntries: () => void
 }
 
 export const useTimesheetStore = create<TimesheetState>((set, get) => ({
@@ -41,6 +48,8 @@ export const useTimesheetStore = create<TimesheetState>((set, get) => ({
   monthData: {},
   // フィルタ
   showOnlyFilled: false,
+  // クリップボード
+  clipboard: null,
   // 選択操作
   setMonthDates: (monthDates) => set({ monthDates }),
   setSelectedDates: (dates) =>
@@ -124,6 +133,53 @@ export const useTimesheetStore = create<TimesheetState>((set, get) => ({
     })
   },
   clearAllData: () => set({ monthData: {}, selectedDates: [] }),
+  // クリップボード操作
+  copySelection: () => {
+    const { selectedDates, monthData } = get()
+    if (selectedDates.length === 0) return
+    const entries: TimesheetEntry[] = []
+    for (const date of selectedDates) {
+      const entry = monthData[date]
+      if (entry) entries.push(entry)
+    }
+    if (entries.length > 0) {
+      set({ clipboard: entries })
+    }
+  },
+  pasteToSelected: (weekdaysOnly) => {
+    const { selectedDates, clipboard } = get()
+    if (!clipboard || clipboard.length === 0 || selectedDates.length === 0)
+      return
+
+    const targets = weekdaysOnly
+      ? selectedDates.filter(isWeekday)
+      : selectedDates
+    if (targets.length === 0) return
+
+    set((state) => {
+      const newData = { ...state.monthData }
+      for (let i = 0; i < targets.length; i++) {
+        const date = targets[i]
+        const entry = clipboard[i % clipboard.length]
+        if (date && entry) {
+          newData[date] = { ...entry }
+        }
+      }
+      return { monthData: newData }
+    })
+  },
+  clearSelectedEntries: () => {
+    const { selectedDates } = get()
+    if (selectedDates.length === 0) return
+
+    set((state) => {
+      const newData = { ...state.monthData }
+      for (const date of selectedDates) {
+        delete newData[date]
+      }
+      return { monthData: newData, selectedDates: [] }
+    })
+  },
 }))
 
 // 各行が自分の選択状態のみ subscribe するセレクタ

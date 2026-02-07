@@ -5,54 +5,43 @@ import {
   ContextMenuSeparator,
 } from '~/components/ui/context-menu'
 import { useTimesheetStore } from './store'
-import type { Clipboard } from './types'
-
-interface TimesheetContextMenuItemsProps {
-  clipboard: Clipboard
-  onCopy: () => void
-  onPaste: () => void
-  onPasteWeekdaysOnly: () => void
-  onClearSelected: () => void
-}
 
 /**
  * タイムシートの右クリックメニュー内容。
- * hasSelection を内部で subscribe するので、親の再レンダリングを防ぐ。
- * ContextMenuContent は Portal 経由なので、このコンポーネントの再レンダリングは
- * 親コンポーネントに伝播しない。
+ * store から直接 subscribe するので、親コンポーネントへの props 依存がない。
  */
-export function TimesheetContextMenuItems({
-  clipboard,
-  onCopy,
-  onPaste,
-  onPasteWeekdaysOnly,
-  onClearSelected,
-}: TimesheetContextMenuItemsProps) {
+export function TimesheetContextMenuItems() {
   const hasSelection = useTimesheetStore((s) => s.selectedDates.length > 0)
+  const hasClipboard = useTimesheetStore(
+    (s) => s.clipboard !== null && s.clipboard.length > 0,
+  )
+
+  const { copySelection, pasteToSelected, clearSelectedEntries } =
+    useTimesheetStore.getState()
 
   return (
     <ContextMenuContent>
-      <ContextMenuItem onClick={onCopy} disabled={!hasSelection}>
+      <ContextMenuItem onClick={copySelection} disabled={!hasSelection}>
         <Copy className="size-4" />
         コピー
       </ContextMenuItem>
       <ContextMenuItem
-        onClick={onPaste}
-        disabled={!clipboard || clipboard.length === 0 || !hasSelection}
+        onClick={() => pasteToSelected()}
+        disabled={!hasClipboard || !hasSelection}
       >
         <ClipboardPaste className="size-4" />
         ペースト
       </ContextMenuItem>
       <ContextMenuItem
-        onClick={onPasteWeekdaysOnly}
-        disabled={!clipboard || clipboard.length === 0 || !hasSelection}
+        onClick={() => pasteToSelected(true)}
+        disabled={!hasClipboard || !hasSelection}
       >
         <ClipboardPaste className="size-4" />
         平日のみペースト
       </ContextMenuItem>
       <ContextMenuSeparator />
       <ContextMenuItem
-        onClick={onClearSelected}
+        onClick={clearSelectedEntries}
         disabled={!hasSelection}
         variant="destructive"
       >

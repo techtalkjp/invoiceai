@@ -1,18 +1,17 @@
 import { CheckIcon, Download, LoaderIcon, Trash2 } from 'lucide-react'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { ControlBar } from '~/components/control-bar'
 import { MonthNav } from '~/components/month-nav'
 import {
-  type Clipboard,
-  type TimesheetEntry,
   FilterToggleButton,
   FloatingToolbar,
   MonthTotalDisplay,
+  SelectionHint,
   TimesheetContextMenuItems,
   TimesheetTable,
   getHolidayName,
   getMonthDates,
-  isWeekday,
+  useTimesheetSelection,
   useTimesheetStore,
 } from '~/components/timesheet'
 import { downloadBlob, generateTimesheetPdf } from '~/components/timesheet-pdf'
@@ -71,9 +70,6 @@ export function WorkHoursTimesheet({
 }: WorkHoursTimesheetProps) {
   const monthDates = useMemo(() => getMonthDates(year, month), [year, month])
 
-  // クリップボード
-  const [clipboard, setClipboard] = useState<Clipboard>(null)
-
   // PDFダウンロードダイアログ
   const [pdfDialogOpen, setPdfDialogOpen] = useState(false)
   const [pdfInfo, setPdfInfo] = useState({
@@ -89,7 +85,7 @@ export function WorkHoursTimesheet({
     flush,
   } = useWorkHoursAutoSave(clientId, year, month)
 
-  // サーバーデータを store にセット（URL ナビゲーションで clientEntry が変わると React Router が再マウントする）
+  // サーバーデータを store にセット
   useState(() => {
     const data = toMonthData(clientEntry.entries)
     useTimesheetStore.getState().setMonthData(data)
@@ -97,247 +93,8 @@ export function WorkHoursTimesheet({
     initializeLastSaved(JSON.stringify(data))
   })
 
-  // マウスアップ: 選択終了
-  const handleMouseUp = useCallback(() => {
-    useTimesheetStore.getState().setIsDragging(false)
-  }, [])
-
-  // グローバルなmouseup/mousemove/touchイベント + 自動スクロール
-  useEffect(() => {
-    let scrollAnimationId: number | null = null
-
-    const handleGlobalMouseUp = () => {
-      useTimesheetStore.getState().setIsDragging(false)
-      if (scrollAnimationId) {
-        cancelAnimationFrame(scrollAnimationId)
-        scrollAnimationId = null
-      }
-    }
-
-    const updateSelectionFromMouseY = (mouseY: number) => {
-      const rows = Array.from(
-        document.querySelectorAll('[data-date]'),
-      ) as HTMLElement[]
-      if (rows.length === 0) return
-
-      let closestRow: HTMLElement | null = null
-      let closestDistance = Number.POSITIVE_INFINITY
-
-      for (const row of rows) {
-        const rect = row.getBoundingClientRect()
-        const rowCenterY = rect.top + rect.height / 2
-        const distance = Math.abs(mouseY - rowCenterY)
-
-        if (mouseY < rect.top && rows.indexOf(row) === 0) {
-          closestRow = row
-          break
-        }
-        if (mouseY > rect.bottom && rows.indexOf(row) === rows.length - 1) {
-          closestRow = row
-          break
-        }
-        if (distance < closestDistance) {
-          closestDistance = distance
-          closestRow = row
-        }
-      }
-
-      if (closestRow) {
-        const date = closestRow.dataset.date
-        if (date) {
-          useTimesheetStore.getState().extendSelection(date)
-        }
-      }
-    }
-
-    const handleGlobalMouseMove = (e: MouseEvent) => {
-      const { isDragging: dragging, dragStartDate: startDate } =
-        useTimesheetStore.getState()
-      if (!dragging || !startDate) return
-
-      const mouseY = e.clientY
-      const viewportHeight = window.innerHeight
-      const scrollThreshold = 80
-      const scrollSpeed = 15
-
-      if (scrollAnimationId) {
-        cancelAnimationFrame(scrollAnimationId)
-        scrollAnimationId = null
-      }
-
-      const autoScroll = () => {
-        let scrolled = false
-        if (mouseY < scrollThreshold) {
-          window.scrollBy(0, -scrollSpeed)
-          scrolled = true
-        } else if (mouseY > viewportHeight - scrollThreshold) {
-          window.scrollBy(0, scrollSpeed)
-          scrolled = true
-        }
-
-        if (scrolled && useTimesheetStore.getState().isDragging) {
-          updateSelectionFromMouseY(mouseY)
-          scrollAnimationId = requestAnimationFrame(autoScroll)
-        }
-      }
-
-      if (
-        mouseY < scrollThreshold ||
-        mouseY > viewportHeight - scrollThreshold
-      ) {
-        scrollAnimationId = requestAnimationFrame(autoScroll)
-      }
-
-      updateSelectionFromMouseY(mouseY)
-    }
-
-    const handleGlobalTouchEnd = () => {
-      useTimesheetStore.getState().setIsDragging(false)
-      if (scrollAnimationId) {
-        cancelAnimationFrame(scrollAnimationId)
-        scrollAnimationId = null
-      }
-    }
-
-    const handleGlobalTouchMove = (e: TouchEvent) => {
-      const { isDragging: dragging, dragStartDate: startDate } =
-        useTimesheetStore.getState()
-      if (!dragging || !startDate) return
-
-      const touch = e.touches[0]
-      if (!touch) return
-
-      const touchY = touch.clientY
-      const viewportHeight = window.innerHeight
-      const scrollThreshold = 80
-      const scrollSpeed = 15
-
-      if (scrollAnimationId) {
-        cancelAnimationFrame(scrollAnimationId)
-        scrollAnimationId = null
-      }
-
-      const autoScroll = () => {
-        let scrolled = false
-        if (touchY < scrollThreshold) {
-          window.scrollBy(0, -scrollSpeed)
-          scrolled = true
-        } else if (touchY > viewportHeight - scrollThreshold) {
-          window.scrollBy(0, scrollSpeed)
-          scrolled = true
-        }
-
-        if (scrolled && useTimesheetStore.getState().isDragging) {
-          updateSelectionFromMouseY(touchY)
-          scrollAnimationId = requestAnimationFrame(autoScroll)
-        }
-      }
-
-      if (
-        touchY < scrollThreshold ||
-        touchY > viewportHeight - scrollThreshold
-      ) {
-        scrollAnimationId = requestAnimationFrame(autoScroll)
-      }
-
-      updateSelectionFromMouseY(touchY)
-      e.preventDefault()
-    }
-
-    window.addEventListener('mouseup', handleGlobalMouseUp)
-    window.addEventListener('mousemove', handleGlobalMouseMove)
-    window.addEventListener('touchend', handleGlobalTouchEnd)
-    window.addEventListener('touchmove', handleGlobalTouchMove, {
-      passive: false,
-    })
-    return () => {
-      window.removeEventListener('mouseup', handleGlobalMouseUp)
-      window.removeEventListener('mousemove', handleGlobalMouseMove)
-      window.removeEventListener('touchend', handleGlobalTouchEnd)
-      window.removeEventListener('touchmove', handleGlobalTouchMove)
-      if (scrollAnimationId) {
-        cancelAnimationFrame(scrollAnimationId)
-      }
-    }
-  }, [])
-
-  // 選択解除
-  const handleClearSelection = useCallback(() => {
-    const { selectedDates, setSelectedDates } = useTimesheetStore.getState()
-    if (selectedDates.length > 0) {
-      setSelectedDates([])
-    }
-  }, [])
-
-  // コピー
-  const handleCopy = useCallback(() => {
-    const { selectedDates, monthData } = useTimesheetStore.getState()
-    if (selectedDates.length === 0) return
-    const entries = selectedDates
-      .map((date: string) => monthData[date])
-      .filter((e): e is TimesheetEntry => e !== undefined)
-    if (entries.length > 0) {
-      setClipboard(entries)
-    }
-  }, [])
-
-  // ペースト
-  const handlePaste = useCallback(() => {
-    const { selectedDates, setMonthData } = useTimesheetStore.getState()
-    if (!clipboard || clipboard.length === 0 || selectedDates.length === 0)
-      return
-
-    setMonthData((prev) => {
-      const newData = { ...prev }
-      selectedDates.forEach((date: string, idx: number) => {
-        const entry = clipboard[idx % clipboard.length]
-        if (entry) {
-          newData[date] = { ...entry }
-        }
-      })
-      return newData
-    })
-    flush()
-  }, [clipboard, flush])
-
-  // 平日のみペースト
-  const handlePasteWeekdaysOnly = useCallback(() => {
-    const { selectedDates, setMonthData } = useTimesheetStore.getState()
-    if (!clipboard || clipboard.length === 0 || selectedDates.length === 0)
-      return
-
-    const weekdayDates = selectedDates.filter(isWeekday)
-    if (weekdayDates.length === 0) return
-
-    setMonthData((prev) => {
-      const newData = { ...prev }
-      weekdayDates.forEach((date: string, idx: number) => {
-        const entry = clipboard[idx % clipboard.length]
-        if (entry) {
-          newData[date] = { ...entry }
-        }
-      })
-      return newData
-    })
-    flush()
-  }, [clipboard, flush])
-
-  // 選択行クリア
-  const handleClearSelected = useCallback(() => {
-    const { selectedDates, setMonthData, setSelectedDates } =
-      useTimesheetStore.getState()
-    if (selectedDates.length === 0) return
-
-    setMonthData((prev) => {
-      const newData = { ...prev }
-      selectedDates.forEach((date: string) => {
-        delete newData[date]
-      })
-      return newData
-    })
-    setSelectedDates([])
-    flush()
-  }, [flush])
+  // 選択操作（mouse/touch/auto-scroll）
+  const { handleMouseUp, handleClearSelection } = useTimesheetSelection()
 
   // 全クリア
   const handleClearAll = useCallback(() => {
@@ -508,33 +265,11 @@ export function WorkHoursTimesheet({
             <TimesheetTable monthDates={monthDates} onMouseUp={handleMouseUp} />
           </div>
         </ContextMenuTrigger>
-        <TimesheetContextMenuItems
-          clipboard={clipboard}
-          onCopy={handleCopy}
-          onPaste={handlePaste}
-          onPasteWeekdaysOnly={handlePasteWeekdaysOnly}
-          onClearSelected={handleClearSelected}
-        />
+        <TimesheetContextMenuItems />
       </ContextMenu>
 
-      {/* 操作ヒント */}
-      <div className="text-muted-foreground text-xs">
-        行をクリックで選択 / ドラッグで範囲選択 / Shift+クリックで範囲拡張
-        {clipboard && clipboard.length > 0 && (
-          <span className="text-primary ml-2">
-            ({clipboard.length}行コピー済み)
-          </span>
-        )}
-      </div>
-
-      {/* フローティングツールバー */}
-      <FloatingToolbar
-        clipboard={clipboard}
-        onCopy={handleCopy}
-        onPaste={handlePaste}
-        onPasteWeekdaysOnly={handlePasteWeekdaysOnly}
-        onClearSelected={handleClearSelected}
-      />
+      <SelectionHint />
+      <FloatingToolbar />
     </div>
   )
 }

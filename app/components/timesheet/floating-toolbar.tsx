@@ -1,25 +1,17 @@
 import { CalendarDays, ClipboardPaste, Copy, Trash2 } from 'lucide-react'
 import { Button } from '~/components/ui/button'
 import { useTimesheetStore } from './store'
-import type { Clipboard } from './types'
 
-interface FloatingToolbarProps {
-  clipboard: Clipboard
-  onCopy: () => void
-  onPaste: () => void
-  onPasteWeekdaysOnly: () => void
-  onClearSelected: () => void
-}
-
-export function FloatingToolbar({
-  clipboard,
-  onCopy,
-  onPaste,
-  onPasteWeekdaysOnly,
-  onClearSelected,
-}: FloatingToolbarProps) {
+export function FloatingToolbar() {
   const selectedCount = useTimesheetStore((s) => s.selectedDates.length)
+  const hasClipboard = useTimesheetStore(
+    (s) => s.clipboard !== null && s.clipboard.length > 0,
+  )
+
   if (selectedCount === 0) return null
+
+  const { copySelection, pasteToSelected, clearSelectedEntries } =
+    useTimesheetStore.getState()
 
   return (
     <div className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2">
@@ -33,7 +25,7 @@ export function FloatingToolbar({
         <Button
           variant="ghost"
           size="icon-sm"
-          onClick={onCopy}
+          onClick={copySelection}
           title="コピー"
           className="sm:hidden"
         >
@@ -42,7 +34,7 @@ export function FloatingToolbar({
         <Button
           variant="ghost"
           size="sm"
-          onClick={onCopy}
+          onClick={copySelection}
           className="hidden gap-1.5 sm:inline-flex"
         >
           <Copy className="size-4" />
@@ -50,13 +42,13 @@ export function FloatingToolbar({
         </Button>
 
         {/* ペーストボタン */}
-        {clipboard && clipboard.length > 0 && (
+        {hasClipboard && (
           <>
             <div className="bg-border hidden h-4 w-px sm:block" />
             <Button
               variant="ghost"
               size="icon-sm"
-              onClick={onPaste}
+              onClick={() => pasteToSelected()}
               title="ペースト"
               className="sm:hidden"
             >
@@ -65,7 +57,7 @@ export function FloatingToolbar({
             <Button
               variant="ghost"
               size="sm"
-              onClick={onPaste}
+              onClick={() => pasteToSelected()}
               className="hidden gap-1.5 sm:inline-flex"
             >
               <ClipboardPaste className="size-4" />
@@ -74,7 +66,7 @@ export function FloatingToolbar({
             <Button
               variant="ghost"
               size="icon-sm"
-              onClick={onPasteWeekdaysOnly}
+              onClick={() => pasteToSelected(true)}
               title="平日のみペースト"
               className="sm:hidden"
             >
@@ -83,7 +75,7 @@ export function FloatingToolbar({
             <Button
               variant="ghost"
               size="sm"
-              onClick={onPasteWeekdaysOnly}
+              onClick={() => pasteToSelected(true)}
               className="hidden gap-1.5 sm:inline-flex"
             >
               <ClipboardPaste className="size-4" />
@@ -97,7 +89,7 @@ export function FloatingToolbar({
         <Button
           variant="ghost"
           size="icon-sm"
-          onClick={onClearSelected}
+          onClick={clearSelectedEntries}
           title="クリア"
           className="text-destructive hover:text-destructive sm:hidden"
         >
@@ -106,7 +98,7 @@ export function FloatingToolbar({
         <Button
           variant="ghost"
           size="sm"
-          onClick={onClearSelected}
+          onClick={clearSelectedEntries}
           className="text-destructive hover:text-destructive hidden gap-1.5 sm:inline-flex"
         >
           <Trash2 className="size-4" />
