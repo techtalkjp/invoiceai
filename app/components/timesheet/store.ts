@@ -187,6 +187,20 @@ export function useIsSelected(date: string) {
   return useTimesheetStore((state) => state.selectedDates.includes(date))
 }
 
+// フィルタリング用: データがある日付のセットを subscribe するセレクタ
+// monthData 全体ではなく「どの日にデータがあるか」の変化だけを検知する
+export function useFilledDatesKey() {
+  return useTimesheetStore((state) => {
+    const parts: string[] = []
+    for (const [date, entry] of Object.entries(state.monthData)) {
+      if (entry?.startTime || entry?.endTime) {
+        parts.push(date)
+      }
+    }
+    return parts.join(',')
+  })
+}
+
 // 各セルが自分のフィールドのみ subscribe するセレクタ
 export function useEntryField<K extends keyof TimesheetEntry>(
   date: string,

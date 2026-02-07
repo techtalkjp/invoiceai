@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { memo, useState } from 'react'
 import { TableCell, TableRow } from '~/components/ui/table'
 import { cn } from '~/lib/utils'
 import {
@@ -14,7 +14,9 @@ interface TimesheetRowProps {
   date: string
 }
 
-export function TimesheetRow({ date }: TimesheetRowProps) {
+export const TimesheetRow = memo(function TimesheetRow({
+  date,
+}: TimesheetRowProps) {
   // store から自分の選択状態のみ subscribe
   const selected = useIsSelected(date)
 
@@ -156,4 +158,4 @@ export function TimesheetRow({ date }: TimesheetRowProps) {
       <TimesheetDescriptionCell date={date} col={3} />
     </TableRow>
   )
-}
+})

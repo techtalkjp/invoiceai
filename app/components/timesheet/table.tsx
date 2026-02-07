@@ -7,7 +7,7 @@ import {
   TableRow,
 } from '~/components/ui/table'
 import { TimesheetRow } from './row'
-import { useTimesheetStore } from './store'
+import { useFilledDatesKey, useTimesheetStore } from './store'
 
 interface TimesheetTableProps {
   monthDates: string[]
@@ -19,17 +19,14 @@ export const TimesheetTable = memo(function TimesheetTable({
   monthDates,
   onMouseUp,
 }: TimesheetTableProps) {
-  // store selector で配列を新規生成すると snapshot 不安定で無限更新になり得る。
-  // selector は参照取得だけにして、配列導出は useMemo で行う。
   const showOnlyFilled = useTimesheetStore((s) => s.showOnlyFilled)
-  const monthData = useTimesheetStore((s) => s.monthData)
+  // monthData 全体ではなく「どの日にデータがあるか」だけを subscribe
+  const filledDatesKey = useFilledDatesKey()
   const filteredDates = useMemo(() => {
     if (!showOnlyFilled) return monthDates
-    return monthDates.filter((date) => {
-      const entry = monthData[date]
-      return entry?.startTime || entry?.endTime
-    })
-  }, [showOnlyFilled, monthDates, monthData])
+    const filledSet = new Set(filledDatesKey.split(','))
+    return monthDates.filter((date) => filledSet.has(date))
+  }, [showOnlyFilled, monthDates, filledDatesKey])
 
   return (
     <Table>
