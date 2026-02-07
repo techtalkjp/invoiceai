@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { useFetcher } from 'react-router'
 import { useTimesheetStore } from '~/components/timesheet/store'
+import { useStableFetcher } from '~/hooks/use-stable-fetcher'
 
 /**
  * store の monthData を監視し、フォーカス移動時にサーバーへ保存する
@@ -16,7 +16,7 @@ export function useWorkHoursAutoSave(
   year: number,
   month: number,
 ) {
-  const fetcher = useFetcher({ key: `auto-save-${clientId}` })
+  const fetcher = useStableFetcher({ key: `auto-save-${clientId}` })
   const lastSavedRef = useRef<string>('')
   const dirtyRef = useRef(false)
   const fallbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -43,7 +43,7 @@ export function useWorkHoursAutoSave(
     formData.append('yearMonth', `${year}-${String(month).padStart(2, '0')}`)
     formData.append('monthData', serialized)
     fetcher.submit(formData, { method: 'POST' })
-  }, [clientId, year, month, fetcher])
+  }, [clientId, year, month, fetcher.submit])
 
   // saving → idle への遷移を検出して「保存済み」を2秒間表示（タイマー = 外部リソース）
   if (

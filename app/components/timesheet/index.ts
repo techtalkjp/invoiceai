@@ -19,6 +19,8 @@ export {
 } from './utils'
 
 // Components
+export { TimesheetContextMenuItems } from './context-menu-items'
+export { FilterToggleButton } from './filter-toggle-button'
 export { FloatingToolbar } from './floating-toolbar'
 export { MonthTotalDisplay } from './month-total'
 export { TimesheetRow } from './row'

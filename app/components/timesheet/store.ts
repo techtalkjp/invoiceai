@@ -10,6 +10,8 @@ export interface TimesheetState {
   monthDates: string[] // 範囲選択のため
   // データ（メモリ上のみ - 永続化は clientAction で行う）
   monthData: MonthData
+  // フィルタ
+  showOnlyFilled: boolean
   // 選択操作
   setMonthDates: (dates: string[]) => void
   setSelectedDates: (dates: string[] | ((prev: string[]) => string[])) => void
@@ -20,6 +22,7 @@ export interface TimesheetState {
   extendSelection: (date: string) => void
   // データ操作
   setMonthData: (data: MonthData | ((prev: MonthData) => MonthData)) => void
+  setShowOnlyFilled: (value: boolean | ((prev: boolean) => boolean)) => void
   updateEntry: (
     date: string,
     field: keyof TimesheetEntry,
@@ -36,6 +39,8 @@ export const useTimesheetStore = create<TimesheetState>((set, get) => ({
   monthDates: [],
   // データ
   monthData: {},
+  // フィルタ
+  showOnlyFilled: false,
   // 選択操作
   setMonthDates: (monthDates) => set({ monthDates }),
   setSelectedDates: (dates) =>
@@ -84,6 +89,11 @@ export const useTimesheetStore = create<TimesheetState>((set, get) => ({
   setMonthData: (data) =>
     set((state) => ({
       monthData: typeof data === 'function' ? data(state.monthData) : data,
+    })),
+  setShowOnlyFilled: (value) =>
+    set((state) => ({
+      showOnlyFilled:
+        typeof value === 'function' ? value(state.showOnlyFilled) : value,
     })),
   updateEntry: (date, field, value) => {
     set((state) => {

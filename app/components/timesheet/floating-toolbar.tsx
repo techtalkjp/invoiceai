@@ -1,9 +1,9 @@
 import { CalendarDays, ClipboardPaste, Copy, Trash2 } from 'lucide-react'
 import { Button } from '~/components/ui/button'
+import { useTimesheetStore } from './store'
 import type { Clipboard } from './types'
 
 interface FloatingToolbarProps {
-  selectedCount: number
   clipboard: Clipboard
   onCopy: () => void
   onPaste: () => void
@@ -12,13 +12,13 @@ interface FloatingToolbarProps {
 }
 
 export function FloatingToolbar({
-  selectedCount,
   clipboard,
   onCopy,
   onPaste,
   onPasteWeekdaysOnly,
   onClearSelected,
 }: FloatingToolbarProps) {
+  const selectedCount = useTimesheetStore((s) => s.selectedDates.length)
   if (selectedCount === 0) return null
 
   return (

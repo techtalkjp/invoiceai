@@ -7,6 +7,7 @@ import {
   TableRow,
 } from '~/components/ui/table'
 import { TimesheetRow } from './row'
+import { useTimesheetStore } from './store'
 
 interface TimesheetTableProps {
   monthDates: string[]
@@ -18,6 +19,16 @@ export const TimesheetTable = memo(function TimesheetTable({
   monthDates,
   onMouseUp,
 }: TimesheetTableProps) {
+  // 「入力済みのみ」フィルタ: showOnlyFilled=false のとき monthDates をそのまま返す（monthData を参照しない → 再レンダリングなし）
+  const showOnlyFilled = useTimesheetStore((s) => s.showOnlyFilled)
+  const filteredDates = useTimesheetStore((s) => {
+    if (!showOnlyFilled) return monthDates
+    return monthDates.filter((date) => {
+      const entry = s.monthData[date]
+      return entry?.startTime || entry?.endTime
+    })
+  })
+
   return (
     <Table>
       <TableHeader>
@@ -31,7 +42,7 @@ export const TimesheetTable = memo(function TimesheetTable({
         </TableRow>
       </TableHeader>
       <TableBody onMouseUp={onMouseUp}>
-        {monthDates.map((date) => (
+        {filteredDates.map((date) => (
           <TimesheetRow key={date} date={date} />
         ))}
       </TableBody>

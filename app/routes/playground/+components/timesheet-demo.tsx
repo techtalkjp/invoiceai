@@ -1,10 +1,7 @@
 import {
   ChevronLeft,
   ChevronRight,
-  ClipboardPaste,
-  Copy,
   Download,
-  FilterIcon,
   Shuffle,
   Trash2,
 } from 'lucide-react'
@@ -14,8 +11,10 @@ import {
   type Clipboard,
   type MonthData,
   type TimesheetEntry,
+  FilterToggleButton,
   FloatingToolbar,
   MonthTotalDisplay,
+  TimesheetContextMenuItems,
   TimesheetTable,
   generateSampleData,
   getHolidayName,
@@ -36,13 +35,7 @@ import {
   AlertDialogTrigger,
 } from '~/components/ui/alert-dialog'
 import { Button } from '~/components/ui/button'
-import {
-  ContextMenu,
-  ContextMenuContent,
-  ContextMenuItem,
-  ContextMenuSeparator,
-  ContextMenuTrigger,
-} from '~/components/ui/context-menu'
+import { ContextMenu, ContextMenuTrigger } from '~/components/ui/context-menu'
 import {
   Dialog,
   DialogContent,
@@ -54,7 +47,7 @@ import {
 } from '~/components/ui/dialog'
 import { Input } from '~/components/ui/input'
 import { Label } from '~/components/ui/label'
-import { useAutoSave, useSaveAction } from './use-auto-save'
+import { clearAllStorage, useAutoSave } from './use-auto-save'
 
 interface TimesheetDemoProps {
   initialData?: Record<string, MonthData>
@@ -64,9 +57,6 @@ export function TimesheetDemo({ initialData }: TimesheetDemoProps) {
   const now = new Date()
   const [year, setYear] = useState(now.getFullYear())
   const [month, setMonth] = useState(now.getMonth() + 1)
-
-  // 選択状態（length のみ subscribe - 配列全体を subscribe すると全行が再レンダリングされる）
-  const selectedCount = useTimesheetStore((s) => s.selectedDates.length)
 
   // クリップボード
   const [clipboard, setClipboard] = useState<Clipboard>(null)
@@ -80,20 +70,10 @@ export function TimesheetDemo({ initialData }: TimesheetDemoProps) {
   })
 
   const monthDates = useMemo(() => getMonthDates(year, month), [year, month])
-  const [showOnlyFilled, setShowOnlyFilled] = useState(false)
-  const monthData = useTimesheetStore((s) => s.monthData)
-  const filteredDates = useMemo(() => {
-    if (!showOnlyFilled) return monthDates
-    return monthDates.filter((date) => {
-      const entry = monthData[date]
-      return entry?.startTime || entry?.endTime
-    })
-  }, [showOnlyFilled, monthDates, monthData])
   const monthKey = `${year}-${String(month).padStart(2, '0')}`
 
   // 自動保存（debounce 付き）
   useAutoSave(monthKey)
-  const { clearAll } = useSaveAction()
 
   // store に月データをセットするヘルパー
   const syncStoreForMonth = useCallback(
@@ -362,8 +342,8 @@ export function TimesheetDemo({ initialData }: TimesheetDemoProps) {
   // 全クリア
   const handleClearAll = useCallback(() => {
     useTimesheetStore.getState().clearAllData()
-    clearAll() // LocalStorage からも削除
-  }, [clearAll])
+    clearAllStorage() // LocalStorage からも削除
+  }, [])
 
   const handlePrevMonth = () => {
     const newYear = month === 1 ? year - 1 : year
@@ -406,15 +386,7 @@ export function TimesheetDemo({ initialData }: TimesheetDemoProps) {
           }
           right={
             <>
-              <Button
-                variant={showOnlyFilled ? 'secondary' : 'ghost'}
-                size="sm"
-                onClick={() => setShowOnlyFilled((v) => !v)}
-                className="text-muted-foreground text-xs"
-              >
-                <FilterIcon className="size-3.5" />
-                入力済みのみ
-              </Button>
+              <FilterToggleButton />
               <Button
                 variant="ghost"
                 size="sm"
@@ -554,45 +526,16 @@ export function TimesheetDemo({ initialData }: TimesheetDemoProps) {
             className="overflow-hidden rounded-md border select-none"
             onClick={(e) => e.stopPropagation()}
           >
-            <TimesheetTable
-              monthDates={filteredDates}
-              onMouseUp={handleMouseUp}
-            />
+            <TimesheetTable monthDates={monthDates} onMouseUp={handleMouseUp} />
           </div>
         </ContextMenuTrigger>
-        <ContextMenuContent>
-          <ContextMenuItem onClick={handleCopy} disabled={selectedCount === 0}>
-            <Copy className="size-4" />
-            コピー
-          </ContextMenuItem>
-          <ContextMenuItem
-            onClick={handlePaste}
-            disabled={
-              !clipboard || clipboard.length === 0 || selectedCount === 0
-            }
-          >
-            <ClipboardPaste className="size-4" />
-            ペースト
-          </ContextMenuItem>
-          <ContextMenuItem
-            onClick={handlePasteWeekdaysOnly}
-            disabled={
-              !clipboard || clipboard.length === 0 || selectedCount === 0
-            }
-          >
-            <ClipboardPaste className="size-4" />
-            平日のみペースト
-          </ContextMenuItem>
-          <ContextMenuSeparator />
-          <ContextMenuItem
-            onClick={handleClearSelected}
-            disabled={selectedCount === 0}
-            variant="destructive"
-          >
-            <Trash2 className="size-4" />
-            選択行をクリア
-          </ContextMenuItem>
-        </ContextMenuContent>
+        <TimesheetContextMenuItems
+          clipboard={clipboard}
+          onCopy={handleCopy}
+          onPaste={handlePaste}
+          onPasteWeekdaysOnly={handlePasteWeekdaysOnly}
+          onClearSelected={handleClearSelected}
+        />
       </ContextMenu>
 
       {/* 操作ヒント */}
@@ -607,7 +550,6 @@ export function TimesheetDemo({ initialData }: TimesheetDemoProps) {
 
       {/* フローティングツールバー */}
       <FloatingToolbar
-        selectedCount={selectedCount}
         clipboard={clipboard}
         onCopy={handleCopy}
         onPaste={handlePaste}

@@ -1,20 +1,14 @@
-import {
-  CheckIcon,
-  ClipboardPaste,
-  Copy,
-  Download,
-  FilterIcon,
-  LoaderIcon,
-  Trash2,
-} from 'lucide-react'
+import { CheckIcon, Download, LoaderIcon, Trash2 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { ControlBar } from '~/components/control-bar'
 import { MonthNav } from '~/components/month-nav'
 import {
   type Clipboard,
   type TimesheetEntry,
+  FilterToggleButton,
   FloatingToolbar,
   MonthTotalDisplay,
+  TimesheetContextMenuItems,
   TimesheetTable,
   getHolidayName,
   getMonthDates,
@@ -34,13 +28,7 @@ import {
   AlertDialogTrigger,
 } from '~/components/ui/alert-dialog'
 import { Button } from '~/components/ui/button'
-import {
-  ContextMenu,
-  ContextMenuContent,
-  ContextMenuItem,
-  ContextMenuSeparator,
-  ContextMenuTrigger,
-} from '~/components/ui/context-menu'
+import { ContextMenu, ContextMenuTrigger } from '~/components/ui/context-menu'
 import {
   Dialog,
   DialogContent,
@@ -82,18 +70,6 @@ export function WorkHoursTimesheet({
   nextMonthUrl,
 }: WorkHoursTimesheetProps) {
   const monthDates = useMemo(() => getMonthDates(year, month), [year, month])
-  const [showOnlyFilled, setShowOnlyFilled] = useState(false)
-  const monthData = useTimesheetStore((s) => s.monthData)
-  const filteredDates = useMemo(() => {
-    if (!showOnlyFilled) return monthDates
-    return monthDates.filter((date) => {
-      const entry = monthData[date]
-      return entry?.startTime || entry?.endTime
-    })
-  }, [showOnlyFilled, monthDates, monthData])
-
-  // 選択状態（length のみ subscribe）
-  const selectedCount = useTimesheetStore((s) => s.selectedDates.length)
 
   // クリップボード
   const [clipboard, setClipboard] = useState<Clipboard>(null)
@@ -402,15 +378,7 @@ export function WorkHoursTimesheet({
           }
           right={
             <>
-              <Button
-                variant={showOnlyFilled ? 'secondary' : 'ghost'}
-                size="sm"
-                onClick={() => setShowOnlyFilled((v) => !v)}
-                className="text-muted-foreground text-xs"
-              >
-                <FilterIcon className="size-3.5" />
-                入力済みのみ
-              </Button>
+              <FilterToggleButton />
               <Dialog open={pdfDialogOpen} onOpenChange={setPdfDialogOpen}>
                 <DialogTrigger asChild>
                   <Button
@@ -537,45 +505,16 @@ export function WorkHoursTimesheet({
             className="overflow-hidden rounded-md border select-none"
             onClick={(e) => e.stopPropagation()}
           >
-            <TimesheetTable
-              monthDates={filteredDates}
-              onMouseUp={handleMouseUp}
-            />
+            <TimesheetTable monthDates={monthDates} onMouseUp={handleMouseUp} />
           </div>
         </ContextMenuTrigger>
-        <ContextMenuContent>
-          <ContextMenuItem onClick={handleCopy} disabled={selectedCount === 0}>
-            <Copy className="size-4" />
-            コピー
-          </ContextMenuItem>
-          <ContextMenuItem
-            onClick={handlePaste}
-            disabled={
-              !clipboard || clipboard.length === 0 || selectedCount === 0
-            }
-          >
-            <ClipboardPaste className="size-4" />
-            ペースト
-          </ContextMenuItem>
-          <ContextMenuItem
-            onClick={handlePasteWeekdaysOnly}
-            disabled={
-              !clipboard || clipboard.length === 0 || selectedCount === 0
-            }
-          >
-            <ClipboardPaste className="size-4" />
-            平日のみペースト
-          </ContextMenuItem>
-          <ContextMenuSeparator />
-          <ContextMenuItem
-            onClick={handleClearSelected}
-            disabled={selectedCount === 0}
-            variant="destructive"
-          >
-            <Trash2 className="size-4" />
-            選択行をクリア
-          </ContextMenuItem>
-        </ContextMenuContent>
+        <TimesheetContextMenuItems
+          clipboard={clipboard}
+          onCopy={handleCopy}
+          onPaste={handlePaste}
+          onPasteWeekdaysOnly={handlePasteWeekdaysOnly}
+          onClearSelected={handleClearSelected}
+        />
       </ContextMenu>
 
       {/* 操作ヒント */}
@@ -590,7 +529,6 @@ export function WorkHoursTimesheet({
 
       {/* フローティングツールバー */}
       <FloatingToolbar
-        selectedCount={selectedCount}
         clipboard={clipboard}
         onCopy={handleCopy}
         onPaste={handlePaste}

@@ -1,5 +1,4 @@
 import { useCallback, useState } from 'react'
-import { useFetcher } from 'react-router'
 import {
   Combobox,
   ComboboxContent,
@@ -8,6 +7,7 @@ import {
   ComboboxItem,
   ComboboxList,
 } from '~/components/ui/combobox'
+import { useStableFetcher } from '~/hooks/use-stable-fetcher'
 import type { loader } from '../users'
 
 interface UserComboboxProps {
@@ -21,7 +21,7 @@ export function UserCombobox({
   value,
   onValueChange,
 }: UserComboboxProps) {
-  const fetcher = useFetcher<typeof loader>()
+  const fetcher = useStableFetcher<typeof loader>()
   const [query, setQuery] = useState('')
   const [open, setOpen] = useState(false)
 
@@ -31,7 +31,7 @@ export function UserCombobox({
         `/admin/organizations/${orgId}/users?q=${encodeURIComponent(q)}`,
       )
     },
-    [orgId, fetcher],
+    [orgId, fetcher.load],
   )
 
   const handleOpenChange = useCallback(

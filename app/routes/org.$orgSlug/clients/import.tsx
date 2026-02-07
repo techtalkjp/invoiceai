@@ -1,7 +1,8 @@
 import { CheckIcon, LoaderIcon } from 'lucide-react'
 import { Suspense, useState } from 'react'
-import { Await, useFetcher, useNavigate } from 'react-router'
+import { Await, useNavigate } from 'react-router'
 import { Button } from '~/components/ui/button'
+import { useStableFetcher } from '~/hooks/use-stable-fetcher'
 import {
   Card,
   CardContent,
@@ -55,17 +56,12 @@ export default function ImportPage({
   loaderData: { organization, partnersPromise, importedPartnerIds },
 }: Route.ComponentProps) {
   const navigate = useNavigate()
-  const fetcher = useFetcher()
+  const fetcher = useStableFetcher()
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set())
 
   const importedSet = new Set(importedPartnerIds)
 
   const isSubmitting = fetcher.state === 'submitting'
-
-  // インポート完了後にクライアント一覧に戻る
-  if (fetcher.state === 'idle' && fetcher.data) {
-    navigate(`/org/${organization.slug}/clients`)
-  }
 
   return (
     <Card>
@@ -95,14 +91,15 @@ export default function ImportPage({
                 selectedIds={selectedIds}
                 setSelectedIds={setSelectedIds}
                 isSubmitting={isSubmitting}
-                onImport={(selectedPartners) => {
-                  fetcher.submit(
+                onImport={async (selectedPartners) => {
+                  await fetcher.submit(
                     {
                       intent: 'import-bulk',
                       partners: JSON.stringify(selectedPartners),
                     },
                     { method: 'POST' },
                   )
+                  navigate(`/org/${organization.slug}/clients`)
                 }}
                 onCancel={() => navigate(`/org/${organization.slug}/clients`)}
               />
