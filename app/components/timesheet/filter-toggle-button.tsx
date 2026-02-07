@@ -3,7 +3,7 @@ import { Button } from '~/components/ui/button'
 import { useTimesheetStore } from './store'
 
 /**
- * 「入力済みのみ」フィルタトグルボタン。
+ * 「稼働日だけ表示」フィルタトグルボタン。
  * store の showOnlyFilled を内部で subscribe するので、
  * 親コンポーネントの再レンダリングを引き起こさない。
  */
@@ -18,7 +18,7 @@ export function FilterToggleButton() {
       className="text-muted-foreground text-xs"
     >
       <FilterIcon className="size-3.5" />
-      入力済みのみ
+      稼働日だけ表示
     </Button>
   )
 }

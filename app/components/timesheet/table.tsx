@@ -1,4 +1,4 @@
-import { memo } from 'react'
+import { memo, useMemo } from 'react'
 import {
   Table,
   TableBody,
@@ -19,15 +19,17 @@ export const TimesheetTable = memo(function TimesheetTable({
   monthDates,
   onMouseUp,
 }: TimesheetTableProps) {
-  // 「入力済みのみ」フィルタ: showOnlyFilled=false のとき monthDates をそのまま返す（monthData を参照しない → 再レンダリングなし）
+  // store selector で配列を新規生成すると snapshot 不安定で無限更新になり得る。
+  // selector は参照取得だけにして、配列導出は useMemo で行う。
   const showOnlyFilled = useTimesheetStore((s) => s.showOnlyFilled)
-  const filteredDates = useTimesheetStore((s) => {
+  const monthData = useTimesheetStore((s) => s.monthData)
+  const filteredDates = useMemo(() => {
     if (!showOnlyFilled) return monthDates
     return monthDates.filter((date) => {
-      const entry = s.monthData[date]
+      const entry = monthData[date]
       return entry?.startTime || entry?.endTime
     })
-  })
+  }, [showOnlyFilled, monthDates, monthData])
 
   return (
     <Table>
