@@ -34,51 +34,56 @@ export function TimesheetDescriptionCell({
 
         {/* フォーカス時: 編集用textarea（absolute配置でオーバーレイ） */}
         {isFocused ? (
-          <textarea
-            value={value}
-            onChange={(e) => handleChange(e.target.value)}
-            onBlur={() => setIsFocused(false)}
-            onKeyDown={(e) => {
-              // IME変換中は何もしない
-              if (e.nativeEvent.isComposing) return
+          <>
+            <textarea
+              value={value}
+              onChange={(e) => handleChange(e.target.value)}
+              onBlur={() => setIsFocused(false)}
+              onKeyDown={(e) => {
+                // IME変換中は何もしない
+                if (e.nativeEvent.isComposing) return
 
-              const textarea = e.target as HTMLTextAreaElement
-              const atStart =
-                textarea.selectionStart === 0 && textarea.selectionEnd === 0
-              const atEnd =
-                textarea.selectionStart === textarea.value.length &&
-                textarea.selectionEnd === textarea.value.length
+                const textarea = e.target as HTMLTextAreaElement
+                const atStart =
+                  textarea.selectionStart === 0 && textarea.selectionEnd === 0
+                const atEnd =
+                  textarea.selectionStart === textarea.value.length &&
+                  textarea.selectionEnd === textarea.value.length
 
-              // Shift+Enterで改行を許可、Enterのみで次の行へ
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault()
-                navigateToCell(date, col, 'down')
-              } else if (e.key === 'Tab') {
-                e.preventDefault()
-                navigateToCell(date, col, e.shiftKey ? 'left' : 'right')
-              } else if (e.key === 'ArrowUp' && atStart) {
-                e.preventDefault()
-                navigateToCell(date, col, 'up')
-              } else if (e.key === 'ArrowDown' && atEnd) {
-                e.preventDefault()
-                navigateToCell(date, col, 'down')
-              } else if (e.key === 'ArrowLeft' && atStart) {
-                e.preventDefault()
-                navigateToCell(date, col, 'left')
-              } else if (e.key === 'ArrowRight' && atEnd) {
-                e.preventDefault()
-                navigateToCell(date, col, 'right')
-              }
-            }}
-            // biome-ignore lint/a11y/noAutofocus: フォーカス切り替え時に必要
-            autoFocus
-            rows={1}
-            placeholder=""
-            className={cn(
-              'absolute inset-0 field-sizing-content min-h-7 w-full min-w-32 resize-none rounded-md border px-2 py-1 text-base md:text-xs',
-              'border-primary bg-background outline-none',
-            )}
-          />
+                // Shift+Enterで改行を許可、Enterのみで次の行へ
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault()
+                  navigateToCell(date, col, 'down')
+                } else if (e.key === 'Tab') {
+                  e.preventDefault()
+                  navigateToCell(date, col, e.shiftKey ? 'left' : 'right')
+                } else if (e.key === 'ArrowUp') {
+                  e.preventDefault()
+                  navigateToCell(date, col, 'up')
+                } else if (e.key === 'ArrowDown') {
+                  e.preventDefault()
+                  navigateToCell(date, col, 'down')
+                } else if (e.key === 'ArrowLeft' && atStart) {
+                  e.preventDefault()
+                  navigateToCell(date, col, 'left')
+                } else if (e.key === 'ArrowRight' && atEnd) {
+                  e.preventDefault()
+                  navigateToCell(date, col, 'right')
+                }
+              }}
+              // biome-ignore lint/a11y/noAutofocus: フォーカス切り替え時に必要
+              autoFocus
+              rows={1}
+              placeholder="概要を入力"
+              className={cn(
+                'absolute inset-0 field-sizing-content min-h-7 w-full min-w-32 resize-none rounded-md border px-2 py-1 text-base md:text-xs',
+                'border-primary bg-background outline-none',
+              )}
+            />
+            <span className="text-muted-foreground/60 pointer-events-none absolute right-1.5 bottom-0.5 text-[9px]">
+              Shift+Enter: 改行
+            </span>
+          </>
         ) : (
           /* 非フォーカス時: line-clampで省略表示（absolute配置でオーバーレイ） */
           <button
@@ -102,11 +107,6 @@ export function TimesheetDescriptionCell({
               {value || '-'}
             </span>
           </button>
-        )}
-        {isFocused && (
-          <span className="text-muted-foreground pointer-events-none absolute right-1 bottom-1.5 z-10 hidden text-[10px] md:block">
-            Shift+Enter: 改行
-          </span>
         )}
       </div>
     </TableCell>

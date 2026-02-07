@@ -2,7 +2,6 @@ import { CheckIcon, LoaderIcon } from 'lucide-react'
 import { Suspense, useState } from 'react'
 import { Await, useNavigate } from 'react-router'
 import { Button } from '~/components/ui/button'
-import { useStableFetcher } from '~/hooks/use-stable-fetcher'
 import {
   Card,
   CardContent,
@@ -19,6 +18,7 @@ import {
   TableHeader,
   TableRow,
 } from '~/components/ui/table'
+import { useStableFetcher } from '~/hooks/use-stable-fetcher'
 import { requireOrgAdmin } from '~/lib/auth-helpers.server'
 import { importPartnersBulk } from './+mutations.server'
 import { fetchFreeePartners, getClients } from './+queries.server'

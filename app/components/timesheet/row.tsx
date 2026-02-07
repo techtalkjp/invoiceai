@@ -81,11 +81,11 @@ export function TimesheetRow({ date }: TimesheetRowProps) {
         !selected && 'active:bg-muted/40',
         !selected && 'md:hover:bg-muted/50',
       )}
-      onMouseDown={handleMouseDown}
       onMouseEnter={handleMouseEnter}
     >
       <TableCell
         className="relative touch-none py-0.5 font-medium md:touch-auto"
+        onMouseDown={handleMouseDown}
         onTouchStart={handleTouchStart}
       >
         {selected && (
