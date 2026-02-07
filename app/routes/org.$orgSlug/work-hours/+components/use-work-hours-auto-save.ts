@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef } from 'react'
 import { useTimesheetStore } from '~/components/timesheet/store'
 import { useStableFetcher } from '~/hooks/use-stable-fetcher'
 
@@ -8,21 +8,22 @@ import { useStableFetcher } from '~/hooks/use-stable-fetcher'
  * - focusout（セル離脱）時に dirty なら保存
  * - フォールバック: 10秒間操作がなければ自動保存
  * - beforeunload: 未保存データがあれば警告
+ *
+ * 保存ステータスの表示は SaveStatusIndicator コンポーネントが
+ * 同じ fetcherKey で useFetcher を共有して行う。
  */
-type SaveStatus = 'idle' | 'saving' | 'saved'
+export const AUTO_SAVE_FETCHER_KEY_PREFIX = 'auto-save-'
 
 export function useWorkHoursAutoSave(
   clientId: string,
   year: number,
   month: number,
 ) {
-  const fetcher = useStableFetcher({ key: `auto-save-${clientId}` })
+  const fetcherKey = `${AUTO_SAVE_FETCHER_KEY_PREFIX}${clientId}`
+  const fetcher = useStableFetcher({ key: fetcherKey })
   const lastSavedRef = useRef<string>('')
   const dirtyRef = useRef(false)
   const fallbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const [showSaved, setShowSaved] = useState(false)
-  const savedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const prevFetcherStateRef = useRef(fetcher.state)
 
   // 実際の保存処理
   const flush = useCallback(() => {
@@ -44,22 +45,6 @@ export function useWorkHoursAutoSave(
     formData.append('monthData', serialized)
     fetcher.submit(formData, { method: 'POST' })
   }, [clientId, year, month, fetcher.submit])
-
-  // saving → idle への遷移を検出して「保存済み」を2秒間表示（タイマー = 外部リソース）
-  if (
-    prevFetcherStateRef.current !== 'idle' &&
-    fetcher.state === 'idle' &&
-    fetcher.data
-  ) {
-    setShowSaved(true)
-    if (savedTimerRef.current) clearTimeout(savedTimerRef.current)
-    savedTimerRef.current = setTimeout(() => setShowSaved(false), 2000)
-  }
-  prevFetcherStateRef.current = fetcher.state
-
-  // status を導出
-  const status: SaveStatus =
-    fetcher.state !== 'idle' ? 'saving' : showSaved ? 'saved' : 'idle'
 
   // store 変更 → dirty + fallback タイマーリセット
   useEffect(() => {
@@ -109,5 +94,5 @@ export function useWorkHoursAutoSave(
     dirtyRef.current = false
   }, [])
 
-  return { initializeLastSaved, status, flush }
+  return { initializeLastSaved, fetcherKey, flush }
 }

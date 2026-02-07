@@ -22,6 +22,7 @@ export {
 export { useTimesheetSelection } from './use-timesheet-selection'
 
 // Components
+export { TimesheetClearAllDialog } from './clear-all-dialog'
 export { TimesheetContextMenuItems } from './context-menu-items'
 export { FilterToggleButton } from './filter-toggle-button'
 export { FloatingToolbar } from './floating-toolbar'
@@ -29,6 +30,7 @@ export { MonthTotalDisplay } from './month-total'
 export { TimesheetRow } from './row'
 export { SelectionHint } from './selection-hint'
 export { TimesheetTable } from './table'
+export { TimesheetArea } from './timesheet-area'
 
 // Cells
 export {
