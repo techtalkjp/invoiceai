@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { memo, useCallback, useState } from 'react'
 import { BreakGridPicker } from '~/components/break-grid-picker'
 import {
   Popover,
@@ -16,58 +16,68 @@ interface TimesheetBreakCellProps {
   col: number
 }
 
-export function TimesheetBreakCell({ date, col }: TimesheetBreakCellProps) {
+const formatBreak = (minutes: number): React.ReactNode => {
+  if (minutes === 0) return null
+  if (minutes < 60)
+    return (
+      <>
+        {minutes}
+        <span className="text-[0.7em]">分</span>
+      </>
+    )
+  const h = Math.floor(minutes / 60)
+  const m = minutes % 60
+  return (
+    <>
+      {h}
+      <span className="text-[0.7em]">時間</span>
+      {m > 0 && (
+        <>
+          {m}
+          <span className="text-[0.7em]">分</span>
+        </>
+      )}
+    </>
+  )
+}
+
+export const TimesheetBreakCell = memo(function TimesheetBreakCell({
+  date,
+  col,
+}: TimesheetBreakCellProps) {
   // 自分のフィールドのみ subscribe
   const value = useEntryField(date, 'breakMinutes') ?? 0
   const [open, setOpen] = useState(false)
 
-  const formatBreak = (minutes: number): React.ReactNode => {
-    if (minutes === 0) return null
-    if (minutes < 60)
-      return (
-        <>
-          {minutes}
-          <span className="text-[0.7em]">分</span>
-        </>
-      )
-    const h = Math.floor(minutes / 60)
-    const m = minutes % 60
-    return (
-      <>
-        {h}
-        <span className="text-[0.7em]">時間</span>
-        {m > 0 && (
-          <>
-            {m}
-            <span className="text-[0.7em]">分</span>
-          </>
-        )}
-      </>
-    )
-  }
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (e.key === 'ArrowUp') {
+        e.preventDefault()
+        navigateToCell(date, col, 'up')
+      } else if (e.key === 'ArrowDown' || e.key === 'Enter') {
+        e.preventDefault()
+        navigateToCell(date, col, 'down')
+      } else if (e.key === 'ArrowLeft') {
+        e.preventDefault()
+        navigateToCell(date, col, 'left')
+      } else if (e.key === 'ArrowRight') {
+        e.preventDefault()
+        navigateToCell(date, col, 'right')
+      } else if (e.key === 'Tab') {
+        e.preventDefault()
+        navigateToCell(date, col, e.shiftKey ? 'left' : 'right')
+      }
+    },
+    [date, col],
+  )
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'ArrowUp') {
-      e.preventDefault()
-      navigateToCell(date, col, 'up')
-    } else if (e.key === 'ArrowDown' || e.key === 'Enter') {
-      e.preventDefault()
-      navigateToCell(date, col, 'down')
-    } else if (e.key === 'ArrowLeft') {
-      e.preventDefault()
-      navigateToCell(date, col, 'left')
-    } else if (e.key === 'ArrowRight') {
-      e.preventDefault()
-      navigateToCell(date, col, 'right')
-    } else if (e.key === 'Tab') {
-      e.preventDefault()
-      navigateToCell(date, col, e.shiftKey ? 'left' : 'right')
-    }
-  }
-
-  const handleChange = (v: number) => {
-    useTimesheetStore.getState().updateEntry(date, 'breakMinutes', v)
-  }
+  const handlePickerSelect = useCallback(
+    (v: number) => {
+      useTimesheetStore.getState().updateEntry(date, 'breakMinutes', v)
+      setOpen(false)
+    },
+    [date],
+  )
 
   return (
     <TableCell className="p-1 text-center" data-col={col}>
@@ -88,15 +98,9 @@ export function TimesheetBreakCell({ date, col }: TimesheetBreakCellProps) {
         </PopoverTrigger>
         <PopoverContent className="w-auto p-2" align="center" sideOffset={8}>
           <PopoverArrow className="fill-popover drop-shadow-sm" />
-          <BreakGridPicker
-            value={value}
-            onChange={(v) => {
-              handleChange(v)
-              setOpen(false)
-            }}
-          />
+          <BreakGridPicker value={value} onChange={handlePickerSelect} />
         </PopoverContent>
       </Popover>
     </TableCell>
   )
-}
+})

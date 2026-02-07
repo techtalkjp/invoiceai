@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import { calculateWorkDuration } from '~/components/time-utils'
 import { TableCell } from '~/components/ui/table'
 import { useEntryField } from '../store'
@@ -6,7 +7,9 @@ interface TimesheetWorkCellProps {
   date: string
 }
 
-export function TimesheetWorkCell({ date }: TimesheetWorkCellProps) {
+export const TimesheetWorkCell = memo(function TimesheetWorkCell({
+  date,
+}: TimesheetWorkCellProps) {
   const startTime = useEntryField(date, 'startTime')
   const endTime = useEntryField(date, 'endTime')
   const breakMinutes = useEntryField(date, 'breakMinutes') ?? 0
@@ -37,4 +40,4 @@ export function TimesheetWorkCell({ date }: TimesheetWorkCellProps) {
       {workDisplay}
     </TableCell>
   )
-}
+})

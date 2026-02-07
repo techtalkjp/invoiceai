@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { memo, useCallback, useState } from 'react'
 import { TimeGridPicker } from '~/components/time-grid-picker'
 import { TimeInput } from '~/components/time-input'
 import {
@@ -16,16 +16,15 @@ interface TimesheetTimeCellProps {
   date: string
   field: 'startTime' | 'endTime'
   baseTimeField?: 'startTime' | 'endTime' | undefined
-  allow24Plus?: boolean
-  disabled?: boolean
+  allow24Plus?: boolean | undefined
+  disabled?: boolean | undefined
   col: number
-  defaultValue?: string
-  open?: boolean
-  onOpenChange?: (open: boolean) => void
-  onSelectFromPicker?: () => void
+  defaultValue?: string | undefined
+  /** Picker から選択後に次のセルへ移動するための col 番号 */
+  nextCol?: number | undefined
 }
 
-export function TimesheetTimeCell({
+export const TimesheetTimeCell = memo(function TimesheetTimeCell({
   date,
   field,
   baseTimeField,
@@ -33,29 +32,63 @@ export function TimesheetTimeCell({
   disabled = false,
   col,
   defaultValue = '09:00',
-  open,
-  onOpenChange,
-  onSelectFromPicker,
+  nextCol,
 }: TimesheetTimeCellProps) {
-  // 自分のフィールドのみ subscribe（フックは常に呼び出す）
+  // 自分のフィールドのみ subscribe
   const value = useEntryField(date, field) ?? ''
   const startTime = useEntryField(date, 'startTime')
   const baseTime = baseTimeField === 'startTime' ? startTime : undefined
 
-  const [internalOpen, setInternalOpen] = useState(false)
-  const isControlled = open !== undefined
-  const isOpen = isControlled ? open : internalOpen
-  const setIsOpen = isControlled
-    ? (onOpenChange ?? (() => {}))
-    : setInternalOpen
+  const [open, setOpen] = useState(false)
 
-  const handleChange = (v: string) => {
-    useTimesheetStore.getState().updateEntry(date, field, v)
-  }
+  const handleChange = useCallback(
+    (v: string) => {
+      useTimesheetStore.getState().updateEntry(date, field, v)
+    },
+    [date, field],
+  )
+
+  const handlePickerSelect = useCallback(
+    (v: string) => {
+      useTimesheetStore.getState().updateEntry(date, field, v)
+      setOpen(false)
+      // Picker 選択後、次のセルへフォーカス移動
+      if (nextCol !== undefined) {
+        const otherField = field === 'startTime' ? 'endTime' : 'startTime'
+        const otherValue =
+          useTimesheetStore.getState().monthData[date]?.[otherField]
+        if (!otherValue) {
+          // 対になる時刻が未入力 → そのセルの input にフォーカス
+          setTimeout(() => {
+            const input = document.querySelector(
+              `[data-date="${date}"] [data-col="${nextCol}"] input`,
+            ) as HTMLInputElement | null
+            input?.focus()
+          }, 0)
+        } else {
+          // 両方入力済み → 概要欄にフォーカス
+          setTimeout(() => {
+            const descButton = document.querySelector(
+              `[data-date="${date}"] [data-col="3"] button`,
+            ) as HTMLButtonElement | null
+            descButton?.click()
+          }, 0)
+        }
+      }
+    },
+    [date, field, nextCol],
+  )
+
+  const handleNavigate = useCallback(
+    (direction: 'up' | 'down' | 'left' | 'right') => {
+      navigateToCell(date, col, direction)
+    },
+    [date, col],
+  )
 
   return (
     <TableCell className="p-1 text-center" data-col={col}>
-      <Popover open={isOpen} onOpenChange={setIsOpen}>
+      <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
           <div className="inline-block">
             <TimeInput
@@ -70,7 +103,7 @@ export function TimesheetTimeCell({
                 disabled && 'pointer-events-none opacity-50',
               )}
               baseTime={baseTime}
-              onNavigate={(direction) => navigateToCell(date, col, direction)}
+              onNavigate={handleNavigate}
             />
           </div>
         </PopoverTrigger>
@@ -78,11 +111,7 @@ export function TimesheetTimeCell({
           <PopoverArrow className="fill-popover drop-shadow-sm" />
           <TimeGridPicker
             value={value || defaultValue}
-            onChange={(v) => {
-              handleChange(v)
-              setIsOpen(false)
-              onSelectFromPicker?.()
-            }}
+            onChange={handlePickerSelect}
             interval={30}
             allow24Plus={allow24Plus}
           />
@@ -90,4 +119,4 @@ export function TimesheetTimeCell({
       </Popover>
     </TableCell>
   )
-}
+})

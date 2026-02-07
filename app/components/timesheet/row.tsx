@@ -1,4 +1,4 @@
-import { memo, useState } from 'react'
+import { memo } from 'react'
 import { TableCell, TableRow } from '~/components/ui/table'
 import { cn } from '~/lib/utils'
 import {
@@ -57,9 +57,6 @@ export const TimesheetRow = memo(function TimesheetRow({
     useTimesheetStore.getState().startSelection(date, false)
   }
 
-  // Picker の開閉状態を行内で管理（0: startTime, 1: endTime）
-  const [openPickerCol, setOpenPickerCol] = useState<number | null>(null)
-
   const saturday = isSaturday(date)
   const sunday = isSunday(date)
   const holidayName = getHolidayName(date)
@@ -105,28 +102,7 @@ export const TimesheetRow = memo(function TimesheetRow({
           )}
         </div>
       </TableCell>
-      <TimesheetTimeCell
-        date={date}
-        field="startTime"
-        col={0}
-        open={openPickerCol === 0}
-        onOpenChange={(open) => setOpenPickerCol(open ? 0 : null)}
-        onSelectFromPicker={() => {
-          // 終了時間が未入力なら終了時間のPickerを開く
-          const endTime = useTimesheetStore.getState().monthData[date]?.endTime
-          if (!endTime) {
-            setOpenPickerCol(1)
-          } else {
-            // 両方入力済みなら備考欄にフォーカス
-            setTimeout(() => {
-              const descButton = document.querySelector(
-                `[data-date="${date}"] [data-col="3"] button`,
-              ) as HTMLButtonElement | null
-              descButton?.click()
-            }, 0)
-          }
-        }}
-      />
+      <TimesheetTimeCell date={date} field="startTime" col={0} nextCol={1} />
       <TimesheetTimeCell
         date={date}
         field="endTime"
@@ -134,24 +110,7 @@ export const TimesheetRow = memo(function TimesheetRow({
         allow24Plus
         col={1}
         defaultValue="18:00"
-        open={openPickerCol === 1}
-        onOpenChange={(open) => setOpenPickerCol(open ? 1 : null)}
-        onSelectFromPicker={() => {
-          // 開始時間が未入力なら開始時間のPickerを開く
-          const startTime =
-            useTimesheetStore.getState().monthData[date]?.startTime
-          if (!startTime) {
-            setOpenPickerCol(0)
-          } else {
-            // 両方入力済みなら備考欄にフォーカス
-            setTimeout(() => {
-              const descButton = document.querySelector(
-                `[data-date="${date}"] [data-col="3"] button`,
-              ) as HTMLButtonElement | null
-              descButton?.click()
-            }, 0)
-          }
-        }}
+        nextCol={0}
       />
       <TimesheetBreakCell date={date} col={2} />
       <TimesheetWorkCell date={date} />

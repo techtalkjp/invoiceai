@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { memo, useState } from 'react'
 import { TableCell } from '~/components/ui/table'
 import { cn } from '~/lib/utils'
 import { useEntryField, useTimesheetStore } from '../store'
@@ -9,7 +9,7 @@ interface TimesheetDescriptionCellProps {
   col: number
 }
 
-export function TimesheetDescriptionCell({
+export const TimesheetDescriptionCell = memo(function TimesheetDescriptionCell({
   date,
   col,
 }: TimesheetDescriptionCellProps) {
@@ -111,4 +111,4 @@ export function TimesheetDescriptionCell({
       </div>
     </TableCell>
   )
-}
+})
