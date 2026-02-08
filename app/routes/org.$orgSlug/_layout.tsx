@@ -10,6 +10,7 @@ import {
 } from 'lucide-react'
 import { Link, NavLink, Outlet, useNavigate } from 'react-router'
 import { AppLogo } from '~/components/app-logo'
+import { Header } from '~/components/layout/header'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -17,7 +18,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '~/components/ui/dropdown-menu'
-import { Separator } from '~/components/ui/separator'
 import {
   Sidebar,
   SidebarContent,
@@ -32,7 +32,6 @@ import {
   SidebarMenuItem,
   SidebarProvider,
   SidebarRail,
-  SidebarTrigger,
 } from '~/components/ui/sidebar'
 import { signOut } from '~/lib/auth-client'
 import {
@@ -236,42 +235,38 @@ export default function OrgLayout({
       </Sidebar>
 
       <SidebarInset>
-        <header className="flex h-16 shrink-0 items-center gap-2 border-b transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12">
-          <div className="flex items-center gap-2 px-4">
-            <SidebarTrigger className="-ml-1" />
-            <Separator orientation="vertical" className="mr-2 h-4" />
-            {organizations.length > 1 ? (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <button
-                    type="button"
-                    className="hover:bg-accent flex items-center gap-1.5 rounded-md px-2 py-1 text-sm font-semibold"
-                  >
-                    {organization.name}
-                    <ChevronsUpDownIcon className="text-muted-foreground h-4 w-4" />
-                  </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="start" className="w-56">
-                  {organizations.map((org) => (
-                    <DropdownMenuItem key={org.id} asChild>
-                      <Link
-                        to={`/org/${org.slug}`}
-                        className="flex items-center justify-between"
-                      >
-                        {org.name}
-                        {org.id === organization.id && (
-                          <CheckIcon className="h-4 w-4" />
-                        )}
-                      </Link>
-                    </DropdownMenuItem>
-                  ))}
-                </DropdownMenuContent>
-              </DropdownMenu>
-            ) : (
-              <span className="text-sm font-semibold">{organization.name}</span>
-            )}
-          </div>
-        </header>
+        <Header>
+          {organizations.length > 1 ? (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  className="hover:bg-accent flex items-center gap-1.5 rounded-md px-2 py-1 text-sm font-semibold"
+                >
+                  {organization.name}
+                  <ChevronsUpDownIcon className="text-muted-foreground h-4 w-4" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-56">
+                {organizations.map((org) => (
+                  <DropdownMenuItem key={org.id} asChild>
+                    <Link
+                      to={`/org/${org.slug}`}
+                      className="flex items-center justify-between"
+                    >
+                      {org.name}
+                      {org.id === organization.id && (
+                        <CheckIcon className="h-4 w-4" />
+                      )}
+                    </Link>
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ) : (
+            <span className="text-sm font-semibold">{organization.name}</span>
+          )}
+        </Header>
         <div className="flex-1 overflow-auto p-6">
           <Outlet context={{ organization, membership, user }} />
         </div>
