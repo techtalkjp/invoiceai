@@ -10,6 +10,9 @@ import { useIsSelected, useTimesheetStore } from './store'
 import { GRID_COLS } from './table'
 import { DAY_LABELS, getHolidayName, isSaturday, isSunday } from './utils'
 
+// タッチ後の合成 mousedown を無視するためのタイムスタンプ
+let lastTouchStartTime = 0
+
 interface TimesheetRowProps {
   date: string
 }
@@ -22,6 +25,8 @@ export const TimesheetRow = memo(function TimesheetRow({
 
   // 選択操作（store から直接取得 - stable reference）
   const handleMouseDown = (e: React.MouseEvent) => {
+    // タッチ後の合成 mousedown を無視（500ms 以内）
+    if (Date.now() - lastTouchStartTime < 500) return
     if (
       e.target instanceof HTMLInputElement ||
       e.target instanceof HTMLTextAreaElement ||
@@ -54,6 +59,7 @@ export const TimesheetRow = memo(function TimesheetRow({
     ) {
       return
     }
+    lastTouchStartTime = Date.now()
     useTimesheetStore.getState().startSelection(date, false)
   }
 
@@ -87,7 +93,7 @@ export const TimesheetRow = memo(function TimesheetRow({
       {/* biome-ignore lint/a11y/noStaticElementInteractions: date cell for selection start */}
       <div
         className={cn(
-          'touch-none border-l-2 py-0.5 font-medium md:touch-auto',
+          'flex touch-none items-center self-stretch border-l-2 py-0.5 font-medium md:touch-auto',
           selected
             ? 'border-primary'
             : 'md:hover:border-primary/30 border-transparent',
