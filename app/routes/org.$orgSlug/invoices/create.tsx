@@ -24,7 +24,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '~/components/ui/select'
-import { useSmartNavigation } from '~/hooks/use-smart-navigation'
 import { requireOrgMember } from '~/lib/auth-helpers.server'
 import { db } from '~/lib/db/kysely'
 import { getFreeeClientForOrganization } from '~/utils/freee.server'
@@ -42,6 +41,13 @@ import {
 } from './+queries.server'
 import { invoiceCreateSchema } from './+schema'
 import type { Route } from './+types/create'
+
+export const handle = {
+  breadcrumb: (data: { organization: { slug: string } }) => [
+    { label: '月次請求', to: `/org/${data.organization.slug}/invoices` },
+    { label: '請求書作成' },
+  ],
+}
 
 export async function loader({ request, params }: Route.LoaderArgs) {
   const { orgSlug } = params
@@ -308,8 +314,6 @@ export default function InvoiceCreate({
   const navigation = useNavigation()
   const isSubmitting = navigation.state === 'submitting'
   const isEditMode = existingInvoice != null
-  const baseUrl = `/org/${orgSlug}/invoices`
-  const { backUrl } = useSmartNavigation({ baseUrl })
   const [form, fields] = useForm({
     lastResult:
       actionData && 'lastResult' in actionData
@@ -336,7 +340,6 @@ export default function InvoiceCreate({
         <PageHeader
           title="請求書作成"
           subtitle="クライアントが登録されていません。まず設定からクライアントを追加してください。"
-          backTo={backUrl}
         />
         <Button asChild>
           <Link to={`/org/${orgSlug}/settings`}>設定を開く</Link>
@@ -354,7 +357,6 @@ export default function InvoiceCreate({
             ? '既存の請求書を更新します。'
             : '対象クライアントと月を指定して請求書を作成します。'
         }
-        backTo={backUrl}
         actions={
           <div className="flex flex-wrap items-center gap-2 text-sm">
             <Badge variant={isPrevMonth ? 'default' : 'outline'}>

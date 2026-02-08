@@ -23,6 +23,10 @@ const formSchema = z.object({
     .regex(/^[a-z0-9-]+$/, '小文字英数字とハイフンのみ使用できます'),
 })
 
+export const handle = {
+  breadcrumb: () => ({ label: '基本設定' }),
+}
+
 export async function loader({ request, params }: Route.LoaderArgs) {
   const { orgSlug } = params
   const { organization } = await requireOrgAdmin(request, orgSlug)

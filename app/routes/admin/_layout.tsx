@@ -8,7 +8,6 @@ import {
 import { Link, NavLink, Outlet } from 'react-router'
 import { AppLogo } from '~/components/app-logo'
 import { Header } from '~/components/layout/header'
-import { Button } from '~/components/ui/button'
 import {
   Sidebar,
   SidebarContent,
@@ -26,6 +25,13 @@ import {
 } from '~/components/ui/sidebar'
 import { requireAdmin } from '~/lib/auth-helpers.server'
 import type { Route } from './+types/_layout'
+
+export const handle = {
+  breadcrumb: () => ({
+    label: '管理画面',
+    to: '/admin',
+  }),
+}
 
 export async function loader({ request }: Route.LoaderArgs) {
   const { user } = await requireAdmin(request)
@@ -128,14 +134,7 @@ export default function AdminLayout({
       </Sidebar>
 
       <SidebarInset>
-        <Header>
-          <span className="text-lg font-semibold">管理画面</span>
-          <div className="ml-auto">
-            <Button variant="outline" size="sm" asChild>
-              <Link to="/">アプリに戻る</Link>
-            </Button>
-          </div>
-        </Header>
+        <Header />
         <div className="flex-1 overflow-auto p-6">
           <Outlet />
         </div>

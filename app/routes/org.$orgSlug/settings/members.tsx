@@ -63,6 +63,10 @@ const formSchema = z.discriminatedUnion('intent', [
   updateRoleSchema,
 ])
 
+export const handle = {
+  breadcrumb: () => ({ label: 'メンバー管理' }),
+}
+
 export async function loader({ request, params }: Route.LoaderArgs) {
   const { orgSlug } = params
   const { organization, membership: currentMembership } = await requireOrgAdmin(

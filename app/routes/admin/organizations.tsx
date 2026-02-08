@@ -55,6 +55,10 @@ const formSchema = z.discriminatedUnion('intent', [
   updateOrgSchema,
 ])
 
+export const handle = {
+  breadcrumb: () => ({ label: '組織管理' }),
+}
+
 export async function loader() {
   const organizations = await db
     .selectFrom('organization')

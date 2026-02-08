@@ -47,6 +47,10 @@ import {
 } from './+queries.server'
 import type { Route } from './+types/index'
 
+export const handle = {
+  breadcrumb: () => ({ label: '月次請求' }),
+}
+
 export async function loader({ request, params }: Route.LoaderArgs) {
   const { orgSlug } = params
   const { organization } = await requireOrgMember(request, orgSlug)

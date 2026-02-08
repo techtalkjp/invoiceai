@@ -5,6 +5,13 @@ import { ClientForm } from './+components/client-form'
 import { upsertClient } from './+mutations.server'
 import type { Route } from './+types/new'
 
+export const handle = {
+  breadcrumb: (data: { orgSlug: string }) => [
+    { label: 'クライアント', to: `/org/${data.orgSlug}/clients` },
+    { label: '新規作成' },
+  ],
+}
+
 export async function loader({ request, params }: Route.LoaderArgs) {
   const { orgSlug } = params
   await requireOrgAdmin(request, orgSlug)
@@ -35,7 +42,7 @@ export default function NewClient({
   return (
     <ClientForm
       lastResult={actionData?.lastResult}
-      backTo={backUrl}
+      cancelUrl={backUrl}
       submitLabel="追加"
     />
   )

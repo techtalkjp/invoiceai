@@ -62,6 +62,10 @@ const formSchema = z.discriminatedUnion('intent', [
   setCompanySchema,
 ])
 
+export const handle = {
+  breadcrumb: () => ({ label: 'freee 連携' }),
+}
+
 export async function loader({ request, params }: Route.LoaderArgs) {
   const { orgSlug } = params
   const { organization } = await requireOrgAdmin(request, orgSlug)

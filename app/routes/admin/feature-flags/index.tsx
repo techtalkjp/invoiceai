@@ -33,6 +33,10 @@ const actionSchema = z.object({
   enabled: z.string().transform((v) => v === 'true'),
 })
 
+export const handle = {
+  breadcrumb: () => ({ label: 'Feature Flags' }),
+}
+
 export async function loader() {
   const flags = await getFeatureFlags()
   return { flags }

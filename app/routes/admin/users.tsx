@@ -21,6 +21,10 @@ import { db } from '~/lib/db/kysely'
 import { formatDate } from '~/utils/date'
 import type { Route } from './+types/users'
 
+export const handle = {
+  breadcrumb: () => ({ label: 'ユーザー管理' }),
+}
+
 export async function loader() {
   const users = await db
     .selectFrom('user')

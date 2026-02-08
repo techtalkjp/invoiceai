@@ -4,6 +4,13 @@ import { Card } from '~/components/ui/card'
 import { requireOrgAdmin } from '~/lib/auth-helpers.server'
 import type { Route } from './+types/_layout'
 
+export const handle = {
+  breadcrumb: (data: { organization: { slug: string } }) => ({
+    label: '設定',
+    to: `/org/${data.organization.slug}/settings`,
+  }),
+}
+
 export async function loader({ request, params }: Route.LoaderArgs) {
   const { orgSlug } = params
   const { organization, membership } = await requireOrgAdmin(request, orgSlug)

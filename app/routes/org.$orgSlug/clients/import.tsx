@@ -25,6 +25,13 @@ import { fetchFreeePartners, getClients } from './+queries.server'
 import type { InvoicePartner } from './+schema'
 import type { Route } from './+types/import'
 
+export const handle = {
+  breadcrumb: (data: { organization: { slug: string } }) => [
+    { label: 'クライアント', to: `/org/${data.organization.slug}/clients` },
+    { label: 'freeeから取込' },
+  ],
+}
+
 export async function loader({ request, params }: Route.LoaderArgs) {
   const { orgSlug } = params
   const { organization } = await requireOrgAdmin(request, orgSlug)

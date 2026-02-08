@@ -26,6 +26,19 @@ export function shouldRevalidate({
   return defaultShouldRevalidate
 }
 
+export const handle = {
+  breadcrumb: (data: {
+    organization: { slug: string }
+    clientEntry: { clientName: string }
+  }) => [
+    {
+      label: '稼働時間',
+      to: `/org/${data.organization.slug}/work-hours`,
+    },
+    { label: data.clientEntry.clientName },
+  ],
+}
+
 export async function loader({ request, params }: Route.LoaderArgs) {
   const { orgSlug, clientId } = params
   const { organization, user } = await requireOrgMember(request, orgSlug)
@@ -199,7 +212,6 @@ export default function ClientWorkHours({
       <PageHeader
         title={clientEntry.clientName}
         subtitle="セルをクリックして編集 · Tab/Enterで移動"
-        backTo={`/org/${orgSlug}/work-hours?year=${year}&month=${month}`}
         actions={
           <TextImportDialog clientId={clientId} year={year} month={month} />
         }

@@ -28,6 +28,10 @@ import { deleteClient, restoreClient } from './+mutations.server'
 import { getClients } from './+queries.server'
 import type { Route } from './+types/index'
 
+export const handle = {
+  breadcrumb: () => ({ label: 'クライアント' }),
+}
+
 export async function loader({ request, params }: Route.LoaderArgs) {
   const { orgSlug } = params
   const { organization } = await requireOrgAdmin(request, orgSlug)

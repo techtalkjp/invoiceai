@@ -1,10 +1,16 @@
 import { Separator } from '~/components/ui/separator'
 import { SidebarTrigger } from '~/components/ui/sidebar'
+import { useBreadcrumbs } from '~/hooks/use-breadcrumbs'
 import { cn } from '~/lib/utils'
 
-interface HeaderProps extends React.ComponentPropsWithRef<'header'> {}
+interface HeaderProps extends Omit<
+  React.ComponentPropsWithRef<'header'>,
+  'children'
+> {}
 
-export const Header = ({ className, children, ...props }: HeaderProps) => {
+export const Header = ({ className, ...props }: HeaderProps) => {
+  const { Breadcrumbs } = useBreadcrumbs()
+
   return (
     <header
       className={cn(
@@ -15,7 +21,7 @@ export const Header = ({ className, children, ...props }: HeaderProps) => {
     >
       <SidebarTrigger variant="outline" className="scale-125 sm:scale-100" />
       <Separator orientation="vertical" className="h-6" />
-      {children}
+      <Breadcrumbs />
     </header>
   )
 }

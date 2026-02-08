@@ -31,16 +31,16 @@ type SyncFetcherData = {
 type ClientFormProps = {
   defaultValue?: Partial<ClientFormData>
   lastResult?: Parameters<typeof useForm>[0]['lastResult']
-  backTo: string
+  cancelUrl: string
   submitLabel: string
-  canSync?: boolean
-  orgSlug?: string
+  canSync?: boolean | undefined
+  orgSlug?: string | undefined
 }
 
 export function ClientForm({
   defaultValue,
   lastResult,
-  backTo,
+  cancelUrl,
   submitLabel,
   canSync,
   orgSlug,
@@ -80,7 +80,6 @@ export function ClientForm({
       <PageHeader
         title={isEditing ? 'クライアントを編集' : 'クライアントを追加'}
         subtitle="クライアント情報を入力してください"
-        backTo={backTo}
       />
 
       <ContentPanel className="p-6">
@@ -262,7 +261,7 @@ export function ClientForm({
 
           <div className="flex justify-end gap-2 border-t pt-4">
             <Button type="button" variant="outline" asChild>
-              <Link to={backTo}>キャンセル</Link>
+              <Link to={cancelUrl}>キャンセル</Link>
             </Button>
             <Button type="submit" disabled={isSubmitting}>
               {isSubmitting ? '保存中...' : submitLabel}

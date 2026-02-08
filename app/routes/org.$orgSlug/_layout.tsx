@@ -1,6 +1,5 @@
 import {
   BriefcaseIcon,
-  CheckIcon,
   ChevronsUpDownIcon,
   ClockIcon,
   HomeIcon,
@@ -40,6 +39,13 @@ import {
 } from '~/lib/auth-helpers.server'
 import type { Route } from './+types/_layout'
 
+export const handle = {
+  breadcrumb: (data: { organization: { name: string; slug: string } }) => ({
+    label: data.organization.name,
+    to: `/org/${data.organization.slug}`,
+  }),
+}
+
 export async function loader({ request, params }: Route.LoaderArgs) {
   const { orgSlug } = params
   const { user, organization, membership } = await requireOrgMember(
@@ -53,7 +59,7 @@ export async function loader({ request, params }: Route.LoaderArgs) {
 }
 
 export default function OrgLayout({
-  loaderData: { user, organization, membership, organizations },
+  loaderData: { user, organization, membership },
 }: Route.ComponentProps) {
   const navigate = useNavigate()
   const isOwner = membership.role === 'owner'
@@ -235,38 +241,7 @@ export default function OrgLayout({
       </Sidebar>
 
       <SidebarInset>
-        <Header>
-          {organizations.length > 1 ? (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button
-                  type="button"
-                  className="hover:bg-accent flex items-center gap-1.5 rounded-md px-2 py-1 text-sm font-semibold"
-                >
-                  {organization.name}
-                  <ChevronsUpDownIcon className="text-muted-foreground h-4 w-4" />
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="w-56">
-                {organizations.map((org) => (
-                  <DropdownMenuItem key={org.id} asChild>
-                    <Link
-                      to={`/org/${org.slug}`}
-                      className="flex items-center justify-between"
-                    >
-                      {org.name}
-                      {org.id === organization.id && (
-                        <CheckIcon className="h-4 w-4" />
-                      )}
-                    </Link>
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          ) : (
-            <span className="text-sm font-semibold">{organization.name}</span>
-          )}
-        </Header>
+        <Header />
         <div className="flex-1 overflow-auto p-6">
           <Outlet context={{ organization, membership, user }} />
         </div>

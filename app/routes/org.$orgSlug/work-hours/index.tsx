@@ -17,6 +17,10 @@ import { getMonthEntries, getTimeBasedClients } from './+queries.server'
 import { formSchema } from './+schema'
 import type { Route } from './+types/index'
 
+export const handle = {
+  breadcrumb: () => ({ label: '稼働時間' }),
+}
+
 export async function loader({ request, params }: Route.LoaderArgs) {
   const { orgSlug } = params
   const { organization, user } = await requireOrgMember(request, orgSlug)

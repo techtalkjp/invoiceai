@@ -6,6 +6,13 @@ import { upsertClient } from './+mutations.server'
 import { getClient } from './+queries.server'
 import type { Route } from './+types/$clientId'
 
+export const handle = {
+  breadcrumb: (data: { orgSlug: string; client: { name: string } }) => [
+    { label: 'クライアント', to: `/org/${data.orgSlug}/clients` },
+    { label: data.client.name },
+  ],
+}
+
 export async function loader({ request, params }: Route.LoaderArgs) {
   const { orgSlug, clientId } = params
   const { organization } = await requireOrgAdmin(request, orgSlug)
@@ -67,7 +74,7 @@ export default function EditClient({
           ? actionData.lastResult
           : undefined
       }
-      backTo={backUrl}
+      cancelUrl={backUrl}
       submitLabel="更新"
       canSync={canSync}
       orgSlug={orgSlug}

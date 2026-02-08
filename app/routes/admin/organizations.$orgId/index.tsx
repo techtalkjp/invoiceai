@@ -1,6 +1,5 @@
 import { parseWithZod } from '@conform-to/zod/v4'
 import {
-  ArrowLeftIcon,
   ExternalLinkIcon,
   Trash2Icon,
   UserMinusIcon,
@@ -58,6 +57,13 @@ const actionSchema = z.discriminatedUnion('intent', [
     memberId: z.string().min(1),
   }),
 ])
+
+export const handle = {
+  breadcrumb: (data: { organization: { name: string } }) => [
+    { label: '組織管理', to: '/admin/organizations' },
+    { label: data.organization.name },
+  ],
+}
 
 export async function loader({ params }: Route.LoaderArgs) {
   const { orgId } = params
@@ -119,18 +125,11 @@ export default function AdminOrganizationDetail({
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Button variant="outline" size="icon" asChild>
-            <Link to="/admin/organizations">
-              <ArrowLeftIcon className="h-4 w-4" />
-            </Link>
-          </Button>
-          <div>
-            <h2 className="text-2xl font-bold tracking-tight">
-              {organization.name}
-            </h2>
-            <p className="text-muted-foreground">組織の詳細情報</p>
-          </div>
+        <div>
+          <h2 className="text-2xl font-bold tracking-tight">
+            {organization.name}
+          </h2>
+          <p className="text-muted-foreground">組織の詳細情報</p>
         </div>
         {organization.slug && (
           <Button variant="outline" asChild>
