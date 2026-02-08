@@ -1,6 +1,5 @@
 import { memo } from 'react'
 import { calculateWorkDuration } from '~/components/time-utils'
-import { TableCell } from '~/components/ui/table'
 import { useEntryField } from '../store'
 
 interface TimesheetWorkCellProps {
@@ -21,7 +20,7 @@ export const TimesheetWorkCell = memo(function TimesheetWorkCell({
       const hours = Math.floor(duration.workMinutes / 60)
       const mins = duration.workMinutes % 60
       workDisplay = (
-        <>
+        <span className="whitespace-nowrap">
           {hours}
           <span className="text-[0.7em]">時間</span>
           {mins > 0 && (
@@ -30,14 +29,16 @@ export const TimesheetWorkCell = memo(function TimesheetWorkCell({
               <span className="text-[0.7em]">分</span>
             </>
           )}
-        </>
+        </span>
       )
     }
   }
 
   return (
-    <TableCell className="text-muted-foreground text-center">
-      {workDisplay}
-    </TableCell>
+    <div className="px-0.5 py-1 text-center">
+      <div className="text-muted-foreground h-7 rounded-md border border-transparent text-sm leading-7">
+        {workDisplay}
+      </div>
+    </div>
   )
 })

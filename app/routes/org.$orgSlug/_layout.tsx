@@ -242,7 +242,7 @@ export default function OrgLayout({
 
       <SidebarInset>
         <Header />
-        <div className="flex-1 overflow-auto p-6">
+        <div className="flex-1 overflow-y-auto p-3 md:p-6">
           <Outlet context={{ organization, membership, user }} />
         </div>
       </SidebarInset>

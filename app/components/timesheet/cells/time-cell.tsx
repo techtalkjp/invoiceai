@@ -7,7 +7,6 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '~/components/ui/popover'
-import { TableCell } from '~/components/ui/table'
 import { cn } from '~/lib/utils'
 import { useEntryField, useTimesheetStore } from '../store'
 import { navigateToCell } from '../utils'
@@ -87,16 +86,16 @@ export const TimesheetTimeCell = memo(function TimesheetTimeCell({
   )
 
   return (
-    <TableCell className="p-1 text-center" data-col={col}>
+    <div className="px-0.5 py-1 text-center" data-col={col}>
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
-          <div className="inline-block">
+          <div>
             <TimeInput
               value={value}
               onChange={handleChange}
               placeholder=""
               className={cn(
-                'h-7! w-20! text-center text-xs',
+                'h-7! w-full! px-1! text-center text-xs',
                 'bg-muted/70! border-transparent! md:bg-transparent!',
                 'hover:border-border! hover:bg-accent/50!',
                 'focus:border-primary! focus:bg-background!',
@@ -117,6 +116,6 @@ export const TimesheetTimeCell = memo(function TimesheetTimeCell({
           />
         </PopoverContent>
       </Popover>
-    </TableCell>
+    </div>
   )
 })

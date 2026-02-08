@@ -67,12 +67,13 @@ export function TimesheetGrid({
               style={{
                 width:
                   clientCount > 0
-                    ? `${Math.max(80, (100 - 10 - 8) / clientCount)}%`
+                    ? `${(100 - 10 - 12) / clientCount}%`
                     : undefined,
+                minWidth: '5rem',
               }}
             />
           ))}
-          <col className="w-16" />
+          <col className="w-24" />
         </colgroup>
         <TableHeader>
           <TableRow>
@@ -80,16 +81,19 @@ export function TimesheetGrid({
               日付
             </TableHead>
             {monthEntries.map((entry, idx) => (
-              <TableHead key={entry.clientId} className="truncate text-center">
+              <TableHead
+                key={entry.clientId}
+                className="overflow-hidden text-center"
+              >
                 <Link
                   to={`/org/${orgSlug}/work-hours/${entry.clientId}?year=${year}&month=${month}`}
-                  className="hover:bg-accent inline-flex items-center gap-1 truncate rounded-md px-2 py-1 text-sm font-medium transition-colors"
+                  className="hover:bg-accent inline-flex max-w-full items-center gap-1 truncate rounded-md px-2 py-1 text-sm font-medium transition-colors"
                 >
                   <span className="truncate">{entry.clientName}</span>
                   <ArrowRightIcon className="h-3 w-3 shrink-0 opacity-50" />
                 </Link>
                 {(clientTotals[idx] ?? 0) > 0 && (
-                  <div className="text-muted-foreground text-[10px]">
+                  <div className="text-muted-foreground truncate text-[10px]">
                     <HoursDurationDisplay hours={clientTotals[idx] ?? 0} />
                   </div>
                 )}

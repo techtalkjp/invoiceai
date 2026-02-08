@@ -47,7 +47,7 @@ export default function PlaygroundIndex({
 }: Route.ComponentProps) {
   return (
     <PublicLayout>
-      <div className="mx-auto grid max-w-4xl gap-4 py-4 sm:py-8">
+      <div className="mx-auto grid max-w-4xl min-w-0 gap-4 py-4 sm:py-8">
         <PageHeader
           title="Timesheet Playground"
           subtitle="月次タイムシートのデモ"

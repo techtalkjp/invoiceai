@@ -1,13 +1,10 @@
 import { memo, useMemo } from 'react'
-import {
-  Table,
-  TableBody,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '~/components/ui/table'
+import { cn } from '~/lib/utils'
 import { TimesheetRow } from './row'
 import { useFilledDatesKey, useTimesheetStore } from './store'
+
+/** ヘッダー・各行で共有する grid-template-columns */
+export const GRID_COLS = 'grid-cols-[4.5rem_4rem_4rem_4rem_4rem_1fr]'
 
 interface TimesheetTableProps {
   monthDates: string[]
@@ -29,22 +26,21 @@ export const TimesheetTable = memo(function TimesheetTable({
   }, [showOnlyFilled, monthDates, filledDatesKey])
 
   return (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHead className="w-28">日付</TableHead>
-          <TableHead className="w-24 text-center">開始</TableHead>
-          <TableHead className="w-24 text-center">終了</TableHead>
-          <TableHead className="w-20 text-center">休憩</TableHead>
-          <TableHead className="w-20 text-center">稼働</TableHead>
-          <TableHead>概要</TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody onMouseUp={onMouseUp}>
+    <div className="min-w-[540px]">
+      <div className={cn('grid items-center border-b', GRID_COLS)}>
+        <div className="px-2 py-2 text-sm font-medium">日付</div>
+        <div className="px-2 py-2 text-center text-sm font-medium">開始</div>
+        <div className="px-2 py-2 text-center text-sm font-medium">終了</div>
+        <div className="px-2 py-2 text-center text-sm font-medium">休憩</div>
+        <div className="px-2 py-2 text-center text-sm font-medium">稼働</div>
+        <div className="px-2 py-2 text-sm font-medium">概要</div>
+      </div>
+      {/* biome-ignore lint/a11y/noStaticElementInteractions: mouse up for selection end */}
+      <div onMouseUp={onMouseUp}>
         {filteredDates.map((date) => (
           <TimesheetRow key={date} date={date} />
         ))}
-      </TableBody>
-    </Table>
+      </div>
+    </div>
   )
 })

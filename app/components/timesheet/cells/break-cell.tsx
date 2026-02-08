@@ -6,7 +6,6 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '~/components/ui/popover'
-import { TableCell } from '~/components/ui/table'
 import { cn } from '~/lib/utils'
 import { useEntryField, useTimesheetStore } from '../store'
 import { navigateToCell } from '../utils'
@@ -20,15 +19,15 @@ const formatBreak = (minutes: number): React.ReactNode => {
   if (minutes === 0) return null
   if (minutes < 60)
     return (
-      <>
+      <span className="whitespace-nowrap">
         {minutes}
         <span className="text-[0.7em]">分</span>
-      </>
+      </span>
     )
   const h = Math.floor(minutes / 60)
   const m = minutes % 60
   return (
-    <>
+    <span className="whitespace-nowrap">
       {h}
       <span className="text-[0.7em]">時間</span>
       {m > 0 && (
@@ -37,7 +36,7 @@ const formatBreak = (minutes: number): React.ReactNode => {
           <span className="text-[0.7em]">分</span>
         </>
       )}
-    </>
+    </span>
   )
 }
 
@@ -80,14 +79,14 @@ export const TimesheetBreakCell = memo(function TimesheetBreakCell({
   )
 
   return (
-    <TableCell className="p-1 text-center" data-col={col}>
+    <div className="px-0.5 py-1 text-center" data-col={col}>
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
           <button
             type="button"
             onKeyDown={handleKeyDown}
             className={cn(
-              'h-7 w-20 rounded-md border text-center leading-7',
+              'h-7 w-full rounded-md border text-center text-sm leading-7',
               'bg-muted/70 border-transparent md:bg-transparent',
               'hover:border-border hover:bg-accent/50',
               'focus:border-primary focus:bg-background focus:outline-none',
@@ -101,6 +100,6 @@ export const TimesheetBreakCell = memo(function TimesheetBreakCell({
           <BreakGridPicker value={value} onChange={handlePickerSelect} />
         </PopoverContent>
       </Popover>
-    </TableCell>
+    </div>
   )
 })

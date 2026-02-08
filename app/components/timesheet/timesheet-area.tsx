@@ -15,7 +15,7 @@ export function TimesheetArea({ monthDates, children }: TimesheetAreaProps) {
 
   return (
     // biome-ignore lint/a11y/useKeyWithClickEvents lint/a11y/noStaticElementInteractions: selection clear on background click
-    <div className="space-y-4" onClick={handleClearSelection}>
+    <div className="min-w-0 space-y-1" onClick={handleClearSelection}>
       {/* biome-ignore lint/a11y/useKeyWithClickEvents lint/a11y/noStaticElementInteractions: stop propagation only */}
       <div onClick={(e) => e.stopPropagation()}>{children}</div>
 
@@ -23,7 +23,7 @@ export function TimesheetArea({ monthDates, children }: TimesheetAreaProps) {
         <ContextMenuTrigger asChild>
           {/* biome-ignore lint/a11y/useKeyWithClickEvents lint/a11y/noStaticElementInteractions: stop propagation only */}
           <div
-            className="overflow-hidden rounded-md border select-none"
+            className="overflow-x-auto rounded-md border select-none"
             onClick={(e) => e.stopPropagation()}
           >
             <TimesheetTable monthDates={monthDates} onMouseUp={handleMouseUp} />

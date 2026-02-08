@@ -1,5 +1,4 @@
 import { memo, useState } from 'react'
-import { TableCell } from '~/components/ui/table'
 import { cn } from '~/lib/utils'
 import { useEntryField, useTimesheetStore } from '../store'
 import { navigateToCell } from '../utils'
@@ -22,7 +21,7 @@ export const TimesheetDescriptionCell = memo(function TimesheetDescriptionCell({
   }
 
   return (
-    <TableCell className="p-1" data-col={col}>
+    <div className="p-1" data-col={col}>
       <div className="relative">
         {/* 高さを確保するための非表示のプレースホルダー（常にline-clamp-3で3行分の高さ） */}
         <div
@@ -80,7 +79,7 @@ export const TimesheetDescriptionCell = memo(function TimesheetDescriptionCell({
                 'border-primary bg-background outline-none',
               )}
             />
-            <span className="text-muted-foreground/60 pointer-events-none absolute right-1.5 bottom-0.5 text-[9px]">
+            <span className="text-muted-foreground/60 pointer-events-none absolute right-1.5 bottom-0.5 hidden text-[9px] md:block">
               Shift+Enter: 改行
             </span>
           </>
@@ -109,6 +108,6 @@ export const TimesheetDescriptionCell = memo(function TimesheetDescriptionCell({
           </button>
         )}
       </div>
-    </TableCell>
+    </div>
   )
 })

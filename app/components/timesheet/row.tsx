@@ -1,5 +1,4 @@
 import { memo } from 'react'
-import { TableCell, TableRow } from '~/components/ui/table'
 import { cn } from '~/lib/utils'
 import {
   TimesheetBreakCell,
@@ -8,7 +7,8 @@ import {
   TimesheetWorkCell,
 } from './cells'
 import { useIsSelected, useTimesheetStore } from './store'
-import { formatDateRow, getHolidayName, isSaturday, isSunday } from './utils'
+import { GRID_COLS } from './table'
+import { DAY_LABELS, getHolidayName, isSaturday, isSunday } from './utils'
 
 interface TimesheetRowProps {
   date: string
@@ -70,10 +70,12 @@ export const TimesheetRow = memo(function TimesheetRow({
         : undefined
 
   return (
-    <TableRow
+    // biome-ignore lint/a11y/noStaticElementInteractions: row selection via mouse enter
+    <div
       data-date={date}
       className={cn(
-        'cursor-pointer transition-colors',
+        'grid cursor-pointer items-center border-b transition-colors',
+        GRID_COLS,
         isOffDay && 'bg-muted/30',
         selected && 'bg-primary/5',
         !selected && !isOffDay && 'odd:bg-muted/10',
@@ -82,16 +84,24 @@ export const TimesheetRow = memo(function TimesheetRow({
       )}
       onMouseEnter={handleMouseEnter}
     >
-      <TableCell
-        className="relative touch-none py-0.5 font-medium md:touch-auto"
+      {/* biome-ignore lint/a11y/noStaticElementInteractions: date cell for selection start */}
+      <div
+        className={cn(
+          'touch-none border-l-2 py-0.5 font-medium md:touch-auto',
+          selected
+            ? 'border-primary'
+            : 'md:hover:border-primary/30 border-transparent',
+        )}
         onMouseDown={handleMouseDown}
         onTouchStart={handleTouchStart}
       >
-        {selected && (
-          <div className="bg-primary absolute top-0 bottom-0 left-0 w-0.5" />
-        )}
-        <div className="flex flex-col">
-          <span className={dateColorClass}>{formatDateRow(date)}</span>
+        <div className="flex flex-col px-2">
+          <span className={cn('whitespace-nowrap', dateColorClass)}>
+            {new Date(date).getDate()}
+            <span className="text-[10px]">
+              日 ({DAY_LABELS[new Date(date).getDay()]})
+            </span>
+          </span>
           {holidayName && (
             <span
               className="text-destructive/70 max-w-20 truncate text-[9px] leading-tight"
@@ -101,7 +111,7 @@ export const TimesheetRow = memo(function TimesheetRow({
             </span>
           )}
         </div>
-      </TableCell>
+      </div>
       <TimesheetTimeCell date={date} field="startTime" col={0} nextCol={1} />
       <TimesheetTimeCell
         date={date}
@@ -115,6 +125,6 @@ export const TimesheetRow = memo(function TimesheetRow({
       <TimesheetBreakCell date={date} col={2} />
       <TimesheetWorkCell date={date} />
       <TimesheetDescriptionCell date={date} col={3} />
-    </TableRow>
+    </div>
   )
 })
