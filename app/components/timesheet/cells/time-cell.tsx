@@ -42,6 +42,10 @@ export const TimesheetTimeCell = memo(function TimesheetTimeCell({
 
   const handleChange = useCallback(
     (v: string) => {
+      // 空→空の変更は store を汚さない（不要な保存を防止）
+      if (v === '' && !useTimesheetStore.getState().monthData[date]?.[field]) {
+        return
+      }
       useTimesheetStore.getState().updateEntry(date, field, v)
     },
     [date, field],
