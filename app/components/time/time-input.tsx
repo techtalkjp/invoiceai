@@ -37,10 +37,14 @@ export const TimeInput = forwardRef<HTMLInputElement, TimeInputProps>(
 
     // 入力値のパースと反映
     const handleConfirm = useCallback(() => {
-      const parsed = parseTimeInput(inputValue, baseTime || value)
-      if (parsed) {
-        const formatted = formatTime(parsed.hours, parsed.minutes)
-        onChange(formatted)
+      if (inputValue.trim() === '') {
+        onChange('')
+      } else {
+        const parsed = parseTimeInput(inputValue, baseTime || value)
+        if (parsed) {
+          const formatted = formatTime(parsed.hours, parsed.minutes)
+          onChange(formatted)
+        }
       }
       // 編集終了（成功時は onChange で親が value を更新、失敗時は元の value に戻る）
       setEditingValue(null)
