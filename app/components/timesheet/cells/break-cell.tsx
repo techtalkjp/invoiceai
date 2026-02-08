@@ -79,7 +79,7 @@ export const TimesheetBreakCell = memo(function TimesheetBreakCell({
   )
 
   return (
-    <div className="px-0.5 py-1 text-center" data-col={col}>
+    <div className="px-0.5 py-1 text-center md:px-1" data-col={col}>
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
           <button

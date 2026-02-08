@@ -35,7 +35,7 @@ export const TimesheetWorkCell = memo(function TimesheetWorkCell({
   }
 
   return (
-    <div className="px-0.5 py-1 text-center">
+    <div className="px-0.5 py-1 text-center md:px-1">
       <div className="text-muted-foreground h-7 rounded-md border border-transparent text-sm leading-7">
         {workDisplay}
       </div>
