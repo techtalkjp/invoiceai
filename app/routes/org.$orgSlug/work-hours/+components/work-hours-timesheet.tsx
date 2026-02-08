@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState } from 'react'
-import { ControlBar } from '~/components/control-bar'
-import { MonthNav } from '~/components/month-nav'
+import { ControlBar } from '~/components/layout/control-bar'
+import { MonthNav } from '~/components/layout/month-nav'
 import {
   FilterToggleButton,
   MonthTotalDisplay,

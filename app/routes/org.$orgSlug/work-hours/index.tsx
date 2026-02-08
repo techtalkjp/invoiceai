@@ -2,11 +2,11 @@ import { parseWithZod } from '@conform-to/zod/v4'
 import { FilterIcon } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router'
-import { ContentPanel } from '~/components/content-panel'
-import { ControlBar } from '~/components/control-bar'
-import { DurationDisplay } from '~/components/duration-display'
-import { MonthNav } from '~/components/month-nav'
-import { PageHeader } from '~/components/page-header'
+import { ContentPanel } from '~/components/layout/content-panel'
+import { ControlBar } from '~/components/layout/control-bar'
+import { MonthNav } from '~/components/layout/month-nav'
+import { PageHeader } from '~/components/layout/page-header'
+import { DurationDisplay } from '~/components/time/duration-display'
 import { getMonthDates } from '~/components/timesheet'
 import { Button } from '~/components/ui/button'
 import { requireOrgMember } from '~/lib/auth-helpers.server'
@@ -161,36 +161,39 @@ export default function WorkHours({
         title="稼働時間入力"
         subtitle="クライアントごとの稼働時間を記録・確認"
       />
-      <ControlBar
-        left={
-          <>
-            <MonthNav
-              label={monthLabel}
-              prevUrl={`/org/${orgSlug}/work-hours?year=${prevYear}&month=${prevMonth}`}
-              nextUrl={`/org/${orgSlug}/work-hours?year=${nextYear}&month=${nextMonth}`}
-            />
-            <span className="text-muted-foreground text-sm">
-              合計:{' '}
-              <span className="text-foreground font-medium">
-                <DurationDisplay minutes={totalMinutes} />
-              </span>
-            </span>
-          </>
+      <ContentPanel
+        className="overflow-x-auto"
+        toolbar={
+          <ControlBar
+            left={
+              <>
+                <MonthNav
+                  label={monthLabel}
+                  prevUrl={`/org/${orgSlug}/work-hours?year=${prevYear}&month=${prevMonth}`}
+                  nextUrl={`/org/${orgSlug}/work-hours?year=${nextYear}&month=${nextMonth}`}
+                />
+                <span className="text-muted-foreground text-sm">
+                  合計:{' '}
+                  <span className="text-foreground font-medium">
+                    <DurationDisplay minutes={totalMinutes} />
+                  </span>
+                </span>
+              </>
+            }
+            right={
+              <Button
+                variant={showOnlyFilled ? 'secondary' : 'ghost'}
+                size="sm"
+                onClick={() => setShowOnlyFilled((v) => !v)}
+                className="text-muted-foreground text-xs"
+              >
+                <FilterIcon className="size-3.5" />
+                入力済みのみ
+              </Button>
+            }
+          />
         }
-        right={
-          <Button
-            variant={showOnlyFilled ? 'secondary' : 'ghost'}
-            size="sm"
-            onClick={() => setShowOnlyFilled((v) => !v)}
-            className="text-muted-foreground text-xs"
-          >
-            <FilterIcon className="size-3.5" />
-            入力済みのみ
-          </Button>
-        }
-      />
-
-      <ContentPanel>
+      >
         <TimesheetGrid
           orgSlug={orgSlug}
           year={year}

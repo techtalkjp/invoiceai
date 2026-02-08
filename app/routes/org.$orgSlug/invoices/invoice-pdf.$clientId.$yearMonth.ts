@@ -3,7 +3,7 @@ import { PDFDocument } from 'pdf-lib'
 import {
   TimesheetPdfDocument,
   buildTimesheetPdfData,
-} from '~/components/timesheet-pdf'
+} from '~/components/timesheet/timesheet-pdf'
 import { requireOrgMember } from '~/lib/auth-helpers.server'
 import { db } from '~/lib/db/kysely'
 import { getFreeeClientForOrganization } from '~/utils/freee.server'

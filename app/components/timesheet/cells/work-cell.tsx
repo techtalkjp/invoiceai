@@ -1,5 +1,5 @@
 import { memo } from 'react'
-import { calculateWorkDuration } from '~/components/time-utils'
+import { calculateWorkDuration } from '~/components/time/time-utils'
 import { useEntryField } from '../store'
 
 interface TimesheetWorkCellProps {

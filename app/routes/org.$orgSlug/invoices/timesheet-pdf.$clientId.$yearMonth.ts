@@ -2,7 +2,7 @@ import { renderToBuffer } from '@react-pdf/renderer'
 import {
   TimesheetPdfDocument,
   buildTimesheetPdfData,
-} from '~/components/timesheet-pdf'
+} from '~/components/timesheet/timesheet-pdf'
 import { requireOrgMember } from '~/lib/auth-helpers.server'
 import { parseYearMonthId } from '~/utils/month'
 import { registerPdfFontServer } from './+pdf/register-font.server'

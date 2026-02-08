@@ -1,4 +1,4 @@
-import { splitHoursMinutes } from '~/components/time-utils'
+import { splitHoursMinutes } from './time-utils'
 
 /**
  * 稼働時間を「8<小さい>時間</小さい>30<小さい>分</小さい>」形式で表示する。

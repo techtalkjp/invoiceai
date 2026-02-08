@@ -1,6 +1,6 @@
 import { Link, redirect } from 'react-router'
-import { AppLogo } from '~/components/app-logo'
-import { PublicLayout } from '~/components/public-layout'
+import { AppLogo } from '~/components/layout/app-logo'
+import { PublicLayout } from '~/components/layout/public-layout'
 import { Button } from '~/components/ui/button'
 import {
   Card,

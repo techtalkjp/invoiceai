@@ -3,8 +3,8 @@ import { parseWithZod } from '@conform-to/zod/v4'
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router'
 import { z } from 'zod'
+import { PublicLayout } from '~/components/layout/public-layout'
 import { PasswordInput } from '~/components/password-input'
-import { PublicLayout } from '~/components/public-layout'
 import { Button } from '~/components/ui/button'
 import {
   Card,

@@ -1,6 +1,6 @@
 import { ArrowRightIcon } from 'lucide-react'
 import { Link } from 'react-router'
-import { HoursDurationDisplay } from '~/components/duration-display'
+import { HoursDurationDisplay } from '~/components/time/duration-display'
 import {
   formatDateRow,
   getHolidayName,

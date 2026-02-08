@@ -1,5 +1,5 @@
 import { memo, useCallback, useState } from 'react'
-import { BreakGridPicker } from '~/components/break-grid-picker'
+import { BreakGridPicker } from '~/components/time/break-grid-picker'
 import {
   Popover,
   PopoverArrow,

@@ -1,7 +1,7 @@
 import { LoaderIcon, SparklesIcon } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { useFetcher } from 'react-router'
-import { formatMinutesToDuration } from '~/components/time-utils'
+import { formatMinutesToDuration } from '~/components/time/time-utils'
 import { useTimesheetStore } from '~/components/timesheet/store'
 import { Button } from '~/components/ui/button'
 import {

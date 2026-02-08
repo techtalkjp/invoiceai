@@ -6,7 +6,7 @@ import {
   UsersIcon,
 } from 'lucide-react'
 import { Link, NavLink, Outlet } from 'react-router'
-import { AppLogo } from '~/components/app-logo'
+import { AppLogo } from '~/components/layout/app-logo'
 import { Header } from '~/components/layout/header'
 import {
   Sidebar,

@@ -8,9 +8,9 @@ import {
 } from 'lucide-react'
 import { Form, Link } from 'react-router'
 import { BillingTypeBadge } from '~/components/billing-type-badge'
-import { ContentPanel } from '~/components/content-panel'
-import { ControlBar } from '~/components/control-bar'
-import { PageHeader } from '~/components/page-header'
+import { ContentPanel } from '~/components/layout/content-panel'
+import { ControlBar } from '~/components/layout/control-bar'
+import { PageHeader } from '~/components/layout/page-header'
 import { Badge } from '~/components/ui/badge'
 import { Button } from '~/components/ui/button'
 import {

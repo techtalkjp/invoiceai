@@ -1,10 +1,10 @@
 import { MessageSquareIcon } from 'lucide-react'
 import { useCallback, useRef, useState } from 'react'
 import { useFetcher } from 'react-router'
-import { BreakGridPicker } from '~/components/break-grid-picker'
-import { HoursDurationDisplay } from '~/components/duration-display'
-import { TimeGridPicker } from '~/components/time-grid-picker'
-import { formatTime, parseTimeInput } from '~/components/time-utils'
+import { BreakGridPicker } from '~/components/time/break-grid-picker'
+import { HoursDurationDisplay } from '~/components/time/duration-display'
+import { TimeGridPicker } from '~/components/time/time-grid-picker'
+import { formatTime, parseTimeInput } from '~/components/time/time-utils'
 import {
   Drawer,
   DrawerContent,

@@ -10,9 +10,9 @@ import {
 import {
   calculateWorkDuration,
   splitHoursMinutes,
-} from '~/components/time-utils'
-import type { TimesheetEntry } from '~/components/timesheet'
-import { getHolidayName } from '~/components/timesheet'
+} from '~/components/time/time-utils'
+import type { TimesheetEntry } from './types'
+import { getHolidayName } from './utils'
 
 // クライアント側: Google Fonts CDN でフォント登録
 Font.register({

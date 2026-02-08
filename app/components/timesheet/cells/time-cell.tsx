@@ -1,6 +1,6 @@
 import { memo, useCallback, useState } from 'react'
-import { TimeGridPicker } from '~/components/time-grid-picker'
-import { TimeInput } from '~/components/time-input'
+import { TimeGridPicker } from '~/components/time/time-grid-picker'
+import { TimeInput } from '~/components/time/time-input'
 import {
   Popover,
   PopoverArrow,
