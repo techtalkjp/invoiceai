@@ -80,7 +80,7 @@ export const TimesheetRow = memo(function TimesheetRow({
     <div
       data-date={date}
       className={cn(
-        'grid cursor-pointer items-center border-b transition-colors',
+        'grid items-center border-b transition-colors',
         GRID_COLS,
         isOffDay && 'bg-muted/30',
         selected && 'bg-primary/5',
@@ -93,7 +93,7 @@ export const TimesheetRow = memo(function TimesheetRow({
       {/* biome-ignore lint/a11y/noStaticElementInteractions: date cell for selection start */}
       <div
         className={cn(
-          'flex touch-none items-center self-stretch border-l-2 py-0.5 font-medium md:touch-auto',
+          'flex cursor-pointer touch-none items-center self-stretch border-l-2 py-0.5 font-medium md:touch-auto',
           selected
             ? 'border-primary'
             : 'md:hover:border-primary/30 border-transparent',
