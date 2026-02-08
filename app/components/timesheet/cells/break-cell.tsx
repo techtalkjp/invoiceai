@@ -2,9 +2,9 @@ import { memo, useCallback, useState } from 'react'
 import { BreakGridPicker } from '~/components/time/break-grid-picker'
 import {
   Popover,
+  PopoverAnchor,
   PopoverArrow,
   PopoverContent,
-  PopoverTrigger,
 } from '~/components/ui/popover'
 import { cn } from '~/lib/utils'
 import { useEntryField, useTimesheetStore } from '../store'
@@ -70,6 +70,10 @@ export const TimesheetBreakCell = memo(function TimesheetBreakCell({
     [date, col],
   )
 
+  const handleFocus = useCallback(() => {
+    setOpen(true)
+  }, [])
+
   const handlePickerSelect = useCallback(
     (v: number) => {
       useTimesheetStore.getState().updateEntry(date, 'breakMinutes', v)
@@ -81,10 +85,11 @@ export const TimesheetBreakCell = memo(function TimesheetBreakCell({
   return (
     <div className="px-0.5 py-1 text-center md:px-1" data-col={col}>
       <Popover open={open} onOpenChange={setOpen}>
-        <PopoverTrigger asChild>
+        <PopoverAnchor asChild>
           <button
             type="button"
             onKeyDown={handleKeyDown}
+            onFocus={handleFocus}
             className={cn(
               'h-7 w-full rounded-md border text-center text-sm leading-7',
               'bg-muted/70 border-transparent md:bg-transparent',
@@ -94,8 +99,13 @@ export const TimesheetBreakCell = memo(function TimesheetBreakCell({
           >
             {formatBreak(value) || '\u00A0'}
           </button>
-        </PopoverTrigger>
-        <PopoverContent className="w-auto p-2" align="center" sideOffset={8}>
+        </PopoverAnchor>
+        <PopoverContent
+          className="w-auto p-2"
+          align="center"
+          sideOffset={8}
+          onOpenAutoFocus={(e) => e.preventDefault()}
+        >
           <PopoverArrow className="fill-popover drop-shadow-sm" />
           <BreakGridPicker value={value} onChange={handlePickerSelect} />
         </PopoverContent>

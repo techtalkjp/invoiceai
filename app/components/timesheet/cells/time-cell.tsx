@@ -3,9 +3,9 @@ import { TimeGridPicker } from '~/components/time/time-grid-picker'
 import { TimeInput } from '~/components/time/time-input'
 import {
   Popover,
+  PopoverAnchor,
   PopoverArrow,
   PopoverContent,
-  PopoverTrigger,
 } from '~/components/ui/popover'
 import { cn } from '~/lib/utils'
 import { useEntryField, useTimesheetStore } from '../store'
@@ -78,6 +78,10 @@ export const TimesheetTimeCell = memo(function TimesheetTimeCell({
     [date, field, nextCol],
   )
 
+  const handleFocus = useCallback(() => {
+    setOpen(true)
+  }, [])
+
   const handleNavigate = useCallback(
     (direction: 'up' | 'down' | 'left' | 'right') => {
       navigateToCell(date, col, direction)
@@ -88,11 +92,13 @@ export const TimesheetTimeCell = memo(function TimesheetTimeCell({
   return (
     <div className="px-0.5 py-1 text-center md:px-1" data-col={col}>
       <Popover open={open} onOpenChange={setOpen}>
-        <PopoverTrigger asChild>
-          <div>
+        <PopoverAnchor asChild>
+          {/* biome-ignore lint/a11y/noStaticElementInteractions: prevent ContextMenuTrigger on mobile */}
+          <div onContextMenu={(e) => e.preventDefault()}>
             <TimeInput
               value={value}
               onChange={handleChange}
+              onFocus={handleFocus}
               placeholder=""
               className={cn(
                 'h-7! w-full! px-1! text-center text-xs',
@@ -105,8 +111,13 @@ export const TimesheetTimeCell = memo(function TimesheetTimeCell({
               onNavigate={handleNavigate}
             />
           </div>
-        </PopoverTrigger>
-        <PopoverContent className="w-auto p-2" align="center" sideOffset={8}>
+        </PopoverAnchor>
+        <PopoverContent
+          className="w-auto p-2"
+          align="center"
+          sideOffset={8}
+          onOpenAutoFocus={(e) => e.preventDefault()}
+        >
           <PopoverArrow className="fill-popover drop-shadow-sm" />
           <TimeGridPicker
             value={value || defaultValue}

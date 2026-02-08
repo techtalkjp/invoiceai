@@ -13,6 +13,7 @@ export interface TimeInputProps {
   value: string
   onChange: (value: string) => void
   onConfirm?: () => void
+  onFocus?: () => void
   placeholder?: string
   className?: string
   baseTime?: string | undefined // 相対時間計算の基準（+1h など）
@@ -25,6 +26,7 @@ export const TimeInput = forwardRef<HTMLInputElement, TimeInputProps>(
       value,
       onChange,
       onConfirm,
+      onFocus: onFocusProp,
       placeholder,
       className,
       baseTime,
@@ -123,8 +125,9 @@ export const TimeInput = forwardRef<HTMLInputElement, TimeInputProps>(
         setEditingValue(value)
         // 全選択
         e.target.select()
+        onFocusProp?.()
       },
-      [value],
+      [value, onFocusProp],
     )
 
     // ブラー時
