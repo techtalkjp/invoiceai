@@ -5,7 +5,7 @@ import { useFilledDatesKey, useTimesheetStore } from './store'
 
 /** ヘッダー・各行で共有する grid-template-columns */
 export const GRID_COLS =
-  'grid-cols-[4.5rem_4rem_4rem_4rem_4rem_1fr] md:grid-cols-[7rem_6rem_6rem_5rem_5rem_1fr]'
+  'grid-cols-[4.5rem_4rem_4rem_4rem_4rem_minmax(8rem,1fr)] md:grid-cols-[7rem_6rem_6rem_5rem_5rem_minmax(10rem,1fr)]'
 
 interface TimesheetTableProps {
   monthDates: string[]
@@ -27,7 +27,7 @@ export const TimesheetTable = memo(function TimesheetTable({
   }, [showOnlyFilled, monthDates, filledDatesKey])
 
   return (
-    <div className="min-w-[540px]">
+    <div className="min-w-[460px] md:min-w-[624px]">
       <div className={cn('grid items-center border-b', GRID_COLS)}>
         <div className="px-2 py-2 text-sm font-medium">日付</div>
         <div className="px-2 py-2 text-center text-sm font-medium">開始</div>
