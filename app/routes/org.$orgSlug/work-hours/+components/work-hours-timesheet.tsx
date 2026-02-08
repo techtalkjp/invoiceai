@@ -23,9 +23,7 @@ interface WorkHoursTimesheetProps {
   organizationName: string
   clientName: string
   staffName: string
-  monthLabel: string
-  prevMonthUrl: string
-  nextMonthUrl: string
+  buildUrl: (year: number, month: number) => string
 }
 
 export function WorkHoursTimesheet({
@@ -36,9 +34,7 @@ export function WorkHoursTimesheet({
   organizationName,
   clientName,
   staffName,
-  monthLabel,
-  prevMonthUrl,
-  nextMonthUrl,
+  buildUrl,
 }: WorkHoursTimesheetProps) {
   const monthDates = useMemo(() => getMonthDates(year, month), [year, month])
 
@@ -68,11 +64,7 @@ export function WorkHoursTimesheet({
       <ControlBar
         left={
           <>
-            <MonthNav
-              label={monthLabel}
-              prevUrl={prevMonthUrl}
-              nextUrl={nextMonthUrl}
-            />
+            <MonthNav year={year} month={month} buildUrl={buildUrl} />
             <div className="flex items-center gap-3">
               <MonthTotalDisplay monthDates={monthDates} />
               <SaveStatusIndicator fetcherKey={saveFetcherKey} />

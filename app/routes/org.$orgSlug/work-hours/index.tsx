@@ -10,7 +10,6 @@ import { DurationDisplay } from '~/components/time/duration-display'
 import { getMonthDates } from '~/components/timesheet'
 import { Button } from '~/components/ui/button'
 import { requireOrgMember } from '~/lib/auth-helpers.server'
-import { formatYearMonthLabel } from '~/utils/month'
 import { TimesheetGrid } from './+components/timesheet-grid'
 import { saveEntry } from './+mutations.server'
 import { getMonthEntries, getTimeBasedClients } from './+queries.server'
@@ -42,14 +41,6 @@ export async function loader({ request, params }: Route.LoaderArgs) {
 
   const monthDates = getMonthDates(year, month)
 
-  // 前月・次月を計算
-  const prevMonth = month === 1 ? 12 : month - 1
-  const prevYear = month === 1 ? year - 1 : year
-  const nextMonth = month === 12 ? 1 : month + 1
-  const nextYear = month === 12 ? year + 1 : year
-
-  const monthLabel = formatYearMonthLabel(year, month)
-
   return {
     organization,
     user,
@@ -58,11 +49,6 @@ export async function loader({ request, params }: Route.LoaderArgs) {
     monthDates,
     monthEntries,
     clients,
-    prevYear,
-    prevMonth,
-    nextYear,
-    nextMonth,
-    monthLabel,
   }
 }
 
@@ -116,18 +102,7 @@ function computeMonthTotalMinutes(
 }
 
 export default function WorkHours({
-  loaderData: {
-    year,
-    month,
-    monthDates,
-    monthEntries,
-    clients,
-    prevYear,
-    prevMonth,
-    nextYear,
-    nextMonth,
-    monthLabel,
-  },
+  loaderData: { year, month, monthDates, monthEntries, clients },
   params: { orgSlug },
 }: Route.ComponentProps) {
   const [showOnlyFilled, setShowOnlyFilled] = useState(false)
@@ -168,9 +143,11 @@ export default function WorkHours({
             left={
               <>
                 <MonthNav
-                  label={monthLabel}
-                  prevUrl={`/org/${orgSlug}/work-hours?year=${prevYear}&month=${prevMonth}`}
-                  nextUrl={`/org/${orgSlug}/work-hours?year=${nextYear}&month=${nextMonth}`}
+                  year={year}
+                  month={month}
+                  buildUrl={(y, m) =>
+                    `/org/${orgSlug}/work-hours?year=${y}&month=${m}`
+                  }
                 />
                 <span className="text-muted-foreground text-sm">
                   合計:{' '}

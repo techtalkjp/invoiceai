@@ -4,7 +4,6 @@ import { PublicLayout } from '~/components/layout/public-layout'
 import type { MonthData } from '~/components/timesheet'
 import { monthDataSchema } from '~/components/timesheet/schema'
 import { Button } from '~/components/ui/button'
-import { formatYearMonthLabel } from '~/utils/month'
 import { TimesheetDemo } from './+components/timesheet-demo'
 import type { Route } from './+types/index'
 
@@ -44,20 +43,10 @@ export function clientLoader({ request }: Route.ClientLoaderArgs) {
     ? Number.parseInt(monthParam, 10)
     : now.getMonth() + 1
 
-  const prevMonth = month === 1 ? 12 : month - 1
-  const prevYear = month === 1 ? year - 1 : year
-  const nextMonth = month === 12 ? 1 : month + 1
-  const nextYear = month === 12 ? year + 1 : year
-
-  const monthLabel = formatYearMonthLabel(year, month)
-
   return {
     storedData,
     year,
     month,
-    monthLabel,
-    prevUrl: `/playground?year=${prevYear}&month=${prevMonth}`,
-    nextUrl: `/playground?year=${nextYear}&month=${nextMonth}`,
   }
 }
 
@@ -69,7 +58,7 @@ export function meta() {
 }
 
 export default function PlaygroundIndex({
-  loaderData: { storedData, year, month, monthLabel, prevUrl, nextUrl },
+  loaderData: { storedData, year, month },
 }: Route.ComponentProps) {
   return (
     <PublicLayout>
@@ -87,9 +76,7 @@ export default function PlaygroundIndex({
         <TimesheetDemo
           year={year}
           month={month}
-          monthLabel={monthLabel}
-          prevUrl={prevUrl}
-          nextUrl={nextUrl}
+          buildUrl={(y, m) => `/playground?year=${y}&month=${m}`}
           initialData={storedData}
         />
       </div>

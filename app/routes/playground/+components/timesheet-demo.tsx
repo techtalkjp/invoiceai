@@ -19,18 +19,14 @@ import { clearAllStorage, useAutoSave } from './use-auto-save'
 interface TimesheetDemoProps {
   year: number
   month: number
-  monthLabel: string
-  prevUrl: string
-  nextUrl: string
+  buildUrl: (year: number, month: number) => string
   initialData?: Record<string, MonthData> | undefined
 }
 
 export function TimesheetDemo({
   year,
   month,
-  monthLabel,
-  prevUrl,
-  nextUrl,
+  buildUrl,
   initialData,
 }: TimesheetDemoProps) {
   const monthDates = useMemo(() => getMonthDates(year, month), [year, month])
@@ -57,7 +53,7 @@ export function TimesheetDemo({
       <ControlBar
         left={
           <>
-            <MonthNav label={monthLabel} prevUrl={prevUrl} nextUrl={nextUrl} />
+            <MonthNav year={year} month={month} buildUrl={buildUrl} />
             <MonthTotalDisplay monthDates={monthDates} />
           </>
         }

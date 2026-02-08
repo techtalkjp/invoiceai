@@ -2,7 +2,6 @@ import { parseWithZod } from '@conform-to/zod/v4'
 import { PageHeader } from '~/components/layout/page-header'
 import { getMonthDates } from '~/components/timesheet'
 import { requireOrgMember } from '~/lib/auth-helpers.server'
-import { formatYearMonthLabel } from '~/utils/month'
 import { parseWorkHoursText } from './+ai-parse.server'
 import { toServerEntries } from './+components/data-mapping'
 import { TextImportDialog } from './+components/text-import-dialog'
@@ -67,13 +66,6 @@ export async function loader({ request, params }: Route.LoaderArgs) {
 
   const monthDates = getMonthDates(year, month)
 
-  const prevMonth = month === 1 ? 12 : month - 1
-  const prevYear = month === 1 ? year - 1 : year
-  const nextMonth = month === 12 ? 1 : month + 1
-  const nextYear = month === 12 ? year + 1 : year
-
-  const monthLabel = formatYearMonthLabel(year, month)
-
   return {
     organization,
     user: { name: user.name },
@@ -81,11 +73,6 @@ export async function loader({ request, params }: Route.LoaderArgs) {
     month,
     monthDates,
     clientEntry,
-    prevYear,
-    prevMonth,
-    nextYear,
-    nextMonth,
-    monthLabel,
   }
 }
 
@@ -193,18 +180,7 @@ export async function action({ request, params }: Route.ActionArgs) {
 }
 
 export default function ClientWorkHours({
-  loaderData: {
-    organization,
-    user,
-    year,
-    month,
-    clientEntry,
-    prevYear,
-    prevMonth,
-    nextYear,
-    nextMonth,
-    monthLabel,
-  },
+  loaderData: { organization, user, year, month, clientEntry },
   params: { orgSlug, clientId },
 }: Route.ComponentProps) {
   return (
@@ -225,9 +201,9 @@ export default function ClientWorkHours({
         organizationName={organization.name}
         clientName={clientEntry.clientName}
         staffName={user.name}
-        monthLabel={monthLabel}
-        prevMonthUrl={`/org/${orgSlug}/work-hours/${clientId}?year=${prevYear}&month=${prevMonth}`}
-        nextMonthUrl={`/org/${orgSlug}/work-hours/${clientId}?year=${nextYear}&month=${nextMonth}`}
+        buildUrl={(y, m) =>
+          `/org/${orgSlug}/work-hours/${clientId}?year=${y}&month=${m}`
+        }
       />
     </div>
   )
