@@ -21,6 +21,8 @@ export function MonthTotalDisplay({ monthDates }: MonthTotalDisplayProps) {
     }, 0)
   })
 
+  if (monthTotal === 0) return null
+
   return (
     <div className="text-muted-foreground text-sm">
       合計:{' '}
