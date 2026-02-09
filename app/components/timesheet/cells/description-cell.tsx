@@ -21,12 +21,17 @@ export const TimesheetDescriptionCell = memo(function TimesheetDescriptionCell({
   }
 
   return (
-    <div className="p-1" data-col={col}>
+    // biome-ignore lint/a11y/noStaticElementInteractions: prevent ContextMenuTrigger on input cells
+    <div
+      className="p-1"
+      data-col={col}
+      onContextMenu={(e) => e.stopPropagation()}
+    >
       <div className="relative">
         {/* 高さを確保するための非表示のプレースホルダー（常にline-clamp-3で3行分の高さ） */}
         <div
           aria-hidden="true"
-          className="pointer-events-none invisible min-h-7 w-full min-w-32 px-2 py-1 text-xs whitespace-pre-wrap"
+          className="pointer-events-none invisible min-h-7 w-full min-w-32 px-2 py-1 text-base whitespace-pre-wrap"
         >
           <span className="line-clamp-3">{value || '-'}</span>
         </div>
@@ -75,7 +80,7 @@ export const TimesheetDescriptionCell = memo(function TimesheetDescriptionCell({
               rows={1}
               placeholder="概要を入力"
               className={cn(
-                'absolute inset-0 field-sizing-content min-h-7 w-full min-w-32 resize-none rounded-md border px-2 py-1 text-base md:text-xs',
+                'absolute inset-0 field-sizing-content min-h-7 w-full min-w-32 resize-none rounded-md border px-2 py-1 text-base',
                 'border-primary bg-background outline-none',
               )}
             />
@@ -95,7 +100,7 @@ export const TimesheetDescriptionCell = memo(function TimesheetDescriptionCell({
               }
             }}
             className={cn(
-              'absolute inset-0 min-h-7 w-full min-w-32 cursor-text rounded-md border px-2 py-1 text-left text-xs',
+              'absolute inset-0 min-h-7 w-full min-w-32 cursor-text rounded-md border px-2 py-1 text-left text-base',
               'bg-muted/70 border-transparent md:bg-transparent',
               'hover:border-border hover:bg-accent/50',
               'focus:border-primary focus:bg-background focus:outline-none',

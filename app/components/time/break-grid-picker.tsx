@@ -79,7 +79,7 @@ export function BreakGridPicker({ value, onChange }: BreakGridPickerProps) {
               size="sm"
               onClick={() => onChange(option.value)}
               className={cn(
-                'h-8 px-2 text-xs tabular-nums transition-colors',
+                'h-8 px-2 text-base tabular-nums transition-colors',
                 isSelected && 'ring-2 ring-offset-1',
               )}
             >
@@ -99,7 +99,7 @@ export function BreakGridPicker({ value, onChange }: BreakGridPickerProps) {
               size="sm"
               onClick={() => onChange(option.value)}
               className={cn(
-                'h-8 px-2 text-xs tabular-nums transition-colors',
+                'h-8 px-2 text-base tabular-nums transition-colors',
                 isSelected && 'ring-2 ring-offset-1',
               )}
             >
@@ -124,7 +124,7 @@ export function BreakGridPicker({ value, onChange }: BreakGridPickerProps) {
             }}
             placeholder="自由入力"
             className={cn(
-              'h-8 w-full rounded-md border pr-6 pl-2 text-xs tabular-nums',
+              'h-8 w-full rounded-md border pr-6 pl-2 text-base tabular-nums',
               'border-input bg-background',
               'focus:border-primary focus:outline-none',
             )}

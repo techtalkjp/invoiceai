@@ -92,7 +92,7 @@ export function TimeGridPicker({
                   size="sm"
                   onClick={() => onChange(time)}
                   className={cn(
-                    'h-8 px-2 font-mono text-xs tabular-nums transition-colors',
+                    'h-8 px-2 font-mono text-base tabular-nums transition-colors',
                     !isSelected && categoryColor,
                     isSelected && 'ring-2 ring-offset-1',
                   )}

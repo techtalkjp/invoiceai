@@ -5,7 +5,7 @@ import { useFilledDatesKey, useTimesheetStore } from './store'
 
 /** ヘッダー・各行で共有する grid-template-columns */
 export const GRID_COLS =
-  'grid-cols-[4.5rem_4rem_4rem_4rem_4rem_minmax(8rem,1fr)] md:grid-cols-[7rem_6rem_6rem_5rem_5rem_minmax(10rem,1fr)]'
+  'grid-cols-[4.5rem_4rem_4rem_4rem_5rem_minmax(8rem,1fr)] md:grid-cols-[7rem_6rem_6rem_5rem_5rem_minmax(10rem,1fr)]'
 
 interface TimesheetTableProps {
   monthDates: string[]

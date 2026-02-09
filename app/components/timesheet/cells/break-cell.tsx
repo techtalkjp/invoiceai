@@ -74,6 +74,10 @@ export const TimesheetBreakCell = memo(function TimesheetBreakCell({
     setOpen(true)
   }, [])
 
+  const handleClick = useCallback(() => {
+    setOpen(true)
+  }, [])
+
   const handlePickerSelect = useCallback(
     (v: number) => {
       useTimesheetStore.getState().updateEntry(date, 'breakMinutes', v)
@@ -87,11 +91,13 @@ export const TimesheetBreakCell = memo(function TimesheetBreakCell({
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverAnchor asChild>
           <button
+            onContextMenu={(e) => e.stopPropagation()}
             type="button"
             onKeyDown={handleKeyDown}
             onFocus={handleFocus}
+            onClick={handleClick}
             className={cn(
-              'h-7 w-full rounded-md border text-center text-sm leading-7',
+              'h-7 w-full rounded-md border text-center text-base leading-7',
               'bg-muted/70 border-transparent md:bg-transparent',
               'hover:border-border hover:bg-accent/50',
               'focus:border-primary focus:bg-background focus:outline-none',
