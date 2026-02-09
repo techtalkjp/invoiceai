@@ -105,7 +105,7 @@ export const TimesheetTimeCell = memo(function TimesheetTimeCell({
               onFocus={handleFocus}
               placeholder=""
               className={cn(
-                'h-7! w-full! px-1! text-center text-base',
+                'h-7! w-full! px-1! text-center text-base md:text-base',
                 'bg-muted/70! border-transparent! md:bg-transparent!',
                 'hover:border-border! hover:bg-accent/50!',
                 'focus:border-primary! focus:bg-background!',
