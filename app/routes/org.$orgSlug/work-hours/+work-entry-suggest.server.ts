@@ -23,12 +23,16 @@ export type SuggestResult = {
 }
 
 /**
- * JSTでの時刻を分に変換
+ * JSTでの時刻を分に変換（30時制: 0:00-5:59 は 24:00-29:59 として扱う）
  */
 function toJstMinutes(isoTimestamp: string): number {
   const date = new Date(isoTimestamp)
   const jst = new Date(date.getTime() + 9 * 60 * 60 * 1000)
-  return jst.getUTCHours() * 60 + jst.getUTCMinutes()
+  const hours = jst.getUTCHours()
+  const minutes = jst.getUTCMinutes()
+  // 6時前は前日の深夜扱い（24時超え）
+  if (hours < 6) return (hours + 24) * 60 + minutes
+  return hours * 60 + minutes
 }
 
 /**
@@ -81,10 +85,37 @@ function buildDescription(activities: Activity[]): string {
   }
 
   if (prs.length > 0) {
-    const titles = prs
-      .map((p) => p.title)
-      .filter(Boolean)
-      .slice(0, 3)
+    // 同じPRのopened/merged/closedを重複排除（titleベース）
+    const seen = new Map<string, string>() // title → best action
+    for (const p of prs) {
+      const title = p.title ?? ''
+      if (!title) continue
+      let action: string | null = null
+      if (p.metadata) {
+        try {
+          const meta = JSON.parse(p.metadata) as { action?: string }
+          action = meta.action ?? null
+        } catch {
+          // ignore
+        }
+      }
+      const prev = seen.get(title)
+      // merged > closed > opened の優先度
+      if (
+        !prev ||
+        action === 'merged' ||
+        (action === 'closed' && prev !== 'merged')
+      ) {
+        seen.set(title, action ?? 'opened')
+      }
+    }
+    const titles: string[] = []
+    for (const [title, action] of seen) {
+      if (titles.length >= 3) break
+      const suffix =
+        action === 'merged' || action === 'closed' ? ` (${action})` : ''
+      titles.push(`${title}${suffix}`)
+    }
     parts.push(`PR: ${titles.join(', ')}`)
   }
 
@@ -102,9 +133,9 @@ function buildDescription(activities: Activity[]): string {
 /**
  * ルールベースでタイムシートの候補を生成する
  *
- * ルール（既存LLMプロンプトと同等）:
- * 1. 開始 = 最初のアクティビティ - 30min（9:00〜10:30に収める）
- * 2. 終了 = 最後のアクティビティ + 30min（17:00〜20:00に収める）
+ * ルール:
+ * 1. 開始 = 最初のアクティビティの時刻（下限 6:00）
+ * 2. 終了 = 最後のアクティビティの時刻（上限 29:59）
  * 3. 休憩 = 6h以上なら60min、それ以下は0
  * 4. 土日祝・アクティビティなしの日はスキップ
  */
@@ -138,10 +169,12 @@ export function suggestWorkEntriesFromActivities(
       const earliest = Math.min(...timestamps)
       const latest = Math.max(...timestamps)
 
-      // 開始: 最初のアクティビティ - 30min、9:00〜10:30に収める
-      startMin = Math.max(9 * 60, Math.min(10 * 60 + 30, earliest - 30))
-      // 終了: 最後のアクティビティ + 30min、17:00〜20:00に収める
-      endMin = Math.max(17 * 60, Math.min(20 * 60, latest + 30))
+      // 開始: 最初のアクティビティの時刻（下限 6:00）
+      startMin = Math.max(6 * 60, earliest)
+      // 終了: 最後のアクティビティの時刻（上限 29:59）
+      endMin = Math.min(29 * 60 + 59, latest)
+      // 開始と終了が逆転しないようにする
+      if (endMin <= startMin) endMin = startMin + 60
     } else {
       // タイムスタンプなし: デフォルト 9:00-18:00
       startMin = 9 * 60

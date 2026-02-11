@@ -43,7 +43,12 @@ export async function action({ request }: Route.ActionArgs) {
   const payload = JSON.parse(body) as {
     repository?: { full_name?: string }
     sender?: { login?: string }
-    commits?: Array<{ id: string; message: string; timestamp: string }>
+    commits?: Array<{
+      id: string
+      message: string
+      timestamp: string
+      url?: string
+    }>
   }
 
   if (event !== 'push' || !payload.commits) {
@@ -101,6 +106,7 @@ export async function action({ request }: Route.ActionArgs) {
           eventTimestamp: commit.timestamp,
           repo: repoFullName,
           title: commit.message.split('\n')[0] ?? null,
+          url: commit.url ?? null,
           metadata: JSON.stringify({ sha: commit.id }),
         }
       }) ?? []

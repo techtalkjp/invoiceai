@@ -2,6 +2,7 @@ import { memo, useState } from 'react'
 import { cn } from '~/lib/utils'
 import { useEntryField, useTimesheetStore } from '../store'
 import { navigateToCell } from '../utils'
+import { ActivityIndicator } from './activity-indicator'
 
 interface TimesheetDescriptionCellProps {
   date: string
@@ -111,6 +112,12 @@ export const TimesheetDescriptionCell = memo(function TimesheetDescriptionCell({
               {value || '-'}
             </span>
           </button>
+        )}
+        {/* アクティビティバッジ（非フォーカス時のみ表示） */}
+        {!isFocused && (
+          <div className="absolute right-1 bottom-0.5">
+            <ActivityIndicator date={date} />
+          </div>
         )}
       </div>
     </div>

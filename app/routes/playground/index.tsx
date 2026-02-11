@@ -17,9 +17,16 @@ import {
 } from '~/components/timesheet/utils'
 import { Button } from '~/components/ui/button'
 import { Skeleton } from '~/components/ui/skeleton'
+import { decrypt } from '~/lib/activity-sources/encryption.server'
+import { fetchGitHubActivities } from '~/lib/activity-sources/github.server'
 import { cn } from '~/lib/utils'
+import { suggestWorkEntriesFromActivities } from '../org.$orgSlug/work-hours/+work-entry-suggest.server'
 import { TimesheetDemo } from './+components/timesheet-demo'
-import { getResultFlash, startGitHubOAuth } from './+lib/github-oauth.server'
+import {
+  type GitHubResult,
+  getTokenFlash,
+  startGitHubOAuth,
+} from './+lib/github-oauth.server'
 import type { Route } from './+types/index'
 
 const STORAGE_KEY = 'invoiceai-playground-timesheet'
@@ -59,11 +66,59 @@ function resolveYearMonth(searchParams: URLSearchParams) {
 const buildPlaygroundUrl = (y: number, m: number) =>
   `/playground?year=${y}&month=${m}`
 
-// server loader: flash cookie から GitHub 結果を読み取り
+// server loader: flash cookie からトークンを取得 → アクティビティ取得 → 提案生成
 export async function loader({ request }: Route.LoaderArgs) {
-  const { result, setCookie } = await getResultFlash(request)
+  const { tokenData, setCookie } = await getTokenFlash(request)
+
+  if (!tokenData) {
+    return data(
+      { githubResult: null as GitHubResult | null },
+      { headers: { 'Set-Cookie': setCookie } },
+    )
+  }
+
+  const accessToken = decrypt(tokenData.encryptedToken)
+  const { username } = tokenData
+
+  const url = new URL(request.url)
+  const { year, month } = resolveYearMonth(url.searchParams)
+  const startDate = `${year}-${String(month).padStart(2, '0')}-01`
+  const lastDay = new Date(year, month, 0).getDate()
+  const endDate = `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`
+
+  const activities = await fetchGitHubActivities(
+    accessToken,
+    username,
+    startDate,
+    endDate,
+  )
+
+  const suggestion =
+    activities.length > 0
+      ? suggestWorkEntriesFromActivities(activities)
+      : {
+          entries: [],
+          reasoning: 'この月のGitHubアクティビティが見つかりませんでした',
+        }
+
   return data(
-    { githubResult: result },
+    {
+      githubResult: {
+        entries: suggestion.entries,
+        activities: activities.map((a) => ({
+          eventType: a.eventType,
+          eventDate: a.eventDate,
+          eventTimestamp: a.eventTimestamp,
+          repo: a.repo,
+          title: a.title,
+          url: a.url,
+          metadata: a.metadata,
+        })),
+        reasoning: suggestion.reasoning,
+        username,
+        activityCount: activities.length,
+      } satisfies GitHubResult,
+    },
     { headers: { 'Set-Cookie': setCookie } },
   )
 }
@@ -104,6 +159,11 @@ export async function clientLoader({
 
   // flash cookie でデータが来ていたら storedData にマージ + toast 通知
   if (githubResult) {
+    // アクティビティを store にセット
+    const { useActivityStore } =
+      await import('~/components/timesheet/activity-store')
+    useActivityStore.getState().setActivities(githubResult.activities)
+
     if (githubResult.entries.length > 0) {
       const monthKey = `${year}-${String(month).padStart(2, '0')}`
       const merged: MonthData = { ...storedData[monthKey] }

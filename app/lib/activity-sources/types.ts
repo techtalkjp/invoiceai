@@ -9,5 +9,6 @@ export interface ActivityRecord {
   eventTimestamp: string // ISO 8601
   repo: string | null
   title: string | null
+  url: string | null // GitHub URL etc.
   metadata: string | null // JSON string
 }

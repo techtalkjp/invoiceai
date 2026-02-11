@@ -131,12 +131,16 @@ async function githubGraphQL<T>(
 }
 
 /**
- * ISOタイムスタンプをJSTの日付文字列に変換
+ * ISOタイムスタンプをJSTの「勤務日」文字列に変換
+ * タイムシートが30時制（6:00起点）なので、JST 0:00〜5:59 は前日扱い
  */
 function isoToJstDate(iso: string): string {
   const date = new Date(iso)
-  const jst = new Date(date.getTime() + 9 * 60 * 60 * 1000)
-  return jst.toISOString().slice(0, 10)
+  // 6時間引くことで 0:00-5:59 → 前日、6:00-23:59 → 当日になる
+  const adjusted = new Date(
+    date.getTime() + 9 * 60 * 60 * 1000 - 6 * 60 * 60 * 1000,
+  )
+  return adjusted.toISOString().slice(0, 10)
 }
 
 // GraphQL レスポンス型
@@ -155,6 +159,7 @@ interface GqlActivitiesResponse {
           pullRequestReview: { state: string }
           pullRequest: {
             title: string
+            url: string
             repository: { nameWithOwner: string }
           }
         }>
@@ -163,15 +168,18 @@ interface GqlActivitiesResponse {
     pullRequests: {
       nodes: Array<{
         title: string
+        url: string
         state: string
         merged: boolean
         createdAt: string
         mergedAt: string | null
+        closedAt: string | null
         repository: { nameWithOwner: string }
       }>
     }
     issueComments: {
       nodes: Array<{
+        url: string
         createdAt: string
         issue: {
           title: string
@@ -197,7 +205,7 @@ const ACTIVITIES_QUERY = `
             occurredAt
             pullRequestReview { state }
             pullRequest {
-              title
+              title url
               repository { nameWithOwner }
             }
           }
@@ -205,13 +213,13 @@ const ACTIVITIES_QUERY = `
       }
       pullRequests(first: 50, orderBy: {field: CREATED_AT, direction: DESC}) {
         nodes {
-          title state merged createdAt mergedAt
+          title url state merged createdAt mergedAt closedAt
           repository { nameWithOwner }
         }
       }
       issueComments(first: 50, orderBy: {field: UPDATED_AT, direction: DESC}) {
         nodes {
-          createdAt
+          url createdAt
           issue {
             title
             repository { nameWithOwner }
@@ -260,27 +268,56 @@ export async function fetchGitHubActivities(
         eventTimestamp: node.occurredAt,
         repo,
         title: `${node.commitCount} commits`,
+        url: `https://github.com/${repo}`,
         metadata: JSON.stringify({ count: node.commitCount }),
       })
     }
   }
 
-  // PR
+  // PR（作成・マージ・クローズをそれぞれ記録）
   for (const pr of data.user.pullRequests.nodes) {
-    const eventDate = isoToJstDate(pr.createdAt)
-    if (eventDate < startDate || eventDate > endDate) continue
-    let action = 'opened'
-    if (pr.merged) action = 'merged'
-    else if (pr.state === 'CLOSED') action = 'closed'
-    records.push({
-      sourceType: 'github',
-      eventType: 'pr',
-      eventDate,
-      eventTimestamp: pr.createdAt,
-      repo: pr.repository.nameWithOwner,
-      title: pr.title,
-      metadata: JSON.stringify({ action }),
-    })
+    const createdDate = isoToJstDate(pr.createdAt)
+    if (createdDate >= startDate && createdDate <= endDate) {
+      records.push({
+        sourceType: 'github',
+        eventType: 'pr',
+        eventDate: createdDate,
+        eventTimestamp: pr.createdAt,
+        repo: pr.repository.nameWithOwner,
+        title: pr.title,
+        url: pr.url,
+        metadata: JSON.stringify({ action: 'opened' }),
+      })
+    }
+    if (pr.merged && pr.mergedAt) {
+      const mergedDate = isoToJstDate(pr.mergedAt)
+      if (mergedDate >= startDate && mergedDate <= endDate) {
+        records.push({
+          sourceType: 'github',
+          eventType: 'pr',
+          eventDate: mergedDate,
+          eventTimestamp: pr.mergedAt,
+          repo: pr.repository.nameWithOwner,
+          title: pr.title,
+          url: pr.url,
+          metadata: JSON.stringify({ action: 'merged' }),
+        })
+      }
+    } else if (pr.state === 'CLOSED' && pr.closedAt) {
+      const closedDate = isoToJstDate(pr.closedAt)
+      if (closedDate >= startDate && closedDate <= endDate) {
+        records.push({
+          sourceType: 'github',
+          eventType: 'pr',
+          eventDate: closedDate,
+          eventTimestamp: pr.closedAt,
+          repo: pr.repository.nameWithOwner,
+          title: pr.title,
+          url: pr.url,
+          metadata: JSON.stringify({ action: 'closed' }),
+        })
+      }
+    }
   }
 
   // レビュー
@@ -295,6 +332,7 @@ export async function fetchGitHubActivities(
       eventTimestamp: review.occurredAt,
       repo: review.pullRequest.repository.nameWithOwner,
       title: review.pullRequest.title,
+      url: review.pullRequest.url,
       metadata: JSON.stringify({ state: review.pullRequestReview.state }),
     })
   }
@@ -310,6 +348,7 @@ export async function fetchGitHubActivities(
       eventTimestamp: comment.createdAt,
       repo: comment.issue.repository.nameWithOwner,
       title: comment.issue.title,
+      url: comment.url,
       metadata: null,
     })
   }

@@ -1,18 +1,14 @@
 import { redirect } from 'react-router'
 import { saveActivitySource } from '~/lib/activity-sources/activity-queries.server'
 import { encrypt } from '~/lib/activity-sources/encryption.server'
-import {
-  fetchGitHubActivities,
-  fetchGitHubUsername,
-} from '~/lib/activity-sources/github.server'
+import { fetchGitHubUsername } from '~/lib/activity-sources/github.server'
 import { requireOrgAdmin } from '~/lib/auth-helpers.server'
 import {
   clearOAuthStateCookie,
   exchangeCodeForToken,
   parseOAuthStateCookie,
 } from '~/lib/github-oauth.server'
-import { suggestWorkEntriesFromActivities } from '../org.$orgSlug/work-hours/+work-entry-suggest.server'
-import { setResultFlash } from '../playground/+lib/github-oauth.server'
+import { setTokenFlash } from '../playground/+lib/github-oauth.server'
 import type { Route } from './+types/callback.github'
 
 export async function loader({ request }: Route.LoaderArgs) {
@@ -66,7 +62,7 @@ export async function loader({ request }: Route.LoaderArgs) {
   }
 }
 
-// --- Playground: アクティビティ取得 → 提案生成 → flash cookie ---
+// --- Playground: 暗号化トークンを flash cookie にセット ---
 
 async function handlePlaygroundCallback(
   request: Request,
@@ -77,37 +73,17 @@ async function handlePlaygroundCallback(
   const month = metadata.month as number
 
   const username = await fetchGitHubUsername(accessToken)
-  const startDate = `${year}-${String(month).padStart(2, '0')}-01`
-  const lastDay = new Date(year, month, 0).getDate()
-  const endDate = `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`
+  const encryptedToken = encrypt(accessToken)
 
-  const activities = await fetchGitHubActivities(
-    accessToken,
+  const tokenCookie = await setTokenFlash(request, {
+    encryptedToken,
     username,
-    startDate,
-    endDate,
-  )
-
-  const suggestion =
-    activities.length > 0
-      ? suggestWorkEntriesFromActivities(activities)
-      : {
-          entries: [],
-          reasoning: 'この月のGitHubアクティビティが見つかりませんでした',
-        }
-
-  const resultCookie = await setResultFlash(request, {
-    entries: suggestion.entries,
-    reasoning: suggestion.reasoning,
-    username,
-    activityCount: activities.length,
   })
-
   const clearOAuthCookie = await clearOAuthStateCookie()
 
   return redirect(`/playground?year=${year}&month=${month}`, {
     headers: [
-      ['Set-Cookie', resultCookie],
+      ['Set-Cookie', tokenCookie],
       ['Set-Cookie', clearOAuthCookie],
     ],
   })
