@@ -7,7 +7,7 @@ import {
   searchRepos,
 } from '~/lib/activity-sources/github.server'
 import { requireOrgMember } from '~/lib/auth-helpers.server'
-import type { Route } from './+types/integrations.repos'
+import type { Route } from './+types/repos'
 
 /**
  * Resource route: GitHub 組織一覧 + リポジトリ一覧

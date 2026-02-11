@@ -1,11 +1,13 @@
-import { getFormProps, getInputProps, useForm } from '@conform-to/react'
+import { getFormProps, useForm } from '@conform-to/react'
 import { parseWithZod } from '@conform-to/zod/v4'
 import {
   CheckCircle2Icon,
   GitBranchIcon,
+  GithubIcon,
   Loader2Icon,
   PlusIcon,
   TrashIcon,
+  UnlinkIcon,
 } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Form, useActionData, useFetcher, useNavigation } from 'react-router'
@@ -36,24 +38,26 @@ import {
   SelectValue,
 } from '~/components/ui/select'
 import {
+  deleteActivitySource,
   deleteClientSourceMapping,
   getActivitySource,
   getClientSourceMappings,
-  saveActivitySource,
   saveClientSourceMapping,
 } from '~/lib/activity-sources/activity-queries.server'
-import { decrypt, encrypt } from '~/lib/activity-sources/encryption.server'
+import { decrypt } from '~/lib/activity-sources/encryption.server'
 import { fetchGitHubUsername } from '~/lib/activity-sources/github.server'
 import { requireOrgAdmin } from '~/lib/auth-helpers.server'
 import { db } from '~/lib/db/kysely'
-import type { Route } from './+types/integrations'
-import type { loader as reposLoader } from './integrations.repos'
+import { startGitHubOAuth } from '~/lib/github-oauth.server'
+import type { Route } from './+types/index'
+import type { loader as reposLoader } from './repos'
 
-const savePatSchema = z.object({
-  intent: z.literal('savePat'),
-  githubPat: z
-    .string()
-    .min(1, 'GitHub Personal Access Token を入力してください'),
+const startOAuthSchema = z.object({
+  intent: z.literal('startOAuth'),
+})
+
+const disconnectGitHubSchema = z.object({
+  intent: z.literal('disconnectGitHub'),
 })
 
 const addMappingSchema = z.object({
@@ -73,7 +77,8 @@ const syncSchema = z.object({
 })
 
 const formSchema = z.discriminatedUnion('intent', [
-  savePatSchema,
+  startOAuthSchema,
+  disconnectGitHubSchema,
   addMappingSchema,
   removeMappingSchema,
   syncSchema,
@@ -87,7 +92,7 @@ export async function loader({ request, params }: Route.LoaderArgs) {
   const { organization, user } = await requireOrgAdmin(request, params.orgSlug)
 
   const source = await getActivitySource(organization.id, user.id, 'github')
-  const hasGitHubPat = !!source
+  const isConnected = !!source
 
   // クライアント一覧
   const clients = await db
@@ -106,20 +111,20 @@ export async function loader({ request, params }: Route.LoaderArgs) {
       ? await getClientSourceMappings(clientIds, 'github')
       : []
 
-  // GitHub username (PAT設定済みの場合のみ)
+  // GitHub username (連携済みの場合のみ)
   let githubUsername: string | null = null
   if (source) {
     try {
-      const pat = decrypt(source.credentials)
-      githubUsername = await fetchGitHubUsername(pat)
+      const token = decrypt(source.credentials)
+      githubUsername = await fetchGitHubUsername(token)
     } catch {
-      // PAT が無効な場合
+      // token が無効な場合
     }
   }
 
   return {
     organization,
-    hasGitHubPat,
+    isConnected,
     githubUsername,
     clients,
     mappings,
@@ -138,33 +143,18 @@ export async function action({ request, params }: Route.ActionArgs) {
 
   const { intent } = submission.value
 
-  if (intent === 'savePat') {
-    const { githubPat } = submission.value
-    try {
-      // PAT の有効性を確認
-      await fetchGitHubUsername(githubPat)
+  if (intent === 'startOAuth') {
+    return startGitHubOAuth({
+      request,
+      returnTo: 'integrations',
+      metadata: { orgSlug: params.orgSlug },
+      scope: 'read:user repo',
+    })
+  }
 
-      // 暗号化して保存
-      const encrypted = encrypt(githubPat)
-      await saveActivitySource(
-        organization.id,
-        user.id,
-        'github',
-        encrypted,
-        null,
-      )
-
-      return { lastResult: submission.reply(), patSaved: true }
-    } catch (e) {
-      const message =
-        e instanceof Error ? e.message : 'GitHub PAT の保存に失敗しました'
-      console.error('savePat error:', e)
-      return {
-        lastResult: submission.reply({
-          formErrors: [message],
-        }),
-      }
-    }
+  if (intent === 'disconnectGitHub') {
+    await deleteActivitySource(organization.id, user.id, 'github')
+    return { lastResult: submission.reply(), disconnected: true }
   }
 
   if (intent === 'addMapping') {
@@ -215,7 +205,7 @@ export async function action({ request, params }: Route.ActionArgs) {
 }
 
 export default function IntegrationsSettings({
-  loaderData: { hasGitHubPat, githubUsername, clients, mappings },
+  loaderData: { isConnected, githubUsername, clients, mappings },
   params: { orgSlug },
 }: Route.ComponentProps) {
   const actionData = useActionData<typeof action>()
@@ -234,10 +224,10 @@ export default function IntegrationsSettings({
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
-        {/* GitHub PAT設定 */}
+        {/* GitHub 連携 */}
         <div className="space-y-3">
           <div className="flex items-center gap-2">
-            {hasGitHubPat ? (
+            {isConnected ? (
               <CheckCircle2Icon className="h-5 w-5 text-emerald-600" />
             ) : (
               <span className="bg-muted flex h-5 w-5 items-center justify-center rounded-full text-xs font-medium">
@@ -245,7 +235,7 @@ export default function IntegrationsSettings({
               </span>
             )}
             <h4 className="font-medium">GitHub 認証</h4>
-            {hasGitHubPat && githubUsername && (
+            {isConnected && githubUsername && (
               <Badge variant="outline" className="text-emerald-600">
                 @{githubUsername}
               </Badge>
@@ -253,12 +243,38 @@ export default function IntegrationsSettings({
           </div>
 
           <div className="ml-7 space-y-3">
-            <p className="text-muted-foreground text-sm">
-              GitHub Personal Access Token (classic) を入力してください。
-              スコープは <code className="text-xs">read:user</code> と{' '}
-              <code className="text-xs">repo</code> が必要です。
-            </p>
-            <PatForm />
+            {isConnected ? (
+              <div className="flex items-center gap-3">
+                <p className="text-muted-foreground text-sm">
+                  GitHub アカウントと連携済みです。
+                </p>
+                <Form method="POST">
+                  <input type="hidden" name="intent" value="disconnectGitHub" />
+                  <Button
+                    type="submit"
+                    variant="outline"
+                    size="sm"
+                    className="text-destructive"
+                  >
+                    <UnlinkIcon className="mr-1 h-4 w-4" />
+                    連携解除
+                  </Button>
+                </Form>
+              </div>
+            ) : (
+              <>
+                <p className="text-muted-foreground text-sm">
+                  GitHub アカウントと連携して、アクティビティを自動記録します。
+                </p>
+                <Form method="POST">
+                  <input type="hidden" name="intent" value="startOAuth" />
+                  <Button type="submit" size="sm">
+                    <GithubIcon className="mr-1 h-4 w-4" />
+                    GitHub と連携
+                  </Button>
+                </Form>
+              </>
+            )}
           </div>
         </div>
 
@@ -275,7 +291,7 @@ export default function IntegrationsSettings({
             <h4 className="font-medium">リポジトリとクライアントの対応付け</h4>
           </div>
 
-          {hasGitHubPat ? (
+          {isConnected ? (
             <div className="ml-7 space-y-3">
               <p className="text-muted-foreground text-sm">
                 GitHub リポジトリをクライアントに対応付けると、
@@ -335,13 +351,13 @@ export default function IntegrationsSettings({
             </div>
           ) : (
             <p className="text-muted-foreground ml-7 text-sm">
-              まず GitHub PAT を設定してください
+              まず GitHub と連携してください
             </p>
           )}
         </div>
 
         {/* 同期 */}
-        {hasGitHubPat && (
+        {isConnected && (
           <div className="space-y-3">
             <div className="flex items-center gap-2">
               <span className="bg-muted flex h-5 w-5 items-center justify-center rounded-full text-xs font-medium">
@@ -379,46 +395,6 @@ export default function IntegrationsSettings({
         )}
       </CardContent>
     </>
-  )
-}
-
-function PatForm() {
-  const actionData = useActionData<typeof action>()
-  const [form, fields] = useForm({
-    lastResult: actionData?.lastResult,
-    onValidate: ({ formData }) =>
-      parseWithZod(formData, { schema: savePatSchema }),
-    shouldRevalidate: 'onBlur',
-  })
-
-  return (
-    <Form method="POST" {...getFormProps(form)} className="space-y-2">
-      <input type="hidden" name="intent" value="savePat" />
-      <div className="space-y-1">
-        <Label htmlFor={fields.githubPat.id}>Personal Access Token</Label>
-        <div className="flex gap-2">
-          <Input
-            {...getInputProps(fields.githubPat, { type: 'password' })}
-            placeholder="ghp_xxxx..."
-            className="flex-1"
-          />
-          <Button type="submit" size="sm">
-            保存
-          </Button>
-        </div>
-        <div className="text-destructive text-sm">
-          {fields.githubPat.errors}
-        </div>
-      </div>
-      {form.errors && (
-        <div className="bg-destructive/10 text-destructive rounded-md p-3 text-sm">
-          {form.errors}
-        </div>
-      )}
-      {actionData && 'patSaved' in actionData && actionData.patSaved && (
-        <p className="text-sm text-emerald-600">PAT を保存しました</p>
-      )}
-    </Form>
   )
 }
 

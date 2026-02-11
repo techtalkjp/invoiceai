@@ -180,7 +180,7 @@ export function ClientForm({
                   disabled={isSyncing}
                   onClick={() => {
                     fetcher.load(
-                      `/org/${orgSlug}/clients/api/sync-invoice?clientId=${defaultValue.id}`,
+                      `/org/${orgSlug}/clients/sync-invoice?clientId=${defaultValue.id}`,
                     )
                   }}
                 >

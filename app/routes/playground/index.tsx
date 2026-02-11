@@ -56,7 +56,11 @@ export async function action({ request }: Route.ActionArgs) {
     if (!year || !month) {
       return redirect('/playground')
     }
-    return startGitHubOAuth(request, year, month)
+    return startGitHubOAuth({
+      request,
+      returnTo: 'playground',
+      metadata: { year, month },
+    })
   }
 
   return redirect('/playground')

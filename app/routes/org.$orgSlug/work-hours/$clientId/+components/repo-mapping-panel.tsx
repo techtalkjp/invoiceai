@@ -19,7 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '~/components/ui/select'
-import type { loader as reposLoader } from '~/routes/org.$orgSlug/settings/integrations.repos'
+import type { loader as reposLoader } from '~/routes/org.$orgSlug/settings/integrations/repos'
 
 interface Mapping {
   clientId: string

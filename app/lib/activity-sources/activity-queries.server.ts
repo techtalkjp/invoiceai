@@ -138,6 +138,22 @@ export async function saveActivitySource(
 }
 
 /**
+ * activity_source を削除
+ */
+export async function deleteActivitySource(
+  organizationId: string,
+  userId: string,
+  sourceType: string,
+) {
+  await db
+    .deleteFrom('activitySource')
+    .where('organizationId', '=', organizationId)
+    .where('userId', '=', userId)
+    .where('sourceType', '=', sourceType)
+    .execute()
+}
+
+/**
  * client_source_mapping を取得
  */
 export function getClientSourceMappings(
