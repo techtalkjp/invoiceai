@@ -1,4 +1,3 @@
-import { Shuffle } from 'lucide-react'
 import { useCallback, useMemo } from 'react'
 import { ControlBar } from '~/components/layout/control-bar'
 import { MonthNav } from '~/components/layout/month-nav'
@@ -8,13 +7,10 @@ import {
   MonthTotalDisplay,
   TimesheetArea,
   TimesheetClearAllDialog,
-  generateSampleData,
   getMonthDates,
   useTimesheetStore,
 } from '~/components/timesheet'
 import { TimesheetPdfDownloadDialog } from '~/components/timesheet/pdf-download-dialog'
-import { Button } from '~/components/ui/button'
-import type { GitHubResult } from '../+lib/github-oauth.server'
 import { GitHubAutoFillButton } from './github-autofill-button'
 import { clearAllStorage, useAutoSave } from './use-auto-save'
 
@@ -23,7 +19,6 @@ interface TimesheetDemoProps {
   month: number
   buildUrl: (year: number, month: number) => string
   initialData?: Record<string, MonthData> | undefined
-  githubResult?: GitHubResult | null | undefined
 }
 
 export function TimesheetDemo({
@@ -31,7 +26,6 @@ export function TimesheetDemo({
   month,
   buildUrl,
   initialData,
-  githubResult,
 }: TimesheetDemoProps) {
   const monthDates = useMemo(() => getMonthDates(year, month), [year, month])
   const monthKey = `${year}-${String(month).padStart(2, '0')}`
@@ -63,25 +57,8 @@ export function TimesheetDemo({
         }
         right={
           <>
-            <GitHubAutoFillButton
-              year={year}
-              month={month}
-              githubResult={githubResult ?? null}
-            />
+            <GitHubAutoFillButton year={year} month={month} />
             <FilterToggleButton />
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() =>
-                useTimesheetStore
-                  .getState()
-                  .setMonthData(generateSampleData(year, month))
-              }
-              className="text-muted-foreground"
-            >
-              <Shuffle className="size-4" />
-              サンプル
-            </Button>
             <TimesheetPdfDownloadDialog
               year={year}
               month={month}

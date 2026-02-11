@@ -1,6 +1,6 @@
-import { syncUserGitHubActivities } from '@shared/services/activity-sync'
 import { getFormProps, useForm } from '@conform-to/react'
 import { parseWithZod } from '@conform-to/zod/v4'
+import { syncUserGitHubActivities } from '@shared/services/activity-sync'
 import {
   CheckCircle2Icon,
   GitBranchIcon,
