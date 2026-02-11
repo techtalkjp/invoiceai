@@ -56,15 +56,7 @@ export async function getTokenFlash(
 
 // --- serverLoader から返す GitHub 結果の型 ---
 
-export interface GitHubActivityDetail {
-  eventType: string
-  eventDate: string
-  eventTimestamp: string
-  repo: string | null
-  title: string | null
-  url: string | null
-  metadata: string | null
-}
+import type { ActivityRecord } from '~/lib/activity-sources/types'
 
 export interface GitHubResult {
   entries: Array<{
@@ -74,7 +66,7 @@ export interface GitHubResult {
     breakMinutes: number
     description: string
   }>
-  activities: GitHubActivityDetail[]
+  activities: ActivityRecord[]
   reasoning: string
   username: string
   activityCount: number

@@ -12,7 +12,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '~/components/ui/popover'
-import type { GitHubActivityDetail } from '~/routes/playground/+lib/github-oauth.server'
+import type { ActivityRecord } from '~/lib/activity-sources/types'
 import { useActivityStore } from '../activity-store'
 
 const EVENT_ICONS: Record<
@@ -36,7 +36,7 @@ function parsePrAction(metadata: string | null): string | null {
 }
 
 function getIconForItem(
-  item: GitHubActivityDetail,
+  item: ActivityRecord,
 ): React.ComponentType<{ className?: string }> {
   if (item.eventType === 'pr') {
     const action = parsePrAction(item.metadata)
@@ -46,7 +46,7 @@ function getIconForItem(
   return EVENT_ICONS[item.eventType] ?? MessageSquareIcon
 }
 
-function getPrActionLabel(item: GitHubActivityDetail): string | null {
+function getPrActionLabel(item: ActivityRecord): string | null {
   if (item.eventType !== 'pr') return null
   const action = parsePrAction(item.metadata)
   if (action === 'merged') return 'merged'
@@ -70,9 +70,7 @@ function formatTime(timestamp: string): string {
   return `${String(displayHours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`
 }
 
-function sortByTimestamp(
-  activities: GitHubActivityDetail[],
-): GitHubActivityDetail[] {
+function sortByTimestamp(activities: ActivityRecord[]): ActivityRecord[] {
   return [...activities].sort((a, b) =>
     a.eventTimestamp.localeCompare(b.eventTimestamp),
   )

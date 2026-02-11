@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react'
 import { useActivityStore } from '~/components/timesheet/activity-store'
 import { useTimesheetStore } from '~/components/timesheet/store'
 import type { MonthData } from '~/components/timesheet/types'
-import type { GitHubActivityDetail } from '~/routes/playground/+lib/github-oauth.server'
+import type { ActivityRecord } from '~/lib/activity-sources/types'
 
 const STORAGE_KEY = 'invoiceai-playground-timesheet'
 const ACTIVITY_STORAGE_KEY = 'invoiceai-playground-activities'
@@ -88,21 +88,20 @@ function saveMonthToStorage(monthKey: string, data: MonthData) {
  */
 export function saveActivities(
   monthKey: string,
-  activitiesByDate: Record<string, GitHubActivityDetail[]>,
+  activitiesByDate: Record<string, ActivityRecord[]>,
 ) {
   saveActivitiesToStorage(monthKey, activitiesByDate)
 }
 
 function saveActivitiesToStorage(
   monthKey: string,
-  activitiesByDate: Record<string, GitHubActivityDetail[]>,
+  activitiesByDate: Record<string, ActivityRecord[]>,
 ) {
   try {
     const stored = localStorage.getItem(ACTIVITY_STORAGE_KEY)
-    const allData: Record<
-      string,
-      Record<string, GitHubActivityDetail[]>
-    > = stored ? JSON.parse(stored) : {}
+    const allData: Record<string, Record<string, ActivityRecord[]>> = stored
+      ? JSON.parse(stored)
+      : {}
     allData[monthKey] = activitiesByDate
     localStorage.setItem(ACTIVITY_STORAGE_KEY, JSON.stringify(allData))
   } catch {
@@ -115,14 +114,14 @@ function saveActivitiesToStorage(
  */
 export function loadActivitiesFromStorage(
   monthKey: string,
-): Record<string, GitHubActivityDetail[]> | null {
+): Record<string, ActivityRecord[]> | null {
   if (typeof window === 'undefined') return null
   try {
     const stored = localStorage.getItem(ACTIVITY_STORAGE_KEY)
     if (!stored) return null
     const allData = JSON.parse(stored) as Record<
       string,
-      Record<string, GitHubActivityDetail[]>
+      Record<string, ActivityRecord[]>
     >
     return allData[monthKey] ?? null
   } catch {

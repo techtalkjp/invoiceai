@@ -44,14 +44,6 @@ export const saveMonthDataSchema = z.object({
   monthData: z.string(), // JSON string of MonthData
 })
 
-// AI提案スキーマ
-export const aiSuggestSchema = z.object({
-  intent: z.literal('aiSuggest'),
-  clientId: z.string().min(1, 'クライアントを選択してください'),
-  year: z.coerce.number().int(),
-  month: z.coerce.number().int().min(1).max(12),
-})
-
 // AI提案確認保存スキーマ
 export const saveAiSuggestionsSchema = z.object({
   intent: z.literal('saveAiSuggestions'),
@@ -66,7 +58,6 @@ export const formSchema = z.discriminatedUnion('intent', [
   deleteEntrySchema,
   parseTextSchema,
   saveMonthDataSchema,
-  aiSuggestSchema,
   saveAiSuggestionsSchema,
 ])
 

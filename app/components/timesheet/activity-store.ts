@@ -1,17 +1,17 @@
 import { create } from 'zustand'
-import type { GitHubActivityDetail } from '~/routes/playground/+lib/github-oauth.server'
+import type { ActivityRecord } from '~/lib/activity-sources/types'
 
 interface ActivityState {
-  activitiesByDate: Record<string, GitHubActivityDetail[]>
-  setActivities: (activities: GitHubActivityDetail[]) => void
-  setActivitiesByDate: (byDate: Record<string, GitHubActivityDetail[]>) => void
+  activitiesByDate: Record<string, ActivityRecord[]>
+  setActivities: (activities: ActivityRecord[]) => void
+  setActivitiesByDate: (byDate: Record<string, ActivityRecord[]>) => void
   clearActivities: () => void
 }
 
 export const useActivityStore = create<ActivityState>((set) => ({
   activitiesByDate: {},
   setActivities: (activities) => {
-    const byDate: Record<string, GitHubActivityDetail[]> = {}
+    const byDate: Record<string, ActivityRecord[]> = {}
     for (const a of activities) {
       let arr = byDate[a.eventDate]
       if (!arr) {

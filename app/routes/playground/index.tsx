@@ -128,6 +128,7 @@ export async function loader({ request }: Route.LoaderArgs) {
       githubResult: {
         entries: suggestion.entries,
         activities: activities.map((a) => ({
+          sourceType: 'github' as const,
           eventType: a.eventType,
           eventDate: a.eventDate,
           eventTimestamp: a.eventTimestamp,
