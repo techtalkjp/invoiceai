@@ -37,8 +37,6 @@ import {
   getClientSourceMappings,
   saveClientSourceMapping,
 } from '~/lib/activity-sources/activity-queries.server'
-import { decrypt } from '~/lib/activity-sources/encryption.server'
-import { fetchGitHubUsername } from '~/lib/activity-sources/github.server'
 import { requireOrgAdmin } from '~/lib/auth-helpers.server'
 import { db } from '~/lib/db/kysely'
 import { startGitHubOAuth } from '~/lib/github-oauth.server'
@@ -103,14 +101,14 @@ export async function loader({ request, params }: Route.LoaderArgs) {
       ? await getClientSourceMappings(clientIds, 'github')
       : []
 
-  // GitHub username (連携済みの場合のみ)
+  // GitHub username (config にキャッシュ済み)
   let githubUsername: string | null = null
-  if (source) {
+  if (source?.config) {
     try {
-      const token = decrypt(source.credentials)
-      githubUsername = await fetchGitHubUsername(token)
+      const config = JSON.parse(source.config) as { username?: string }
+      githubUsername = config.username ?? null
     } catch {
-      // token が無効な場合
+      // JSON parse error
     }
   }
 

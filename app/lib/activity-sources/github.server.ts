@@ -135,12 +135,12 @@ async function githubGraphQL<T>(
  * タイムシートが30時制（6:00起点）なので、JST 0:00〜5:59 は前日扱い
  */
 function isoToJstDate(iso: string): string {
-  const date = new Date(iso)
-  // 6時間引くことで 0:00-5:59 → 前日、6:00-23:59 → 当日になる
-  const adjusted = new Date(
-    date.getTime() + 9 * 60 * 60 * 1000 - 6 * 60 * 60 * 1000,
-  )
-  return adjusted.toISOString().slice(0, 10)
+  const utc = new Date(iso)
+  // UTC → JST (+9h)
+  const jst = new Date(utc.getTime() + 9 * 60 * 60 * 1000)
+  // 30時制: 0:00-5:59 のアクティビティは前日の稼働として扱う (-6h)
+  const workDay = new Date(jst.getTime() - 6 * 60 * 60 * 1000)
+  return workDay.toISOString().slice(0, 10)
 }
 
 // GraphQL レスポンス型

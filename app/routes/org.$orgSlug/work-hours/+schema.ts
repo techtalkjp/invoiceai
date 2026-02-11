@@ -88,7 +88,6 @@ export const formSchema = z.discriminatedUnion('intent', [
   deleteEntrySchema,
   parseTextSchema,
   saveMonthDataSchema,
-  saveAiSuggestionsSchema,
 ])
 
 // 型定義

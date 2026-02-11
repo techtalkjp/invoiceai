@@ -101,12 +101,18 @@ async function handleIntegrationsCallback(
   // 認証チェック（session cookie で判定）
   const { organization, user } = await requireOrgAdmin(request, orgSlug)
 
-  // token の有効性を確認
-  await fetchGitHubUsername(accessToken)
+  // token の有効性を確認し username を取得
+  const username = await fetchGitHubUsername(accessToken)
 
-  // 暗号化して保存
+  // 暗号化して保存（config に username をキャッシュ）
   const encrypted = encrypt(accessToken)
-  await saveActivitySource(organization.id, user.id, 'github', encrypted, null)
+  await saveActivitySource(
+    organization.id,
+    user.id,
+    'github',
+    encrypted,
+    JSON.stringify({ username }),
+  )
 
   const clearOAuthCookie = await clearOAuthStateCookie()
   return redirect(`/org/${orgSlug}/settings/integrations`, {

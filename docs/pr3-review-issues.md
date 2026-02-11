@@ -20,6 +20,10 @@ PR: feat/activity-integration (GitHub Activity Integration + AI Timesheet Sugges
 - ~~Playground loader の `decrypt` 未ガード → try/catch 追加~~
 - ~~`callback.github.tsx` の `metadata` unsafe キャスト → discriminated union で型安全化~~
 - ~~`OAuthState.metadata` を discriminated union に変更~~
+- ~~`ActivityRecord` の `SourceType | string` → `SourceType` に統一~~
+- ~~`isoToJstDate` の可読性改善（2段階に分割）~~
+- ~~`formSchema` から未使用の `saveAiSuggestionsSchema` を除外~~
+- ~~integrations loader の毎回 GitHub API 呼び出し → config キャッシュに変更~~
 
 ---
 
