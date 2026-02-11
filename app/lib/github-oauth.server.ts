@@ -34,12 +34,19 @@ export function generatePKCEPair(): {
 
 export type OAuthReturnTo = 'playground' | 'integrations'
 
-export interface OAuthState {
-  state: string
-  codeVerifier: string
-  returnTo: OAuthReturnTo
-  metadata: Record<string, unknown>
-}
+export type OAuthState =
+  | {
+      state: string
+      codeVerifier: string
+      returnTo: 'playground'
+      metadata: { year: number; month: number }
+    }
+  | {
+      state: string
+      codeVerifier: string
+      returnTo: 'integrations'
+      metadata: { orgSlug: string }
+    }
 
 const oauthStateCookie = createCookie('github_oauth', {
   httpOnly: true,
@@ -131,7 +138,7 @@ export async function exchangeCodeForToken(
 export async function startGitHubOAuth(params: {
   request: Request
   returnTo: OAuthReturnTo
-  metadata: Record<string, unknown>
+  metadata: OAuthState['metadata']
   scope?: string | undefined
 }): Promise<Response> {
   const { codeVerifier, codeChallenge } = generatePKCEPair()
@@ -151,7 +158,7 @@ export async function startGitHubOAuth(params: {
     codeVerifier,
     returnTo: params.returnTo,
     metadata: params.metadata,
-  })
+  } as OAuthState)
 
   return redirect(authUrl, {
     headers: { 'Set-Cookie': cookie },

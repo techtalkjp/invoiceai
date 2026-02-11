@@ -17,6 +17,9 @@ PR: feat/activity-integration (GitHub Activity Integration + AI Timesheet Sugges
 - ~~Webhook `JSON.parse(body)` のエラーハンドリング追加~~
 - ~~`ai-preview.tsx` の `JSON.parse` + `as` キャストを Zod バリデーションに変更~~
 - ~~`ai-preview.tsx` の `addMapping` / `removeMapping` を Zod スキーマでバリデーション~~
+- ~~Playground loader の `decrypt` 未ガード → try/catch 追加~~
+- ~~`callback.github.tsx` の `metadata` unsafe キャスト → discriminated union で型安全化~~
+- ~~`OAuthState.metadata` を discriminated union に変更~~
 
 ---
 

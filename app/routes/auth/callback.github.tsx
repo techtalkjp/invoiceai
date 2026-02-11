@@ -4,6 +4,7 @@ import { encrypt } from '~/lib/activity-sources/encryption.server'
 import { fetchGitHubUsername } from '~/lib/activity-sources/github.server'
 import { requireOrgAdmin } from '~/lib/auth-helpers.server'
 import {
+  type OAuthState,
   clearOAuthStateCookie,
   exchangeCodeForToken,
   parseOAuthStateCookie,
@@ -67,10 +68,9 @@ export async function loader({ request }: Route.LoaderArgs) {
 async function handlePlaygroundCallback(
   request: Request,
   accessToken: string,
-  metadata: Record<string, unknown>,
+  metadata: Extract<OAuthState, { returnTo: 'playground' }>['metadata'],
 ): Promise<Response> {
-  const year = metadata.year as number
-  const month = metadata.month as number
+  const { year, month } = metadata
 
   const username = await fetchGitHubUsername(accessToken)
   const encryptedToken = encrypt(accessToken)
@@ -94,9 +94,9 @@ async function handlePlaygroundCallback(
 async function handleIntegrationsCallback(
   request: Request,
   accessToken: string,
-  metadata: Record<string, unknown>,
+  metadata: Extract<OAuthState, { returnTo: 'integrations' }>['metadata'],
 ): Promise<Response> {
-  const orgSlug = metadata.orgSlug as string
+  const { orgSlug } = metadata
 
   // 認証チェック（session cookie で判定）
   const { organization, user } = await requireOrgAdmin(request, orgSlug)

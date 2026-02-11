@@ -82,7 +82,16 @@ export async function loader({ request }: Route.LoaderArgs) {
     )
   }
 
-  const accessToken = decrypt(tokenData.encryptedToken)
+  let accessToken: string
+  try {
+    accessToken = decrypt(tokenData.encryptedToken)
+  } catch {
+    // ENCRYPTION_KEY 変更等で復号失敗 → 再認証を促す
+    return data(
+      { githubResult: null as GitHubResult | null },
+      { headers: { 'Set-Cookie': setCookie } },
+    )
+  }
   const { username } = tokenData
 
   const url = new URL(request.url)
