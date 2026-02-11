@@ -173,6 +173,17 @@ export interface Organization {
   updatedAt: Generated<string>;
 }
 
+export interface PlaygroundAiUsage {
+  createdAt: Generated<string>;
+  githubUsername: string;
+  id: string;
+  requestCount: Generated<number>;
+  totalInputTokens: Generated<number>;
+  totalOutputTokens: Generated<number>;
+  updatedAt: Generated<string>;
+  yearMonth: string;
+}
+
 export interface ProviderToken {
   accessToken: string | null;
   createdAt: Generated<string>;
@@ -264,6 +275,7 @@ export interface DB {
   member: Member;
   monthlyStatus: MonthlyStatus;
   organization: Organization;
+  playgroundAiUsage: PlaygroundAiUsage;
   providerToken: ProviderToken;
   session: Session;
   team: Team;

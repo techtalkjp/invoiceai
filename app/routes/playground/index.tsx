@@ -23,6 +23,11 @@ import { cn } from '~/lib/utils'
 import { suggestWorkEntriesFromActivities } from '../org.$orgSlug/work-hours/+work-entry-suggest.server'
 import { TimesheetDemo } from './+components/timesheet-demo'
 import {
+  loadActivitiesFromStorage,
+  saveActivities,
+} from './+components/use-auto-save'
+import { checkAiUsage, recordAiUsage } from './+lib/ai-usage.server'
+import {
   type GitHubResult,
   getTokenFlash,
   startGitHubOAuth,
@@ -93,13 +98,30 @@ export async function loader({ request }: Route.LoaderArgs) {
     endDate,
   )
 
-  const suggestion =
-    activities.length > 0
-      ? suggestWorkEntriesFromActivities(activities)
-      : {
-          entries: [],
-          reasoning: 'この月のGitHubアクティビティが見つかりませんでした',
-        }
+  const currentMonth = `${year}-${String(month).padStart(2, '0')}`
+  let suggestion: Awaited<ReturnType<typeof suggestWorkEntriesFromActivities>>
+
+  if (activities.length === 0) {
+    suggestion = {
+      entries: [],
+      reasoning: 'この月のGitHubアクティビティが見つかりませんでした',
+      totalInputTokens: 0,
+      totalOutputTokens: 0,
+    }
+  } else {
+    const usage = await checkAiUsage(username, currentMonth)
+    suggestion = await suggestWorkEntriesFromActivities(activities, {
+      useAi: usage.allowed,
+    })
+    if (usage.allowed && suggestion.totalInputTokens > 0) {
+      await recordAiUsage(
+        username,
+        currentMonth,
+        suggestion.totalInputTokens,
+        suggestion.totalOutputTokens,
+      )
+    }
+  }
 
   return data(
     {
@@ -157,15 +179,17 @@ export async function clientLoader({
 
   const githubResult = serverData?.githubResult ?? null
 
+  const monthKey = `${year}-${String(month).padStart(2, '0')}`
+  const { useActivityStore } =
+    await import('~/components/timesheet/activity-store')
+
   // flash cookie でデータが来ていたら storedData にマージ + toast 通知
   if (githubResult) {
-    // アクティビティを store にセット
-    const { useActivityStore } =
-      await import('~/components/timesheet/activity-store')
+    // アクティビティを store にセット + localStorage に即座に保存
     useActivityStore.getState().setActivities(githubResult.activities)
+    saveActivities(monthKey, useActivityStore.getState().activitiesByDate)
 
     if (githubResult.entries.length > 0) {
-      const monthKey = `${year}-${String(month).padStart(2, '0')}`
       const merged: MonthData = { ...storedData[monthKey] }
       for (const entry of githubResult.entries) {
         merged[entry.workDate] = {
@@ -183,6 +207,12 @@ export async function clientLoader({
       toast.info(
         `@${githubResult.username} のアクティビティが見つかりませんでした`,
       )
+    }
+  } else {
+    // サーバーからアクティビティが来なかった場合、localStorage から復元
+    const savedActivities = loadActivitiesFromStorage(monthKey)
+    if (savedActivities) {
+      useActivityStore.getState().setActivitiesByDate(savedActivities)
     }
   }
 

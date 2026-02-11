@@ -120,7 +120,9 @@ export async function loader({ request, params }: Route.LoaderArgs) {
       : []
 
   const suggestion =
-    activities.length > 0 ? suggestWorkEntriesFromActivities(activities) : null
+    activities.length > 0
+      ? await suggestWorkEntriesFromActivities(activities)
+      : null
 
   return {
     organization,

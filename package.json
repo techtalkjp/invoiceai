@@ -57,6 +57,7 @@
     "kysely": "0.28.10",
     "kysely-libsql": "0.7.1",
     "lucide-react": "0.563.0",
+    "nanoid": "5.1.6",
     "pdf-lib": "1.17.1",
     "radix-ui": "latest",
     "react": "19.2.4",

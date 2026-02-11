@@ -4,6 +4,7 @@ import type { GitHubActivityDetail } from '~/routes/playground/+lib/github-oauth
 interface ActivityState {
   activitiesByDate: Record<string, GitHubActivityDetail[]>
   setActivities: (activities: GitHubActivityDetail[]) => void
+  setActivitiesByDate: (byDate: Record<string, GitHubActivityDetail[]>) => void
   clearActivities: () => void
 }
 
@@ -21,5 +22,6 @@ export const useActivityStore = create<ActivityState>((set) => ({
     }
     set({ activitiesByDate: byDate })
   },
+  setActivitiesByDate: (byDate) => set({ activitiesByDate: byDate }),
   clearActivities: () => set({ activitiesByDate: {} }),
 }))

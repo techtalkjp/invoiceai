@@ -287,3 +287,18 @@ CREATE INDEX IF NOT EXISTS "activity_org_user_date_idx"
   ON "activity"("organization_id", "user_id", "event_date");
 CREATE INDEX IF NOT EXISTS "activity_source_type_idx"
   ON "activity"("organization_id", "user_id", "source_type");
+
+-- Playground AI usage tracking
+CREATE TABLE IF NOT EXISTS "playground_ai_usage" (
+  "id" TEXT PRIMARY KEY NOT NULL,
+  "github_username" TEXT NOT NULL,
+  "year_month" TEXT NOT NULL,
+  "request_count" INTEGER NOT NULL DEFAULT 0,
+  "total_input_tokens" INTEGER NOT NULL DEFAULT 0,
+  "total_output_tokens" INTEGER NOT NULL DEFAULT 0,
+  "created_at" TEXT NOT NULL DEFAULT (datetime('now')),
+  "updated_at" TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS "playground_ai_usage_user_month_idx"
+  ON "playground_ai_usage"("github_username", "year_month");
