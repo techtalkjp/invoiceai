@@ -4,6 +4,9 @@
   "description": "AI-powered invoice management for freelancers and small teams",
   "main": "index.js",
   "type": "module",
+  "bin": {
+    "invoiceai": "./src/cli-entry.ts"
+  },
   "scripts": {
     "dev": "react-router dev",
     "build": "react-router build",
@@ -12,6 +15,7 @@
     "cli:auth": "tsx src/auth.ts",
     "cli:google": "tsx src/google-auth.ts",
     "cli:invoice": "tsx src/create-invoice.ts",
+    "cli:activity": "tsx src/sync-activities.ts",
     "test": "vitest",
     "test:watch": "vitest --watch",
     "cli:typecheck": "tsc -p tsconfig.json",
@@ -36,6 +40,7 @@
     "@fontsource-variable/noto-sans": "5.2.10",
     "@holiday-jp/holiday_jp": "2.5.1",
     "@libsql/client": "0.17.0",
+    "@modelcontextprotocol/sdk": "^1.12.1",
     "@react-pdf/renderer": "4.3.2",
     "@react-router/node": "7.13.0",
     "@react-router/serve": "7.13.0",

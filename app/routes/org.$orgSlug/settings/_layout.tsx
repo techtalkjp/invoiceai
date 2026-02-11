@@ -1,4 +1,10 @@
-import { BuildingIcon, LinkIcon, SettingsIcon, UsersIcon } from 'lucide-react'
+import {
+  BuildingIcon,
+  GitBranchIcon,
+  LinkIcon,
+  SettingsIcon,
+  UsersIcon,
+} from 'lucide-react'
 import { NavLink, Outlet, useLocation } from 'react-router'
 import { Card } from '~/components/ui/card'
 import { requireOrgAdmin } from '~/lib/auth-helpers.server'
@@ -42,6 +48,12 @@ export default function SettingsLayout({
       to: `${basePath}/members`,
       icon: UsersIcon,
       description: 'メンバーの追加・削除・権限変更',
+    },
+    {
+      label: '外部連携',
+      to: `${basePath}/integrations`,
+      icon: GitBranchIcon,
+      description: 'GitHub等の外部サービス連携',
     },
   ]
 

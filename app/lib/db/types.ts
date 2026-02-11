@@ -25,6 +25,32 @@ export interface Account {
   userId: string;
 }
 
+export interface Activity {
+  createdAt: Generated<string>;
+  eventDate: string;
+  eventTimestamp: string;
+  eventType: string;
+  id: string;
+  metadata: string | null;
+  organizationId: string;
+  repo: string | null;
+  sourceType: string;
+  title: string | null;
+  userId: string;
+}
+
+export interface ActivitySource {
+  config: string | null;
+  createdAt: Generated<string>;
+  credentials: string;
+  id: string;
+  isActive: Generated<number>;
+  organizationId: string;
+  sourceType: string;
+  updatedAt: Generated<string>;
+  userId: string;
+}
+
 export interface Client {
   billingType: string;
   createdAt: Generated<string>;
@@ -42,6 +68,14 @@ export interface Client {
   paymentTerms: Generated<string>;
   unitLabel: Generated<string | null>;
   updatedAt: Generated<string>;
+}
+
+export interface ClientSourceMapping {
+  clientId: string;
+  createdAt: Generated<string>;
+  id: string;
+  sourceIdentifier: string;
+  sourceType: string;
 }
 
 export interface FeatureFlag {
@@ -218,7 +252,10 @@ export interface WorkEntry {
 
 export interface DB {
   account: Account;
+  activity: Activity;
+  activitySource: ActivitySource;
   client: Client;
+  clientSourceMapping: ClientSourceMapping;
   featureFlag: FeatureFlag;
   invitation: Invitation;
   invoice: Invoice;
