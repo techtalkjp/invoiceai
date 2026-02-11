@@ -35,12 +35,15 @@ export async function action({ request }: Route.ActionArgs) {
   const body = await request.text()
   const expected = `sha256=${createHmac('sha256', secret).update(body).digest('hex')}`
 
-  if (!timingSafeEqual(Buffer.from(signature), Buffer.from(expected))) {
+  const sigBuf = Buffer.from(signature)
+  const expBuf = Buffer.from(expected)
+  if (sigBuf.length !== expBuf.length || !timingSafeEqual(sigBuf, expBuf)) {
     throw data({ error: 'Invalid signature' }, { status: 401 })
   }
 
   const event = request.headers.get('X-GitHub-Event')
-  const payload = JSON.parse(body) as {
+
+  let payload: {
     repository?: { full_name?: string }
     sender?: { login?: string }
     commits?: Array<{
@@ -49,6 +52,11 @@ export async function action({ request }: Route.ActionArgs) {
       timestamp: string
       url?: string
     }>
+  }
+  try {
+    payload = JSON.parse(body)
+  } catch {
+    throw data({ error: 'Invalid JSON body' }, { status: 400 })
   }
 
   if (event !== 'push' || !payload.commits) {

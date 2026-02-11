@@ -48,7 +48,37 @@ export const saveMonthDataSchema = z.object({
 export const saveAiSuggestionsSchema = z.object({
   intent: z.literal('saveAiSuggestions'),
   clientId: z.string().min(1),
-  entries: z.string(), // JSON string: Array<{workDate, startTime, endTime, breakMinutes, description}>
+  entries: z
+    .string()
+    .transform((val, ctx) => {
+      try {
+        return JSON.parse(val) as unknown
+      } catch {
+        ctx.addIssue({ code: 'custom', message: 'Invalid JSON' })
+        return z.NEVER
+      }
+    })
+    .pipe(
+      z.array(
+        z.object({
+          workDate: z.string().min(1),
+          startTime: z.string().min(1),
+          endTime: z.string().min(1),
+          breakMinutes: z.number(),
+          description: z.string(),
+        }),
+      ),
+    ),
+})
+
+export const addMappingSchema = z.object({
+  intent: z.literal('addMapping'),
+  repoFullName: z.string().min(1),
+})
+
+export const removeMappingSchema = z.object({
+  intent: z.literal('removeMapping'),
+  sourceIdentifier: z.string().min(1),
 })
 
 // フォームスキーマ（discriminated union）

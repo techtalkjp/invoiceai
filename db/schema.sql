@@ -287,6 +287,8 @@ CREATE INDEX IF NOT EXISTS "activity_org_user_date_idx"
   ON "activity"("organization_id", "user_id", "event_date");
 CREATE INDEX IF NOT EXISTS "activity_source_type_idx"
   ON "activity"("organization_id", "user_id", "source_type");
+CREATE UNIQUE INDEX IF NOT EXISTS "activity_unique_event_idx"
+  ON "activity"("organization_id", "user_id", "source_type", "event_type", "event_timestamp", "repo");
 
 -- Playground AI usage tracking
 CREATE TABLE IF NOT EXISTS "playground_ai_usage" (

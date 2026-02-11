@@ -59,7 +59,12 @@ import { requireOrgMember } from '~/lib/auth-helpers.server'
 import { formatYearMonthLabel } from '~/utils/month'
 import { saveEntries } from '../+mutations.server'
 import { getMonthEntries, getTimeBasedClients } from '../+queries.server'
-import { calculateHours, saveAiSuggestionsSchema } from '../+schema'
+import {
+  addMappingSchema,
+  calculateHours,
+  removeMappingSchema,
+  saveAiSuggestionsSchema,
+} from '../+schema'
 import { suggestWorkEntriesFromActivities } from '../+work-entry-suggest.server'
 import { RepoMappingPanel } from './+components/repo-mapping-panel'
 import type { Route } from './+types/ai-preview'
@@ -144,24 +149,30 @@ export async function action({ request, params }: Route.ActionArgs) {
   const formData = await request.formData()
   const intent = formData.get('intent')
 
-  // マッピング操作（conform 外）
+  // マッピング操作
   if (intent === 'addMapping') {
-    const repoFullName = formData.get('repoFullName') as string
-    if (repoFullName) {
-      await saveClientSourceMapping(clientId, 'github', repoFullName)
+    const result = parseWithZod(formData, { schema: addMappingSchema })
+    if (result.status !== 'success') {
+      return { error: 'バリデーションエラー' }
     }
+    await saveClientSourceMapping(clientId, 'github', result.value.repoFullName)
     return { mappingUpdated: true }
   }
 
   if (intent === 'removeMapping') {
-    const sourceIdentifier = formData.get('sourceIdentifier') as string
-    if (sourceIdentifier) {
-      await deleteClientSourceMapping(clientId, 'github', sourceIdentifier)
+    const result = parseWithZod(formData, { schema: removeMappingSchema })
+    if (result.status !== 'success') {
+      return { error: 'バリデーションエラー' }
     }
+    await deleteClientSourceMapping(
+      clientId,
+      'github',
+      result.value.sourceIdentifier,
+    )
     return { mappingUpdated: true }
   }
 
-  // 候補保存（conform）
+  // 候補保存
   const submission = parseWithZod(formData, {
     schema: saveAiSuggestionsSchema,
   })
@@ -170,18 +181,11 @@ export async function action({ request, params }: Route.ActionArgs) {
     return { error: 'バリデーションエラー' }
   }
 
-  const { entries: entriesJson } = submission.value
+  const { entries } = submission.value
   const year = formData.get('year')
   const month = formData.get('month')
 
   try {
-    const entries = JSON.parse(entriesJson) as Array<{
-      workDate: string
-      startTime: string
-      endTime: string
-      breakMinutes: number
-      description: string
-    }>
     await saveEntries(
       organization.id,
       user.id,

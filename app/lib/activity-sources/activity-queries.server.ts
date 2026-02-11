@@ -3,6 +3,8 @@ import type { ActivityRecord } from './types'
 
 /**
  * アクティビティを一括挿入（重複はスキップ）
+ * UNIQUE INDEX (org, user, source_type, event_type, event_timestamp, repo) で重複排除
+ * SQLite パラメータ上限を考慮して 90 行ずつチャンク分割
  */
 export async function insertActivities(
   organizationId: string,
@@ -11,30 +13,46 @@ export async function insertActivities(
 ): Promise<number> {
   if (records.length === 0) return 0
 
+  const CHUNK_SIZE = 90
   let insertedCount = 0
-  for (const record of records) {
-    const id = crypto.randomUUID()
-    try {
-      await db
-        .insertInto('activity')
-        .values({
-          id,
-          organizationId,
-          userId,
-          sourceType: record.sourceType,
-          eventType: record.eventType,
-          eventDate: record.eventDate,
-          eventTimestamp: record.eventTimestamp,
-          repo: record.repo,
-          title: record.title,
-          metadata: record.metadata,
-        })
-        .execute()
-      insertedCount++
-    } catch {
-      // duplicate or constraint violation — skip
+
+  for (let i = 0; i < records.length; i += CHUNK_SIZE) {
+    const chunk = records.slice(i, i + CHUNK_SIZE)
+    const values = chunk.map((record) => ({
+      id: crypto.randomUUID(),
+      organizationId,
+      userId,
+      sourceType: record.sourceType,
+      eventType: record.eventType,
+      eventDate: record.eventDate,
+      eventTimestamp: record.eventTimestamp,
+      repo: record.repo ?? '',
+      title: record.title,
+      metadata: record.metadata,
+    }))
+
+    const result = await db
+      .insertInto('activity')
+      .values(values)
+      .onConflict((oc) =>
+        oc
+          .columns([
+            'organizationId',
+            'userId',
+            'sourceType',
+            'eventType',
+            'eventTimestamp',
+            'repo',
+          ])
+          .doNothing(),
+      )
+      .execute()
+
+    for (const r of result) {
+      insertedCount += Number(r.numInsertedOrUpdatedRows ?? 0)
     }
   }
+
   return insertedCount
 }
 
@@ -110,31 +128,27 @@ export async function saveActivitySource(
   credentials: string,
   config: string | null,
 ) {
-  const existing = await getActivitySource(organizationId, userId, sourceType)
   const now = new Date().toISOString()
 
-  if (existing) {
-    await db
-      .updateTable('activitySource')
-      .set({ credentials, config, updatedAt: now })
-      .where('id', '=', existing.id)
-      .execute()
-  } else {
-    await db
-      .insertInto('activitySource')
-      .values({
-        id: crypto.randomUUID(),
-        organizationId,
-        userId,
-        sourceType,
-        credentials,
-        config,
-        isActive: 1,
-        createdAt: now,
-        updatedAt: now,
-      })
-      .execute()
-  }
+  await db
+    .insertInto('activitySource')
+    .values({
+      id: crypto.randomUUID(),
+      organizationId,
+      userId,
+      sourceType,
+      credentials,
+      config,
+      isActive: 1,
+      createdAt: now,
+      updatedAt: now,
+    })
+    .onConflict((oc) =>
+      oc
+        .columns(['organizationId', 'userId', 'sourceType'])
+        .doUpdateSet({ credentials, config, updatedAt: now }),
+    )
+    .execute()
 }
 
 /**
@@ -177,26 +191,19 @@ export async function saveClientSourceMapping(
   sourceType: string,
   sourceIdentifier: string,
 ) {
-  const existing = await db
-    .selectFrom('clientSourceMapping')
-    .select('id')
-    .where('clientId', '=', clientId)
-    .where('sourceType', '=', sourceType)
-    .where('sourceIdentifier', '=', sourceIdentifier)
-    .executeTakeFirst()
-
-  if (!existing) {
-    await db
-      .insertInto('clientSourceMapping')
-      .values({
-        id: crypto.randomUUID(),
-        clientId,
-        sourceType,
-        sourceIdentifier,
-        createdAt: new Date().toISOString(),
-      })
-      .execute()
-  }
+  await db
+    .insertInto('clientSourceMapping')
+    .values({
+      id: crypto.randomUUID(),
+      clientId,
+      sourceType,
+      sourceIdentifier,
+      createdAt: new Date().toISOString(),
+    })
+    .onConflict((oc) =>
+      oc.columns(['clientId', 'sourceType', 'sourceIdentifier']).doNothing(),
+    )
+    .execute()
 }
 
 /**

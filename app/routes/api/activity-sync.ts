@@ -1,4 +1,5 @@
 import { syncAllGitHubActivities } from '@shared/services/activity-sync'
+import { timingSafeEqual } from 'node:crypto'
 import { data } from 'react-router'
 import type { Route } from './+types/activity-sync'
 
@@ -19,8 +20,11 @@ export async function action({ request }: Route.ActionArgs) {
     throw data({ error: 'CRON_SECRET not configured' }, { status: 500 })
   }
 
-  const authHeader = request.headers.get('Authorization')
-  if (authHeader !== `Bearer ${secret}`) {
+  const authHeader = request.headers.get('Authorization') ?? ''
+  const expected = `Bearer ${secret}`
+  const authBuf = Buffer.from(authHeader)
+  const expBuf = Buffer.from(expected)
+  if (authBuf.length !== expBuf.length || !timingSafeEqual(authBuf, expBuf)) {
     throw data({ error: 'Unauthorized' }, { status: 401 })
   }
 
