@@ -60,16 +60,36 @@ export async function syncAllGitHubActivities(
   endDate: string,
 ): Promise<SyncResult[]> {
   const users = await getActiveSourceUsers('github')
+  const CONCURRENCY = 5
   const results: SyncResult[] = []
 
-  for (const user of users) {
-    const result = await syncUserGitHubActivities(
-      user.organizationId,
-      user.userId,
-      startDate,
-      endDate,
+  for (let i = 0; i < users.length; i += CONCURRENCY) {
+    const batch = users.slice(i, i + CONCURRENCY)
+    const settled = await Promise.allSettled(
+      batch.map((user) =>
+        syncUserGitHubActivities(
+          user.organizationId,
+          user.userId,
+          startDate,
+          endDate,
+        ),
+      ),
     )
-    results.push(result)
+    for (const [j, s] of settled.entries()) {
+      if (s.status === 'fulfilled') {
+        results.push(s.value)
+      } else {
+        const user = batch[j]
+        if (user) {
+          results.push({
+            organizationId: user.organizationId,
+            userId: user.userId,
+            inserted: 0,
+            error: String(s.reason),
+          })
+        }
+      }
+    }
   }
 
   return results

@@ -19,7 +19,7 @@ export async function loader({ request, params }: Route.LoaderArgs) {
 
   const source = await getActivitySource(organization.id, user.id, 'github')
   if (!source) {
-    return { ghOrgs: [], repos: [] }
+    return { ghOrgs: [], repos: [], error: null as string | null }
   }
 
   const url = new URL(request.url)
@@ -35,8 +35,15 @@ export async function loader({ request, params }: Route.LoaderArgs) {
     const repos = q
       ? await searchRepos(pat, q, ghOrg ?? undefined, username)
       : await fetchRecentRepos(pat, ghOrg ?? undefined)
-    return { ghOrgs: orgs, repos }
-  } catch {
-    return { ghOrgs: [], repos: [] }
+    return { ghOrgs: orgs, repos, error: null as string | null }
+  } catch (e) {
+    const message = e instanceof Error ? e.message : 'Unknown error'
+    const isAuthError =
+      message.includes('401') || message.includes('Bad credentials')
+    return {
+      ghOrgs: [],
+      repos: [],
+      error: isAuthError ? 'token_expired' : 'fetch_failed',
+    }
   }
 }

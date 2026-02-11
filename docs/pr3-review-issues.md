@@ -24,6 +24,8 @@ PR: feat/activity-integration (GitHub Activity Integration + AI Timesheet Sugges
 - ~~`isoToJstDate` の可読性改善（2段階に分割）~~
 - ~~`formSchema` から未使用の `saveAiSuggestionsSchema` を除外~~
 - ~~integrations loader の毎回 GitHub API 呼び出し → config キャッシュに変更~~
+- ~~`repos.ts` のエラーが空配列として飲み込まれる → エラー種別を返すように改善~~
+- ~~`syncAllGitHubActivities` を逐次処理 → 5並列バッチに変更~~
 
 ---
 
