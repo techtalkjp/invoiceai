@@ -71,4 +71,5 @@ export interface GitHubResult {
   reasoning: string
   username: string
   activityCount: number
+  aiUsage?: { used: number; limit: number; remaining: number } | undefined
 }

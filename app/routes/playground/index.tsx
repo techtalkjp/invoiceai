@@ -110,6 +110,8 @@ export async function loader({ request }: Route.LoaderArgs) {
   const currentMonth = `${year}-${String(month).padStart(2, '0')}`
   let suggestion: Awaited<ReturnType<typeof suggestWorkEntriesFromActivities>>
 
+  const usage = await checkAiUsage(username, currentMonth)
+
   if (activities.length === 0) {
     suggestion = {
       entries: [],
@@ -119,7 +121,6 @@ export async function loader({ request }: Route.LoaderArgs) {
       aiDaysUsed: 0,
     }
   } else {
-    const usage = await checkAiUsage(username, currentMonth)
     suggestion = await suggestWorkEntriesFromActivities(activities, {
       aiDaysLimit: usage.remainingDays,
     })
@@ -132,6 +133,12 @@ export async function loader({ request }: Route.LoaderArgs) {
         suggestion.totalOutputTokens,
       )
     }
+  }
+
+  const aiUsageAfter = {
+    used: usage.used + suggestion.aiDaysUsed,
+    limit: usage.limit,
+    remaining: Math.max(0, usage.remainingDays - suggestion.aiDaysUsed),
   }
 
   return data(
@@ -151,6 +158,7 @@ export async function loader({ request }: Route.LoaderArgs) {
         reasoning: suggestion.reasoning,
         username,
         activityCount: activities.length,
+        aiUsage: aiUsageAfter,
       } satisfies GitHubResult,
     },
     { headers: { 'Set-Cookie': setCookie } },
@@ -220,6 +228,12 @@ export async function clientLoader({
       toast.success(
         `@${githubResult.username}: ${githubResult.activityCount}件のアクティビティから${githubResult.entries.length}日分を反映しました`,
       )
+      // AI使用量の制限に達している場合に通知
+      if (githubResult.aiUsage && githubResult.aiUsage.remaining === 0) {
+        toast.info(
+          `AI要約の月間上限（${githubResult.aiUsage.limit}日分）に達しました。一部の概要はルールベースで生成されています`,
+        )
+      }
     } else {
       toast.info(
         `@${githubResult.username} のアクティビティが見つかりませんでした`,
