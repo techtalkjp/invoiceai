@@ -120,11 +120,12 @@ export const useTimesheetStore = create<TimesheetState>((set, get) => ({
       if (field === 'description') {
         updated.aiGenerated = false
       }
-      // 開始 or 終了が入力され、休憩が未設定の場合はデフォルト1時間
+      // 初回入力時のみ休憩を自動設定（既に両方入力済みの場合は上書きしない）
       if (
         (field === 'startTime' || field === 'endTime') &&
         value &&
-        entry.breakMinutes === 0
+        entry.breakMinutes === 0 &&
+        !(entry.startTime && entry.endTime)
       ) {
         updated.breakMinutes = 60
       }
