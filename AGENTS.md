@@ -117,10 +117,12 @@ org.$orgSlug/
 ## Forms (future API)
 
 - 新ルートは `~/lib/form` の `useForm` を使う（`configureForms` 統合済み）
+- スキーマは定義時に `coerceFormValue()` でラップする。クライアント (`useForm`) もサーバー action (`safeParse`) も同じスキーマを使う
+- `coerceFormValue` がフォーム値の型変換を担う（`"on"` → `true`, `"123"` → `123` 等）。`z.coerce.number()` は不要、`z.number()` で OK
 - クライアント: `useForm(schema, { lastResult, defaultValue })` — `onValidate` 不要
-- サーバー action: `parseSubmission` + `report` (`@conform-to/react/future`)、バリデーションは `coerceFormValue(schema).safeParse()` + `formatResult()` (`@conform-to/zod/v4/future`)
+- サーバー action: `parseSubmission` + `report` (`@conform-to/react/future`)、`formatResult(schema.safeParse())` (`@conform-to/zod/v4/future`)
 - `parseWithZod` / `getInputProps` は旧 API。`fields.xxx.inputProps` / `.moneyInputProps` を使う
-- 実装例: `app/routes/playground/money-input/index.tsx`
+- 実装例: `app/routes/playground/forms/index.tsx`, `app/routes/playground/money-input/index.tsx`
 
 ## References
 
