@@ -40,12 +40,7 @@ export async function action({ request }: Route.ActionArgs) {
   const summary = {
     totalUsers: results.length,
     totalInserted: results.reduce((sum, r) => sum + r.inserted, 0),
-    errors: results
-      .filter((r) => r.error)
-      .map((r) => ({
-        userId: r.userId,
-        error: r.error,
-      })),
+    errorCount: results.filter((r) => r.error).length,
   }
 
   return data(summary, { status: 200 })

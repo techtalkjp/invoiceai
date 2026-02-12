@@ -34,6 +34,9 @@ export function encrypt(plaintext: string): string {
 export function decrypt(encoded: string): string {
   const key = getEncryptionKey()
   const data = Buffer.from(encoded, 'base64')
+  if (data.length < IV_LENGTH + AUTH_TAG_LENGTH + 1) {
+    throw new Error('Encrypted data is too short or corrupted')
+  }
   const iv = data.subarray(0, IV_LENGTH)
   const authTag = data.subarray(IV_LENGTH, IV_LENGTH + AUTH_TAG_LENGTH)
   const ciphertext = data.subarray(IV_LENGTH + AUTH_TAG_LENGTH)

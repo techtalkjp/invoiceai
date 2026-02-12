@@ -61,6 +61,11 @@ export async function searchRepos(
   org?: string | undefined,
   username?: string | undefined,
 ): Promise<Array<{ fullName: string; pushedAt: string | null }>> {
+  // org/username に不正な文字が含まれていないか検証
+  const ghNameRegex = /^[a-zA-Z0-9](?:[a-zA-Z0-9._-]*[a-zA-Z0-9])?$/
+  if (org && !ghNameRegex.test(org)) {
+    return []
+  }
   const scope = org ? `org:${org}` : username ? `user:${username}` : ''
   const qualifiers = scope ? `${query} ${scope}` : query
   const result = await githubFetch<{
@@ -134,7 +139,7 @@ async function githubGraphQL<T>(
  * ISOタイムスタンプをJSTの「勤務日」文字列に変換
  * タイムシートが30時制（6:00起点）なので、JST 0:00〜5:59 は前日扱い
  */
-function isoToJstDate(iso: string): string {
+export function isoToJstDate(iso: string): string {
   const utc = new Date(iso)
   // UTC → JST (+9h)
   const jst = new Date(utc.getTime() + 9 * 60 * 60 * 1000)

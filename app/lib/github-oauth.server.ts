@@ -1,5 +1,6 @@
 import crypto from 'node:crypto'
 import { createCookie, redirect } from 'react-router'
+import { z } from 'zod'
 
 // --- 環境変数 ---
 
@@ -54,8 +55,16 @@ const oauthStateCookie = createCookie('github_oauth', {
   path: '/',
   maxAge: 300, // 5分
   secure: process.env.NODE_ENV === 'production',
-  secrets: [process.env.BETTER_AUTH_SECRET ?? 'dev-oauth-secret'],
+  secrets: [getCookieSecret()],
 })
+
+function getCookieSecret(): string {
+  const secret = process.env.BETTER_AUTH_SECRET
+  if (!secret && process.env.NODE_ENV === 'production') {
+    throw new Error('BETTER_AUTH_SECRET must be set in production')
+  }
+  return secret ?? 'dev-oauth-secret'
+}
 
 export async function createOAuthStateCookie(
   oauthState: OAuthState,
@@ -63,13 +72,28 @@ export async function createOAuthStateCookie(
   return await oauthStateCookie.serialize(oauthState)
 }
 
+const oauthStateSchema = z.discriminatedUnion('returnTo', [
+  z.object({
+    state: z.string(),
+    codeVerifier: z.string(),
+    returnTo: z.literal('playground'),
+    metadata: z.object({ year: z.number(), month: z.number() }),
+  }),
+  z.object({
+    state: z.string(),
+    codeVerifier: z.string(),
+    returnTo: z.literal('integrations'),
+    metadata: z.object({ orgSlug: z.string() }),
+  }),
+])
+
 export async function parseOAuthStateCookie(
   request: Request,
 ): Promise<OAuthState | null> {
   const cookieHeader = request.headers.get('Cookie')
   const value = await oauthStateCookie.parse(cookieHeader)
-  if (!value || typeof value !== 'object') return null
-  return value as OAuthState
+  const result = oauthStateSchema.safeParse(value)
+  return result.success ? result.data : null
 }
 
 export async function clearOAuthStateCookie(): Promise<string> {

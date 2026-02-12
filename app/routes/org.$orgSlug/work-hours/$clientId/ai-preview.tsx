@@ -220,9 +220,9 @@ type PreviewEntry = {
 }
 
 function formatDate(dateStr: string): string {
-  const date = new Date(dateStr)
-  const day = date.getDate()
-  const dow = DAY_LABELS[date.getDay()]
+  const d = new Date(`${dateStr}T00:00:00`)
+  const day = d.getDate()
+  const dow = DAY_LABELS[d.getDay()]
   return `${day}(${dow})`
 }
 
@@ -232,7 +232,7 @@ function timeToMinutes(time: string): number {
 }
 
 function minutesToTime(minutes: number): string {
-  const clamped = Math.min(Math.max(0, minutes), 23 * 60 + 59)
+  const clamped = Math.min(Math.max(0, minutes), 29 * 60 + 59)
   const h = Math.floor(clamped / 60)
   const m = clamped % 60
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`

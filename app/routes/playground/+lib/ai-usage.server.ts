@@ -5,6 +5,10 @@ import { db } from '~/lib/db/kysely'
 const MONTHLY_DAYS_LIMIT = 5
 
 export async function checkAiUsage(githubUsername: string, yearMonth: string) {
+  // recordAiUsage と同一トランザクションではないため、
+  // 同時リクエストで上限を超える可能性がある（TOCTOU）。
+  // recordAiUsage 側の INSERT ... ON CONFLICT で加算するため、
+  // 最悪でも 2 倍程度の超過で済む（Playground の制限なので許容）。
   const row = await db
     .selectFrom('playgroundAiUsage')
     .select(['requestCount'])

@@ -217,61 +217,75 @@ export async function suggestWorkEntriesFromActivities(
     inputTokens: number
     outputTokens: number
   }
-  const entryPromises: Promise<EntryWithTokens | null>[] = []
 
+  // 各日の処理タスクを作成
   let aiDayIndex = 0
+  const tasks: Array<{
+    date: string
+    acts: Activity[]
+    useAi: boolean
+  }> = []
   for (const [date, acts] of sortedDates) {
     const useAi = aiDayIndex < aiDaysLimit
     if (useAi) aiDayIndex++
-
-    entryPromises.push(
-      (async () => {
-        // タイムスタンプを持つアクティビティのみで時間推定
-        const timestamps = acts
-          .filter((a) => a.eventTimestamp)
-          .map((a) => toJstMinutes(a.eventTimestamp))
-          .filter((m) => m >= 0)
-
-        let startMin: number
-        let endMin: number
-
-        if (timestamps.length > 0) {
-          const earliest = Math.min(...timestamps)
-          const latest = Math.max(...timestamps)
-
-          // 開始: 最初のアクティビティの時刻（下限 6:00）
-          startMin = Math.max(6 * 60, earliest)
-          // 終了: 最後のアクティビティの時刻（上限 29:59）
-          endMin = Math.min(29 * 60 + 59, latest)
-          // 開始と終了が逆転しないようにする
-          if (endMin <= startMin) endMin = startMin + 60
-        } else {
-          // タイムスタンプなし: デフォルト 9:00-18:00
-          startMin = 9 * 60
-          endMin = 18 * 60
-        }
-
-        // 休憩: 6h以上なら60min
-        const workDuration = endMin - startMin
-        const breakMinutes = workDuration >= 6 * 60 ? 60 : 0
-
-        const desc = await buildDescription(acts, useAi)
-
-        return {
-          workDate: date,
-          startTime: minutesToHHMM(startMin),
-          endTime: minutesToHHMM(endMin),
-          breakMinutes,
-          description: desc.text,
-          aiGenerated: desc.inputTokens > 0,
-          inputTokens: desc.inputTokens,
-          outputTokens: desc.outputTokens,
-        }
-      })(),
-    )
+    tasks.push({ date, acts, useAi })
   }
 
-  const results = await Promise.all(entryPromises)
+  async function processDay(task: {
+    date: string
+    acts: Activity[]
+    useAi: boolean
+  }): Promise<EntryWithTokens> {
+    const timestamps = task.acts
+      .filter((a) => a.eventTimestamp)
+      .map((a) => toJstMinutes(a.eventTimestamp))
+      .filter((m) => m >= 0)
+
+    let startMin: number
+    let endMin: number
+
+    if (timestamps.length > 0) {
+      const earliest = Math.min(...timestamps)
+      const latest = Math.max(...timestamps)
+
+      // 開始: 最初のアクティビティの時刻（下限 6:00）
+      startMin = Math.max(6 * 60, earliest)
+      // 終了: 最後のアクティビティの時刻（上限 29:59）
+      endMin = Math.min(29 * 60 + 59, latest)
+      // 開始と終了が逆転しないようにする
+      if (endMin <= startMin) endMin = startMin + 60
+    } else {
+      // タイムスタンプなし: デフォルト 9:00-18:00
+      startMin = 9 * 60
+      endMin = 18 * 60
+    }
+
+    // 休憩: 6h以上なら60min
+    const workDuration = endMin - startMin
+    const breakMinutes = workDuration >= 6 * 60 ? 60 : 0
+
+    const desc = await buildDescription(task.acts, task.useAi)
+
+    return {
+      workDate: task.date,
+      startTime: minutesToHHMM(startMin),
+      endTime: minutesToHHMM(endMin),
+      breakMinutes,
+      description: desc.text,
+      aiGenerated: desc.inputTokens > 0,
+      inputTokens: desc.inputTokens,
+      outputTokens: desc.outputTokens,
+    }
+  }
+
+  // AI API のレート制限を考慮して 5 並列ずつ処理
+  const AI_CONCURRENCY = 5
+  const results: EntryWithTokens[] = []
+  for (let i = 0; i < tasks.length; i += AI_CONCURRENCY) {
+    const chunk = tasks.slice(i, i + AI_CONCURRENCY)
+    const chunkResults = await Promise.all(chunk.map(processDay))
+    results.push(...chunkResults)
+  }
   const entries: SuggestedEntry[] = []
   let totalInputTokens = 0
   let totalOutputTokens = 0

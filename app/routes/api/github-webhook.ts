@@ -1,6 +1,7 @@
 import { createHmac, timingSafeEqual } from 'node:crypto'
 import { data } from 'react-router'
 import { insertActivities } from '~/lib/activity-sources/activity-queries.server'
+import { isoToJstDate } from '~/lib/activity-sources/github.server'
 import type { ActivityRecord } from '~/lib/activity-sources/types'
 import { db } from '~/lib/db/kysely'
 import type { Route } from './+types/github-webhook'
@@ -106,7 +107,7 @@ export async function action({ request }: Route.ActionArgs) {
   for (const source of matchingSources) {
     const records: ActivityRecord[] =
       payload.commits?.map((commit) => {
-        const eventDate = commit.timestamp.slice(0, 10)
+        const eventDate = isoToJstDate(commit.timestamp)
         return {
           sourceType: 'github',
           eventType: 'commit',
@@ -115,7 +116,7 @@ export async function action({ request }: Route.ActionArgs) {
           repo: repoFullName,
           title: commit.message.split('\n')[0] ?? null,
           url: commit.url ?? null,
-          metadata: JSON.stringify({ sha: commit.id }),
+          metadata: JSON.stringify({ oid: commit.id.slice(0, 7) }),
         }
       }) ?? []
 

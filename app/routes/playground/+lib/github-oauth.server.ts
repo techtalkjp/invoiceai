@@ -12,6 +12,14 @@ interface TokenFlashData {
   tokenData: string // JSON encoded
 }
 
+function getPlaygroundCookieSecret(): string {
+  const secret = process.env.BETTER_AUTH_SECRET
+  if (!secret && process.env.NODE_ENV === 'production') {
+    throw new Error('BETTER_AUTH_SECRET must be set in production')
+  }
+  return secret ?? 'dev-playground-secret'
+}
+
 const tokenSessionStorage = createCookieSessionStorage<
   TokenSessionData,
   TokenFlashData
@@ -23,7 +31,7 @@ const tokenSessionStorage = createCookieSessionStorage<
     path: '/',
     maxAge: 60, // 1分 (flash なのですぐ消える)
     secure: process.env.NODE_ENV === 'production',
-    secrets: [process.env.BETTER_AUTH_SECRET ?? 'dev-playground-secret'],
+    secrets: [getPlaygroundCookieSecret()],
   },
 })
 

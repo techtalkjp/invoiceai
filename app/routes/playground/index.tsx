@@ -164,10 +164,13 @@ export async function loader({ request }: Route.LoaderArgs) {
       },
       { headers: { 'Set-Cookie': setCookie } },
     )
-  } catch {
-    // GitHub API/AI生成/DB エラー → graceful fallback
+  } catch (e) {
+    console.error('[Playground loader]', e)
     return data(
-      { githubResult: null as GitHubResult | null },
+      {
+        githubResult: null as GitHubResult | null,
+        error: 'GitHubアクティビティの取得に失敗しました',
+      },
       { headers: { 'Set-Cookie': setCookie } },
     )
   }
@@ -207,9 +210,14 @@ export async function clientLoader({
   // OAuth コールバックからのリダイレクト時のみ serverLoader を呼ぶ
   // （flash cookie にトークンがある場合のみサーバーリクエストが必要）
   const fromOAuth = url.searchParams.get('fromOAuth') === '1'
-  const githubResult = fromOAuth
-    ? ((await serverLoader())?.githubResult ?? null)
-    : null
+  let githubResult: GitHubResult | null = null
+  if (fromOAuth) {
+    const serverData = await serverLoader()
+    githubResult = serverData?.githubResult ?? null
+    if ('error' in serverData && typeof serverData.error === 'string') {
+      toast.error(serverData.error)
+    }
+  }
 
   const monthKey = `${year}-${String(month).padStart(2, '0')}`
   const { useActivityStore } =
