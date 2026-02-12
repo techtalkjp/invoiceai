@@ -28,7 +28,11 @@ export const TimesheetTable = memo(function TimesheetTable({
 
   return (
     <div className="min-w-[460px] md:min-w-[624px]">
-      <div className={cn('grid items-center border-b', GRID_COLS)}>
+      {/* biome-ignore lint/a11y/noStaticElementInteractions: prevent context menu on header */}
+      <div
+        className={cn('grid items-center border-b', GRID_COLS)}
+        onContextMenu={(e) => e.stopPropagation()}
+      >
         <div className="px-2 py-2 text-sm font-medium">日付</div>
         <div className="px-2 py-2 text-center text-sm font-medium">開始</div>
         <div className="px-2 py-2 text-center text-sm font-medium">終了</div>
