@@ -37,21 +37,33 @@ export function TimeGridPicker({
     return rows
   }, [interval, allow24Plus])
 
+  // value から時間(hour)を抽出して、最も近い行のインデックスを計算
+  const nearestRowIndex = useMemo(() => {
+    const match = value.match(/^(\d{1,2}):/)
+    if (!match?.[1]) return 0
+    const hour = parseInt(match[1], 10)
+    const maxHour = allow24Plus ? 29 : 23
+    return Math.min(hour, maxHour)
+  }, [value, allow24Plus])
+
+  // 最も近い行への ref（完全一致がない場合のフォールバック）
+  const nearestRowRef = useRef<HTMLDivElement>(null)
+
   // 初回マウント時に選択位置へスクロール
   // useEffect + rAF でペイント後に実行し、Forced Reflow を回避
   useEffect(() => {
     const rafId = requestAnimationFrame(() => {
-      if (selectedRef.current && scrollRef.current) {
-        const container = scrollRef.current
-        const selected = selectedRef.current
+      const container = scrollRef.current
+      if (!container) return
 
-        // 選択要素をコンテナの中央に配置
+      // 完全一致があればそこへ、なければ最も近い行へスクロール
+      const target = selectedRef.current ?? nearestRowRef.current
+      if (target) {
         const containerHeight = container.clientHeight
-        const selectedTop = selected.offsetTop
-        const selectedHeight = selected.clientHeight
+        const targetTop = target.offsetTop
+        const targetHeight = target.clientHeight
 
-        container.scrollTop =
-          selectedTop - containerHeight / 2 + selectedHeight / 2
+        container.scrollTop = targetTop - containerHeight / 2 + targetHeight / 2
       }
     })
     return () => cancelAnimationFrame(rafId)
@@ -78,7 +90,11 @@ export function TimeGridPicker({
       {/* スクロール可能なグリッド */}
       <div ref={scrollRef} className="max-h-50 space-y-1 overflow-y-auto pr-1">
         {grid.map((row, rowIndex) => (
-          <div key={rowIndex} className="flex gap-1">
+          <div
+            key={rowIndex}
+            ref={rowIndex === nearestRowIndex ? nearestRowRef : undefined}
+            className="flex gap-1"
+          >
             {row.map((time) => {
               const isSelected = time === value
               const category = getTimeCategory(time)
