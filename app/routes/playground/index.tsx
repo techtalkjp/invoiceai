@@ -182,12 +182,16 @@ export async function clientLoader({
   serverLoader,
 }: Route.ClientLoaderArgs) {
   const storedData = loadFromStorage()
-  const serverData = await serverLoader()
 
   const url = new URL(request.url)
   const { year, month } = resolveYearMonth(url.searchParams)
 
-  const githubResult = serverData?.githubResult ?? null
+  // OAuth コールバックからのリダイレクト時のみ serverLoader を呼ぶ
+  // （flash cookie にトークンがある場合のみサーバーリクエストが必要）
+  const fromOAuth = url.searchParams.get('fromOAuth') === '1'
+  const githubResult = fromOAuth
+    ? ((await serverLoader())?.githubResult ?? null)
+    : null
 
   const monthKey = `${year}-${String(month).padStart(2, '0')}`
   const { useActivityStore } =

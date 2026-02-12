@@ -81,7 +81,7 @@ async function handlePlaygroundCallback(
   })
   const clearOAuthCookie = await clearOAuthStateCookie()
 
-  return redirect(`/playground?year=${year}&month=${month}`, {
+  return redirect(`/playground?year=${year}&month=${month}&fromOAuth=1`, {
     headers: [
       ['Set-Cookie', tokenCookie],
       ['Set-Cookie', clearOAuthCookie],
