@@ -12,9 +12,19 @@ function getDateRange(monthArg?: string): {
   endDate: string
 } {
   if (monthArg) {
+    if (!/^\d{4}-\d{1,2}$/.test(monthArg)) {
+      throw new Error(
+        `無効な月指定です: ${monthArg} (YYYY-MM 形式で指定してください)`,
+      )
+    }
     const [yearStr, monthStr] = monthArg.split('-')
     const year = Number(yearStr)
     const month = Number(monthStr)
+    if (month < 1 || month > 12) {
+      throw new Error(
+        `無効な月指定です: ${monthArg} (月は1〜12で指定してください)`,
+      )
+    }
     const lastDay = new Date(year, month, 0).getDate()
     return {
       startDate: `${year}-${String(month).padStart(2, '0')}-01`,
@@ -90,9 +100,23 @@ function main() {
         const monthArg =
           options.month ??
           `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+        if (!/^\d{4}-\d{1,2}$/.test(monthArg)) {
+          console.error(
+            `無効な月指定です: ${monthArg} (YYYY-MM 形式で指定してください)`,
+          )
+          process.exitCode = 1
+          return
+        }
         const [yearStr, monthStr] = monthArg.split('-')
         const year = Number(yearStr)
         const month = Number(monthStr)
+        if (month < 1 || month > 12) {
+          console.error(
+            `無効な月指定です: ${monthArg} (月は1〜12で指定してください)`,
+          )
+          process.exitCode = 1
+          return
+        }
 
         const activities = await getActivitiesByMonth(
           options.org,

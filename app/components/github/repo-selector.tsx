@@ -27,8 +27,6 @@ interface RepoSelectorProps {
   isLoadingRepos: boolean
   ghOrgs: Array<{ login: string }>
   repos: Array<{ fullName: string }>
-  /** フォールバック用 Input の name 属性 */
-  fallbackInputName?: string | undefined
 }
 
 /**
@@ -44,7 +42,6 @@ export function RepoSelector({
   isLoadingRepos,
   ghOrgs,
   repos,
-  fallbackInputName,
 }: RepoSelectorProps) {
   return (
     <div className="flex items-end gap-2">
@@ -108,8 +105,12 @@ export function RepoSelector({
           </Combobox>
         ) : (
           <Input
-            name={fallbackInputName ?? 'repoFullName'}
             placeholder="owner/repo"
+            value={repoValue}
+            onChange={(e) => {
+              onRepoValueChange(e.target.value)
+              onRepoQueryChange(e.target.value)
+            }}
           />
         )}
       </div>

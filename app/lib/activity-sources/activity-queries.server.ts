@@ -148,7 +148,7 @@ export async function saveActivitySource(
     .onConflict((oc) =>
       oc
         .columns(['organizationId', 'userId', 'sourceType'])
-        .doUpdateSet({ credentials, config, updatedAt: now }),
+        .doUpdateSet({ credentials, config, isActive: 1, updatedAt: now }),
     )
     .execute()
 }

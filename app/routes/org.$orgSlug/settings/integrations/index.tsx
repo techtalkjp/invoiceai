@@ -456,7 +456,6 @@ function AddMappingForm({
           isLoadingRepos={isLoadingRepos}
           ghOrgs={ghOrgs}
           repos={repos}
-          fallbackInputName={fields.repoFullName.name}
         />
         <Button type="submit" size="sm">
           <PlusIcon className="mr-1 h-4 w-4" />

@@ -58,7 +58,7 @@ export async function loader({ request }: Route.LoaderArgs) {
     const fallback =
       returnTo === 'playground'
         ? '/playground'
-        : returnTo === 'integrations' && metadata.orgSlug
+        : returnTo === 'integrations' && 'orgSlug' in metadata
           ? `/org/${metadata.orgSlug}/settings/integrations`
           : '/'
     return redirect(fallback, { headers: { 'Set-Cookie': clearCookie } })
