@@ -60,20 +60,19 @@ function buildMechanicalDescription(activities: Activity[]): string {
   const comments = activities.filter((a) => a.eventType === 'issue_comment')
 
   if (commits.length > 0) {
-    let totalCount = 0
     const repos = new Set<string>()
+    const messages: string[] = []
     for (const c of commits) {
-      if (c.metadata) {
-        try {
-          const meta = JSON.parse(c.metadata) as { count?: number }
-          totalCount += meta.count ?? 0
-        } catch {
-          totalCount += 1
-        }
-      }
       if (c.repo) repos.add(c.repo.split('/')[1] ?? c.repo)
+      if (c.title) messages.push(c.title)
     }
-    parts.push(`${totalCount}commits(${[...repos].join(',')})`)
+    const repoStr = [...repos].join(',')
+    // コミットメッセージを最大5件まで含める（LLMが具体的な概要を書けるように）
+    const msgStr =
+      messages.length > 0
+        ? `: ${messages.slice(0, 5).join(', ')}${messages.length > 5 ? ` 他${messages.length - 5}件` : ''}`
+        : ''
+    parts.push(`${commits.length}commits(${repoStr})${msgStr}`)
   }
 
   if (prs.length > 0) {
@@ -144,28 +143,31 @@ async function buildDescription(
 
   try {
     const { text, usage } = await generateText({
-      model: google('gemini-2.0-flash-lite'),
+      model: google('gemini-flash-lite-latest'),
       system: `あなたはGitHubのアクティビティログを、クライアント向けの勤怠表（タイムシート）に記載する作業概要に変換するアシスタントです。
 
 ルール:
-- 出力は日本語1行のみ（50文字以内）。説明や補足は一切不要
-- リポジトリ名やコミット数などの技術的な詳細は省略する
-- PRタイトルから「何の作業をしたか」を読み取り、業務内容として表現する
-- 複数の作業がある場合は読点で繋げる
-- クライアントが読んで作業内容がわかる表現にする
+- 出力は日本語1行のみ（30文字以内厳守）。説明や補足は一切不要
+- 1日の作業を「何のためにやったか」の観点で最大2項目に要約する
+- 技術的な手段（memo化、モジュール分離、リファクタリング等）ではなく、その目的・効果をクライアントに伝わる言葉で表現する
+- リポジトリ名・コミット数・ハッシュなどのGit固有の情報は省略する
+- feat:/fix:/refactor:などのプレフィックスは除去して自然な日本語にする
 
 例:
-入力: 5commits(api-server), PR: Add user API (merged), レビュー1件
-出力: ユーザーAPI機能の追加、コードレビュー
+入力: 5commits(api-server): Add user endpoint, Add validation, Fix error handling / PR: Add user API (merged) / レビュー1件
+出力: ユーザーAPI追加、コードレビュー
 
-入力: 3commits(invoiceai), PR: feat: migrate from Prisma to Atlas + kysely-codegen (merged)
-出力: DB基盤のAtlas移行対応
+入力: 3commits(invoiceai): migrate schema, update codegen config, fix types / PR: feat: migrate from Prisma to Atlas + kysely-codegen (merged)
+出力: DB基盤の移行による保守性向上
 
-入力: 17commits(invoiceai), PR: fix: iOS input zoom prevention (merged), PR: refactor: timesheet module extraction (merged)
-出力: iOS入力ズーム修正、タイムシートのモジュール化
+入力: 17commits(invoiceai): prevent zoom on iOS, extract timesheet module, fix mobile scroll, update store / PR: fix: iOS input zoom prevention, PR: refactor: timesheet module extraction
+出力: モバイル操作性の改善、タイムシート保守性向上
 
-入力: 8commits(docs,backend)
-出力: ドキュメント整備、バックエンド開発`,
+入力: 8commits(invoiceai): add page header, unify layout, add sidebar, simplify root.tsx, add useEffect policy, fix props
+出力: 画面レイアウトの統一、ナビゲーション改善
+
+入力: 6commits(invoiceai): memo cell component, fix filter rerender, perf: batch updates, extract shared timesheet component
+出力: タイムシート表示の高速化`,
       prompt: fallback,
     })
     return {
