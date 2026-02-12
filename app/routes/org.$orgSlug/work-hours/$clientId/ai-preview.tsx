@@ -497,7 +497,7 @@ function SuggestionPreview({
         const startMin = timeToMinutes(entry.startTime)
         const endMin = timeToMinutes(entry.endTime)
         const workMinutes = endMin - startMin - entry.breakMinutes
-        const newWorkMinutes = Math.round(workMinutes * ratio)
+        const newWorkMinutes = Math.max(0, Math.round(workMinutes * ratio))
         const newEndMin = startMin + newWorkMinutes + entry.breakMinutes
         const newEndTime = minutesToTime(newEndMin)
         const newHours = calculateHours(

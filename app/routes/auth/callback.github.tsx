@@ -20,13 +20,15 @@ export async function loader({ request }: Route.LoaderArgs) {
 
   // GitHub がエラーを返した場合
   if (error || !code || !state) {
-    return redirect('/')
+    const clearCookie = await clearOAuthStateCookie()
+    return redirect('/', { headers: { 'Set-Cookie': clearCookie } })
   }
 
   // Cookie から state + code_verifier を取得
   const oauthState = await parseOAuthStateCookie(request)
   if (!oauthState || oauthState.state !== state) {
-    return redirect('/')
+    const clearCookie = await clearOAuthStateCookie()
+    return redirect('/', { headers: { 'Set-Cookie': clearCookie } })
   }
 
   const { codeVerifier, returnTo, metadata } = oauthState

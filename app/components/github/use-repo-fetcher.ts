@@ -49,6 +49,12 @@ export function useRepoFetcher(orgSlug: string, fetcherKey: string) {
     [reposBasePath, selectedOrg],
   )
 
+  // アンマウント時にデバウンスタイマーをクリア
+  // sync with external resource: pending debounce timer cleanup
+  useEffect(() => {
+    return () => clearTimeout(debounceRef.current)
+  }, [])
+
   return {
     selectedOrg,
     repoValue,

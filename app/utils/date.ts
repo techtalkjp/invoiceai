@@ -1,4 +1,4 @@
-import dayjs from 'dayjs'
+import { dayjs } from '~/utils/dayjs'
 
 /**
  * 日付を日本語フォーマットで表示

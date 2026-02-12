@@ -13,6 +13,7 @@ import {
   PopoverTrigger,
 } from '~/components/ui/popover'
 import type { ActivityRecord } from '~/lib/activity-sources/types'
+import { dayjs } from '~/utils/dayjs'
 import { useActivityStore } from '../activity-store'
 
 const EVENT_ICONS: Record<
@@ -62,9 +63,9 @@ function repoShortName(repo: string | null): string {
 }
 
 function formatTime(timestamp: string): string {
-  const d = new Date(timestamp)
-  const hours = d.getHours()
-  const minutes = d.getMinutes()
+  const jst = dayjs(timestamp).tz('Asia/Tokyo')
+  const hours = jst.hour()
+  const minutes = jst.minute()
   // 30時制: 0:00-5:59 は 24:00-29:59 として表示
   const displayHours = hours < 6 ? hours + 24 : hours
   return `${String(displayHours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`
