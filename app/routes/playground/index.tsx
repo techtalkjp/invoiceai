@@ -326,7 +326,7 @@ export function HydrateFallback() {
                   <div
                     key={date}
                     className={cn(
-                      'grid h-[41px] items-center border-b',
+                      'grid items-center border-b last:border-b-0',
                       GRID_COLS,
                       isOffDay && 'bg-muted/30',
                       !isOffDay && 'odd:bg-muted/10',
@@ -350,19 +350,19 @@ export function HydrateFallback() {
                       </div>
                     </div>
                     <div className="px-0.5 py-1">
-                      <Skeleton className="mx-auto h-5 w-10" />
+                      <Skeleton className="mx-auto h-7 w-10" />
                     </div>
                     <div className="px-0.5 py-1">
-                      <Skeleton className="mx-auto h-5 w-10" />
+                      <Skeleton className="mx-auto h-7 w-10" />
                     </div>
                     <div className="px-0.5 py-1">
-                      <Skeleton className="mx-auto h-5 w-8" />
+                      <Skeleton className="mx-auto h-7 w-8" />
                     </div>
                     <div className="px-0.5 py-1">
-                      <Skeleton className="mx-auto h-5 w-10" />
+                      <Skeleton className="mx-auto h-7 w-10" />
                     </div>
                     <div className="px-0.5 py-1">
-                      <Skeleton className="h-5 w-24" />
+                      <Skeleton className="h-7 w-24" />
                     </div>
                   </div>
                 )
