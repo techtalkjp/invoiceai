@@ -34,7 +34,7 @@ export const TimesheetDescriptionCell = memo(function TimesheetDescriptionCell({
         {/* 高さを確保するための非表示のプレースホルダー（常にline-clamp-3で3行分の高さ） */}
         <div
           aria-hidden="true"
-          className="pointer-events-none invisible min-h-7 w-full min-w-32 px-2 py-1 text-base whitespace-pre-wrap"
+          className="pointer-events-none invisible min-h-7 w-full min-w-32 px-2 py-1 text-base whitespace-pre-wrap md:text-sm"
         >
           <span className="line-clamp-3">{value || '-'}</span>
         </div>
@@ -83,7 +83,7 @@ export const TimesheetDescriptionCell = memo(function TimesheetDescriptionCell({
               rows={1}
               placeholder="概要を入力"
               className={cn(
-                'absolute inset-0 field-sizing-content min-h-7 w-full min-w-32 resize-none rounded-md border px-2 py-1 text-base',
+                'absolute inset-0 field-sizing-content min-h-7 w-full min-w-32 resize-none rounded-md border px-2 py-1 text-base md:text-sm',
                 'border-primary bg-background outline-none',
               )}
             />
@@ -103,7 +103,7 @@ export const TimesheetDescriptionCell = memo(function TimesheetDescriptionCell({
               }
             }}
             className={cn(
-              'absolute inset-0 min-h-7 w-full min-w-32 cursor-text rounded-md border px-2 py-1 text-left text-base',
+              'absolute inset-0 min-h-7 w-full min-w-32 cursor-text rounded-md border px-2 py-1 text-left text-base md:text-sm',
               'bg-muted/70 border-transparent md:bg-transparent',
               'hover:border-border hover:bg-accent/50',
               'focus:border-primary focus:bg-background focus:outline-none',
