@@ -7,7 +7,7 @@ import { PageHeader } from '~/components/layout/page-header'
 import { PublicLayout } from '~/components/layout/public-layout'
 import type { MonthData } from '~/components/timesheet'
 import { getMonthDates } from '~/components/timesheet'
-import { monthDataSchema } from '~/components/timesheet/schema'
+import { timesheetEntrySchema } from '~/components/timesheet/schema'
 import { GRID_COLS } from '~/components/timesheet/table'
 import {
   DAY_LABELS,
@@ -37,6 +37,7 @@ import type { Route } from './+types/index'
 const STORAGE_KEY = 'invoiceai-playground-timesheet'
 
 // LocalStorage から全月データを読み込み
+// エントリ単位で safeParse し、1エントリの不正で月全体が消えるのを防ぐ
 function loadFromStorage(): Record<string, MonthData> {
   if (typeof window === 'undefined') return {}
   try {
@@ -44,10 +45,20 @@ function loadFromStorage(): Record<string, MonthData> {
     if (!stored) return {}
     const parsed = JSON.parse(stored)
     const validated: Record<string, MonthData> = {}
-    for (const [key, value] of Object.entries(parsed)) {
-      const result = monthDataSchema.safeParse(value)
-      if (result.success) {
-        validated[key] = result.data
+    for (const [monthKey, monthValue] of Object.entries(parsed)) {
+      if (typeof monthValue !== 'object' || monthValue === null) continue
+      const monthData: MonthData = {}
+      for (const [date, entry] of Object.entries(
+        monthValue as Record<string, unknown>,
+      )) {
+        const result = timesheetEntrySchema.safeParse(entry)
+        if (result.success) {
+          monthData[date] = result.data
+        }
+        // 不正なエントリはスキップ（他のエントリは保持）
+      }
+      if (Object.keys(monthData).length > 0) {
+        validated[monthKey] = monthData
       }
     }
     return validated
@@ -217,6 +228,10 @@ export async function clientLoader({
     if ('error' in serverData && typeof serverData.error === 'string') {
       toast.error(serverData.error)
     }
+    // fromOAuth パラメータを URL から除去（リロード時の不要な serverLoader 呼び出しを防止）
+    const cleanUrl = new URL(window.location.href)
+    cleanUrl.searchParams.delete('fromOAuth')
+    window.history.replaceState(null, '', cleanUrl.toString())
   }
 
   const monthKey = `${year}-${String(month).padStart(2, '0')}`
@@ -241,6 +256,12 @@ export async function clientLoader({
         }
       }
       storedData[monthKey] = merged
+      // マージ結果を即座に localStorage に保存（リロードでデータが消えるのを防止）
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(storedData))
+      } catch {
+        // Storage full or disabled
+      }
       toast.success(
         `@${githubResult.username}: ${githubResult.activityCount}件のアクティビティから${githubResult.entries.length}日分を反映しました`,
       )
