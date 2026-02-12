@@ -149,9 +149,6 @@ interface GqlActivitiesResponse {
     contributionsCollection: {
       commitContributionsByRepository: Array<{
         repository: { nameWithOwner: string }
-        contributions: {
-          nodes: Array<{ commitCount: number; occurredAt: string }>
-        }
       }>
       pullRequestReviewContributions: {
         nodes: Array<{
@@ -190,15 +187,29 @@ interface GqlActivitiesResponse {
   }
 }
 
+interface GqlCommitHistoryResponse {
+  repository: {
+    defaultBranchRef: {
+      target: {
+        history: {
+          nodes: Array<{
+            oid: string
+            message: string
+            authoredDate: string
+            url: string
+          }>
+        }
+      }
+    } | null
+  } | null
+}
+
 const ACTIVITIES_QUERY = `
   query($login: String!, $from: DateTime!, $to: DateTime!) {
     user(login: $login) {
       contributionsCollection(from: $from, to: $to) {
         commitContributionsByRepository(maxRepositories: 50) {
           repository { nameWithOwner }
-          contributions(first: 100) {
-            nodes { commitCount occurredAt }
-          }
         }
         pullRequestReviewContributions(first: 50) {
           nodes {
@@ -230,6 +241,35 @@ const ACTIVITIES_QUERY = `
   }
 `
 
+const COMMIT_HISTORY_QUERY = `
+  query($owner: String!, $name: String!, $authorId: ID!, $since: GitTimestamp!, $until: GitTimestamp!) {
+    repository(owner: $owner, name: $name) {
+      defaultBranchRef {
+        target {
+          ... on Commit {
+            history(first: 100, author: {id: $authorId}, since: $since, until: $until) {
+              nodes {
+                oid
+                message
+                authoredDate
+                url
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+`
+
+const USER_ID_QUERY = `
+  query($login: String!) {
+    user(login: $login) {
+      id
+    }
+  }
+`
+
 /**
  * 指定期間のGitHubアクティビティをGraphQL APIで取得
  */
@@ -254,23 +294,50 @@ export async function fetchGitHubActivities(
 
   const records: ActivityRecord[] = []
 
-  // コミット（リポジトリ別・日別）
-  for (const repoContrib of data.user.contributionsCollection
-    .commitContributionsByRepository) {
-    const repo = repoContrib.repository.nameWithOwner
-    for (const node of repoContrib.contributions.nodes) {
-      const eventDate = isoToJstDate(node.occurredAt)
-      if (eventDate < startDate || eventDate > endDate) continue
-      records.push({
-        sourceType: 'github',
-        eventType: 'commit',
-        eventDate,
-        eventTimestamp: node.occurredAt,
-        repo,
-        title: `${node.commitCount} commits`,
-        url: `https://github.com/${repo}`,
-        metadata: JSON.stringify({ count: node.commitCount }),
-      })
+  // コミット（リポジトリ別に個別コミット履歴を取得）
+  const contributedRepos =
+    data.user.contributionsCollection.commitContributionsByRepository
+  if (contributedRepos.length > 0) {
+    // ユーザーIDを取得（コミット履歴のauthorフィルタに必要）
+    const userData = await githubGraphQL<{ user: { id: string } }>(
+      pat,
+      USER_ID_QUERY,
+      { login: username },
+    )
+    const authorId = userData.user.id
+
+    // 各リポジトリのコミット履歴を並列取得
+    const commitResults = await Promise.all(
+      contributedRepos.map(async (repoContrib) => {
+        const repo = repoContrib.repository.nameWithOwner
+        const [owner, name] = repo.split('/')
+        const result = await githubGraphQL<GqlCommitHistoryResponse>(
+          pat,
+          COMMIT_HISTORY_QUERY,
+          { owner, name, authorId, since: from, until: to },
+        )
+        return { repo, result }
+      }),
+    )
+
+    for (const { repo, result } of commitResults) {
+      const nodes = result.repository?.defaultBranchRef?.target?.history?.nodes
+      if (!nodes) continue
+      for (const commit of nodes) {
+        const eventDate = isoToJstDate(commit.authoredDate)
+        if (eventDate < startDate || eventDate > endDate) continue
+        const firstLine = commit.message.split('\n')[0] ?? ''
+        records.push({
+          sourceType: 'github',
+          eventType: 'commit',
+          eventDate,
+          eventTimestamp: commit.authoredDate,
+          repo,
+          title: firstLine,
+          url: commit.url,
+          metadata: JSON.stringify({ oid: commit.oid.slice(0, 7) }),
+        })
+      }
     }
   }
 

@@ -1,5 +1,4 @@
 import { google } from '@ai-sdk/google'
-import holidayJp from '@holiday-jp/holiday_jp'
 import { generateText } from 'ai'
 
 interface Activity {
@@ -46,17 +45,6 @@ function minutesToHHMM(minutes: number): string {
   const h = Math.floor(minutes / 60)
   const m = minutes % 60
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
-}
-
-/**
- * 日付が祝日・土日かどうかを判定
- */
-function isNonWorkingDay(dateStr: string): boolean {
-  const date = new Date(dateStr)
-  const dow = date.getDay()
-  if (dow === 0 || dow === 6) return true
-  const holidays = holidayJp.between(date, date)
-  return holidays.length > 0
 }
 
 /**
@@ -222,9 +210,6 @@ export async function suggestWorkEntriesFromActivities(
   const entryPromises: Promise<EntryWithTokens | null>[] = []
 
   for (const [date, acts] of [...byDate.entries()].sort()) {
-    // 土日祝はスキップ
-    if (isNonWorkingDay(date)) continue
-
     entryPromises.push(
       (async () => {
         // タイムスタンプを持つアクティビティのみで時間推定
