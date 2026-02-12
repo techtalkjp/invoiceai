@@ -4,9 +4,6 @@
   "description": "AI-powered invoice management for freelancers and small teams",
   "main": "index.js",
   "type": "module",
-  "bin": {
-    "invoiceai": "./src/cli-entry.ts"
-  },
   "scripts": {
     "dev": "react-router dev",
     "build": "react-router build",

@@ -28,6 +28,7 @@ export async function insertActivities(
       eventTimestamp: record.eventTimestamp,
       repo: record.repo ?? '',
       title: record.title,
+      url: record.url ?? null,
       metadata: record.metadata,
     }))
 
@@ -75,6 +76,7 @@ export function getActivities(
       'eventTimestamp',
       'repo',
       'title',
+      'url',
       'metadata',
     ])
     .where('organizationId', '=', organizationId)

@@ -100,69 +100,77 @@ export async function loader({ request }: Route.LoaderArgs) {
   const lastDay = new Date(year, month, 0).getDate()
   const endDate = `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`
 
-  const activities = await fetchGitHubActivities(
-    accessToken,
-    username,
-    startDate,
-    endDate,
-  )
+  try {
+    const activities = await fetchGitHubActivities(
+      accessToken,
+      username,
+      startDate,
+      endDate,
+    )
 
-  const currentMonth = `${year}-${String(month).padStart(2, '0')}`
-  let suggestion: Awaited<ReturnType<typeof suggestWorkEntriesFromActivities>>
+    const currentMonth = `${year}-${String(month).padStart(2, '0')}`
+    let suggestion: Awaited<ReturnType<typeof suggestWorkEntriesFromActivities>>
 
-  const usage = await checkAiUsage(username, currentMonth)
+    const usage = await checkAiUsage(username, currentMonth)
 
-  if (activities.length === 0) {
-    suggestion = {
-      entries: [],
-      reasoning: 'この月のGitHubアクティビティが見つかりませんでした',
-      totalInputTokens: 0,
-      totalOutputTokens: 0,
-      aiDaysUsed: 0,
+    if (activities.length === 0) {
+      suggestion = {
+        entries: [],
+        reasoning: 'この月のGitHubアクティビティが見つかりませんでした',
+        totalInputTokens: 0,
+        totalOutputTokens: 0,
+        aiDaysUsed: 0,
+      }
+    } else {
+      suggestion = await suggestWorkEntriesFromActivities(activities, {
+        aiDaysLimit: usage.remainingDays,
+      })
+      if (suggestion.aiDaysUsed > 0) {
+        await recordAiUsage(
+          username,
+          currentMonth,
+          suggestion.aiDaysUsed,
+          suggestion.totalInputTokens,
+          suggestion.totalOutputTokens,
+        )
+      }
     }
-  } else {
-    suggestion = await suggestWorkEntriesFromActivities(activities, {
-      aiDaysLimit: usage.remainingDays,
-    })
-    if (suggestion.aiDaysUsed > 0) {
-      await recordAiUsage(
-        username,
-        currentMonth,
-        suggestion.aiDaysUsed,
-        suggestion.totalInputTokens,
-        suggestion.totalOutputTokens,
-      )
+
+    const aiUsageAfter = {
+      used: usage.used + suggestion.aiDaysUsed,
+      limit: usage.limit,
+      remaining: Math.max(0, usage.remainingDays - suggestion.aiDaysUsed),
     }
-  }
 
-  const aiUsageAfter = {
-    used: usage.used + suggestion.aiDaysUsed,
-    limit: usage.limit,
-    remaining: Math.max(0, usage.remainingDays - suggestion.aiDaysUsed),
+    return data(
+      {
+        githubResult: {
+          entries: suggestion.entries,
+          activities: activities.map((a) => ({
+            sourceType: 'github' as const,
+            eventType: a.eventType,
+            eventDate: a.eventDate,
+            eventTimestamp: a.eventTimestamp,
+            repo: a.repo,
+            title: a.title,
+            url: a.url,
+            metadata: a.metadata,
+          })),
+          reasoning: suggestion.reasoning,
+          username,
+          activityCount: activities.length,
+          aiUsage: aiUsageAfter,
+        } satisfies GitHubResult,
+      },
+      { headers: { 'Set-Cookie': setCookie } },
+    )
+  } catch {
+    // GitHub API/AI生成/DB エラー → graceful fallback
+    return data(
+      { githubResult: null as GitHubResult | null },
+      { headers: { 'Set-Cookie': setCookie } },
+    )
   }
-
-  return data(
-    {
-      githubResult: {
-        entries: suggestion.entries,
-        activities: activities.map((a) => ({
-          sourceType: 'github' as const,
-          eventType: a.eventType,
-          eventDate: a.eventDate,
-          eventTimestamp: a.eventTimestamp,
-          repo: a.repo,
-          title: a.title,
-          url: a.url,
-          metadata: a.metadata,
-        })),
-        reasoning: suggestion.reasoning,
-        username,
-        activityCount: activities.length,
-        aiUsage: aiUsageAfter,
-      } satisfies GitHubResult,
-    },
-    { headers: { 'Set-Cookie': setCookie } },
-  )
 }
 
 // action: GitHub OAuth フロー開始

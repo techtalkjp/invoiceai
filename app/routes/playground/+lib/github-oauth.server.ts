@@ -23,6 +23,7 @@ const tokenSessionStorage = createCookieSessionStorage<
     path: '/',
     maxAge: 60, // 1分 (flash なのですぐ消える)
     secure: process.env.NODE_ENV === 'production',
+    secrets: [process.env.BETTER_AUTH_SECRET ?? 'dev-playground-secret'],
   },
 })
 
@@ -49,7 +50,14 @@ export async function getTokenFlash(
     request.headers.get('Cookie'),
   )
   const raw = session.get('tokenData')
-  const tokenData = raw ? (JSON.parse(raw) as TokenFlash) : null
+  let tokenData: TokenFlash | null = null
+  if (raw) {
+    try {
+      tokenData = JSON.parse(raw) as TokenFlash
+    } catch {
+      // malformed JSON → treat as no token
+    }
+  }
   const setCookie = await tokenSessionStorage.commitSession(session)
   return { tokenData, setCookie }
 }

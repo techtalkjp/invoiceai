@@ -145,6 +145,7 @@ async function buildDescription(
 
   try {
     const { text, usage } = await generateText({
+      abortSignal: AbortSignal.timeout(30_000),
       model: google('gemini-flash-lite-latest'),
       system: `あなたはGitHubのアクティビティログを、クライアント向けの勤怠表（タイムシート）に記載する作業概要に変換するアシスタントです。
 

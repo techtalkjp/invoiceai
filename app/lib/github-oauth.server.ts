@@ -54,6 +54,7 @@ const oauthStateCookie = createCookie('github_oauth', {
   path: '/',
   maxAge: 300, // 5分
   secure: process.env.NODE_ENV === 'production',
+  secrets: [process.env.BETTER_AUTH_SECRET ?? 'dev-oauth-secret'],
 })
 
 export async function createOAuthStateCookie(

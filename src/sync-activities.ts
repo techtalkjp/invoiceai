@@ -42,6 +42,11 @@ function main() {
         const { startDate, endDate } = getDateRange(options.month)
         console.log(`同期期間: ${startDate} ～ ${endDate}`)
 
+        if ((options.org && !options.user) || (!options.org && options.user)) {
+          console.error('--org と --user は両方指定してください')
+          process.exit(1)
+        }
+
         if (options.org && options.user) {
           const result = await syncUserGitHubActivities(
             options.org,

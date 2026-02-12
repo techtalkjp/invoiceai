@@ -106,6 +106,7 @@ export async function startMcpServer() {
         .select(['id', 'name', 'billingType', 'hourlyRate', 'isActive'])
         .where('organizationId', '=', organizationId)
         .where('isActive', '=', 1)
+        .where('billingType', '=', 'time')
         .orderBy('name', 'asc')
         .execute()
 

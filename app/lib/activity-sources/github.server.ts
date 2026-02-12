@@ -222,13 +222,13 @@ const ACTIVITIES_QUERY = `
           }
         }
       }
-      pullRequests(first: 50, orderBy: {field: CREATED_AT, direction: DESC}) {
+      pullRequests(first: 100, orderBy: {field: CREATED_AT, direction: DESC}) {
         nodes {
           title url state merged createdAt mergedAt closedAt
           repository { nameWithOwner }
         }
       }
-      issueComments(first: 50, orderBy: {field: UPDATED_AT, direction: DESC}) {
+      issueComments(first: 100, orderBy: {field: UPDATED_AT, direction: DESC}) {
         nodes {
           url createdAt
           issue {

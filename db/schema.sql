@@ -279,6 +279,7 @@ CREATE TABLE IF NOT EXISTS "activity" (
   "event_timestamp" TEXT NOT NULL,
   "repo" TEXT,
   "title" TEXT,
+  "url" TEXT,
   "metadata" TEXT,
   "created_at" TEXT NOT NULL DEFAULT (datetime('now'))
 );

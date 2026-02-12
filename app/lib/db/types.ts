@@ -36,6 +36,7 @@ export interface Activity {
   repo: string | null;
   sourceType: string;
   title: string | null;
+  url: string | null;
   userId: string;
 }
 
