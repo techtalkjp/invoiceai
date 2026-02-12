@@ -2,7 +2,7 @@ import { nanoid } from 'nanoid'
 import { db } from '~/lib/db/kysely'
 
 /** 月あたりAI生成できる日数の上限 */
-const MONTHLY_DAYS_LIMIT = 5
+const MONTHLY_DAYS_LIMIT = 30
 
 export async function checkAiUsage(githubUsername: string, yearMonth: string) {
   // recordAiUsage と同一トランザクションではないため、
