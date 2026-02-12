@@ -1,7 +1,8 @@
 import { nanoid } from 'nanoid'
 import { db } from '~/lib/db/kysely'
 
-const MONTHLY_LIMIT = 5
+/** 月あたりAI生成できる日数の上限 */
+const MONTHLY_DAYS_LIMIT = 25
 
 export async function checkAiUsage(githubUsername: string, yearMonth: string) {
   const row = await db
@@ -11,16 +12,24 @@ export async function checkAiUsage(githubUsername: string, yearMonth: string) {
     .where('yearMonth', '=', yearMonth)
     .executeTakeFirst()
 
+  const usedDays = row?.requestCount ?? 0
+  const remainingDays = Math.max(0, MONTHLY_DAYS_LIMIT - usedDays)
+
   return {
-    used: row?.requestCount ?? 0,
-    limit: MONTHLY_LIMIT,
-    allowed: (row?.requestCount ?? 0) < MONTHLY_LIMIT,
+    used: usedDays,
+    limit: MONTHLY_DAYS_LIMIT,
+    remainingDays,
   }
 }
 
+/**
+ * AI生成した日数分を記録する
+ * @param aiDaysUsed 今回AIで生成した日数
+ */
 export async function recordAiUsage(
   githubUsername: string,
   yearMonth: string,
+  aiDaysUsed: number,
   inputTokens: number,
   outputTokens: number,
 ) {
@@ -30,13 +39,13 @@ export async function recordAiUsage(
       id: nanoid(),
       githubUsername,
       yearMonth,
-      requestCount: 1,
+      requestCount: aiDaysUsed,
       totalInputTokens: inputTokens,
       totalOutputTokens: outputTokens,
     })
     .onConflict((oc) =>
       oc.columns(['githubUsername', 'yearMonth']).doUpdateSet((eb) => ({
-        requestCount: eb('requestCount', '+', 1),
+        requestCount: eb('requestCount', '+', aiDaysUsed),
         totalInputTokens: eb('totalInputTokens', '+', inputTokens),
         totalOutputTokens: eb('totalOutputTokens', '+', outputTokens),
         updatedAt: new Date().toISOString(),

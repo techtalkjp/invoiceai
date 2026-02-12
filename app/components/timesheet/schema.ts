@@ -22,6 +22,7 @@ export const timesheetEntrySchema = z
     endTime: optionalTimeSchema,
     breakMinutes: z.number().int().min(0).max(480), // 最大8時間
     description: z.string().max(500),
+    aiGenerated: z.boolean().optional().default(false),
   })
   .refine(
     (data) => {

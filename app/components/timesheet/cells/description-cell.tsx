@@ -1,3 +1,4 @@
+import { SparklesIcon } from 'lucide-react'
 import { memo, useState } from 'react'
 import { cn } from '~/lib/utils'
 import { useEntryField, useTimesheetStore } from '../store'
@@ -15,6 +16,7 @@ export const TimesheetDescriptionCell = memo(function TimesheetDescriptionCell({
 }: TimesheetDescriptionCellProps) {
   // 自分のフィールドのみ subscribe
   const value = useEntryField(date, 'description') ?? ''
+  const aiGenerated = useEntryField(date, 'aiGenerated') ?? false
   const [isFocused, setIsFocused] = useState(false)
 
   const handleChange = (v: string) => {
@@ -113,9 +115,12 @@ export const TimesheetDescriptionCell = memo(function TimesheetDescriptionCell({
             </span>
           </button>
         )}
-        {/* アクティビティバッジ（非フォーカス時のみ表示） */}
+        {/* バッジ（非フォーカス時のみ表示） */}
         {!isFocused && (
-          <div className="absolute right-1 bottom-0.5">
+          <div className="absolute right-1 bottom-0.5 flex items-center gap-0.5">
+            {aiGenerated && (
+              <SparklesIcon className="text-muted-foreground/50 size-3" />
+            )}
             <ActivityIndicator date={date} />
           </div>
         )}

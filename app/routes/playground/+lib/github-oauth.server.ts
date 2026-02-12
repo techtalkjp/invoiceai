@@ -65,6 +65,7 @@ export interface GitHubResult {
     endTime: string
     breakMinutes: number
     description: string
+    aiGenerated: boolean
   }>
   activities: ActivityRecord[]
   reasoning: string

@@ -213,6 +213,7 @@ type PreviewEntry = {
   endTime: string
   breakMinutes: number
   description: string
+  aiGenerated: boolean
   selected: boolean
   hasConflict: boolean
   hours: number
@@ -398,6 +399,7 @@ function SuggestionPreview({
       endTime: string
       breakMinutes: number
       description: string
+      aiGenerated: boolean
     }>
     reasoning: string
   }
@@ -684,6 +686,9 @@ function SuggestionPreview({
                       {entry.hours.toFixed(1)}h
                     </TableCell>
                     <TableCell className="max-w-64 truncate text-xs">
+                      {entry.aiGenerated && (
+                        <SparklesIcon className="text-muted-foreground/60 mr-1 inline size-3" />
+                      )}
                       {entry.description}
                     </TableCell>
                     <TableCell>

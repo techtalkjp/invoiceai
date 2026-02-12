@@ -116,16 +116,18 @@ export async function loader({ request }: Route.LoaderArgs) {
       reasoning: 'この月のGitHubアクティビティが見つかりませんでした',
       totalInputTokens: 0,
       totalOutputTokens: 0,
+      aiDaysUsed: 0,
     }
   } else {
     const usage = await checkAiUsage(username, currentMonth)
     suggestion = await suggestWorkEntriesFromActivities(activities, {
-      useAi: usage.allowed,
+      aiDaysLimit: usage.remainingDays,
     })
-    if (usage.allowed && suggestion.totalInputTokens > 0) {
+    if (suggestion.aiDaysUsed > 0) {
       await recordAiUsage(
         username,
         currentMonth,
+        suggestion.aiDaysUsed,
         suggestion.totalInputTokens,
         suggestion.totalOutputTokens,
       )
@@ -211,6 +213,7 @@ export async function clientLoader({
           endTime: entry.endTime,
           breakMinutes: entry.breakMinutes,
           description: entry.description,
+          aiGenerated: entry.aiGenerated,
         }
       }
       storedData[monthKey] = merged

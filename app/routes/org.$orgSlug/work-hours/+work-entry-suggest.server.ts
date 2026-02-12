@@ -16,6 +16,7 @@ export type SuggestedEntry = {
   endTime: string
   breakMinutes: number
   description: string
+  aiGenerated: boolean
 }
 
 export type SuggestResult = {
@@ -23,6 +24,7 @@ export type SuggestResult = {
   reasoning: string
   totalInputTokens: number
   totalOutputTokens: number
+  aiDaysUsed: number
 }
 
 /**
@@ -190,11 +192,14 @@ async function buildDescription(
  * 3. 休憩 = 6h以上なら60min、それ以下は0
  * 4. 土日祝・アクティビティなしの日はスキップ
  */
+/**
+ * @param aiDaysLimit AI生成を許可する日数。Infinity=無制限、0=AI不使用。省略時は無制限。
+ */
 export async function suggestWorkEntriesFromActivities(
   activities: Activity[],
-  options?: { useAi?: boolean | undefined } | undefined,
+  options?: { aiDaysLimit?: number | undefined } | undefined,
 ): Promise<SuggestResult> {
-  const useAi = options?.useAi ?? true
+  const aiDaysLimit = options?.aiDaysLimit ?? Number.POSITIVE_INFINITY
 
   // 日付ごとにグループ化
   const byDate = new Map<string, Activity[]>()
@@ -204,14 +209,20 @@ export async function suggestWorkEntriesFromActivities(
     byDate.set(a.eventDate, existing)
   }
 
-  // 各日のエントリを並列で生成
+  // 日付順にソートし、先頭 aiDaysLimit 日分だけ AI を使う
+  const sortedDates = [...byDate.entries()].sort()
+
   type EntryWithTokens = SuggestedEntry & {
     inputTokens: number
     outputTokens: number
   }
   const entryPromises: Promise<EntryWithTokens | null>[] = []
 
-  for (const [date, acts] of [...byDate.entries()].sort()) {
+  let aiDayIndex = 0
+  for (const [date, acts] of sortedDates) {
+    const useAi = aiDayIndex < aiDaysLimit
+    if (useAi) aiDayIndex++
+
     entryPromises.push(
       (async () => {
         // タイムスタンプを持つアクティビティのみで時間推定
@@ -251,6 +262,7 @@ export async function suggestWorkEntriesFromActivities(
           endTime: minutesToHHMM(endMin),
           breakMinutes,
           description: desc.text,
+          aiGenerated: desc.inputTokens > 0,
           inputTokens: desc.inputTokens,
           outputTokens: desc.outputTokens,
         }
@@ -262,16 +274,19 @@ export async function suggestWorkEntriesFromActivities(
   const entries: SuggestedEntry[] = []
   let totalInputTokens = 0
   let totalOutputTokens = 0
+  let aiDaysUsed = 0
   for (const r of results) {
     if (r) {
       totalInputTokens += r.inputTokens
       totalOutputTokens += r.outputTokens
+      if (r.inputTokens > 0) aiDaysUsed++
       entries.push({
         workDate: r.workDate,
         startTime: r.startTime,
         endTime: r.endTime,
         breakMinutes: r.breakMinutes,
         description: r.description,
+        aiGenerated: r.aiGenerated,
       })
     }
   }
@@ -284,7 +299,7 @@ export async function suggestWorkEntriesFromActivities(
 
   const reasoning = `${entries.length}日分のアクティビティから稼働時間を推定（合計${totalHours.toFixed(1)}h）`
 
-  return { entries, reasoning, totalInputTokens, totalOutputTokens }
+  return { entries, reasoning, totalInputTokens, totalOutputTokens, aiDaysUsed }
 }
 
 function timeToMin(hhmm: string): number {

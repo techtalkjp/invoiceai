@@ -116,6 +116,10 @@ export const useTimesheetStore = create<TimesheetState>((set, get) => ({
         ...entry,
         [field]: value,
       }
+      // description を手動編集したら aiGenerated をリセット
+      if (field === 'description') {
+        updated.aiGenerated = false
+      }
       // 開始 or 終了が入力され、休憩が未設定の場合はデフォルト1時間
       if (
         (field === 'startTime' || field === 'endTime') &&
@@ -162,7 +166,7 @@ export const useTimesheetStore = create<TimesheetState>((set, get) => ({
         const date = targets[i]
         const entry = clipboard[i % clipboard.length]
         if (date && entry) {
-          newData[date] = { ...entry }
+          newData[date] = { ...entry, aiGenerated: false }
         }
       }
       return { monthData: newData }
