@@ -27,7 +27,7 @@
 
 - Data read: `loader` only (no component `fetch`/`useEffect`).
 - Data write: `action` only (no direct API route calls).
-- Forms: `conform + zod` validation on client + server.
+- Forms: `conform + zod` validation on client + server (see Forms section below).
 - Auth: use `requireAuth` / `requireAdmin` helpers.
 
 ## DB Clients (`app/lib/db/kysely.ts`)
@@ -114,11 +114,20 @@ org.$orgSlug/
 - Key should include target ID (e.g., `delete-client-${id}`) to reset fetcher state between uses.
 - Close dialog in `useEffect` when `fetcher.state === 'idle' && fetcher.data`.
 
+## Forms (future API)
+
+- 新ルートは `~/lib/form` の `useForm` を使う（`configureForms` 統合済み）
+- クライアント: `useForm(schema, { lastResult, defaultValue })` — `onValidate` 不要
+- サーバー action: `parseSubmission` + `report` (`@conform-to/react/future`)、バリデーションは `coerceFormValue(schema).safeParse()` + `formatResult()` (`@conform-to/zod/v4/future`)
+- `parseWithZod` / `getInputProps` は旧 API。`fields.xxx.inputProps` / `.moneyInputProps` を使う
+- 実装例: `app/routes/playground/money-input/index.tsx`
+
 ## References
 
-- Form examples: `app/routes/auth/signin.tsx`, `app/routes/auth/signup.tsx`,
+- Form examples (legacy): `app/routes/auth/signin.tsx`, `app/routes/auth/signup.tsx`,
   `app/routes/index.tsx`, `app/routes/org.$orgSlug/clients/`,
   `app/components/password-input.tsx`
+- Form examples (future): `app/routes/playground/money-input/index.tsx`
 
 ## Security
 

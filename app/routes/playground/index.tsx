@@ -308,9 +308,17 @@ export function HydrateFallback() {
           title="Timesheet Playground"
           subtitle="月次タイムシートのデモ"
           actions={
-            <Button variant="ghost" size="sm" asChild>
-              <Link to="/">← トップへ</Link>
-            </Button>
+            <div className="flex gap-1">
+              <Button variant="ghost" size="sm" asChild>
+                <Link to="/playground/forms">Forms</Link>
+              </Button>
+              <Button variant="ghost" size="sm" asChild>
+                <Link to="/playground/money-input">MoneyInput</Link>
+              </Button>
+              <Button variant="ghost" size="sm" asChild>
+                <Link to="/">← トップへ</Link>
+              </Button>
+            </div>
           }
         />
 
@@ -422,9 +430,17 @@ export default function PlaygroundIndex({ loaderData }: Route.ComponentProps) {
           title="Timesheet Playground"
           subtitle="月次タイムシートのデモ"
           actions={
-            <Button variant="ghost" size="sm" asChild>
-              <Link to="/">← トップへ</Link>
-            </Button>
+            <div className="flex gap-1">
+              <Button variant="ghost" size="sm" asChild>
+                <Link to="/playground/forms">Forms</Link>
+              </Button>
+              <Button variant="ghost" size="sm" asChild>
+                <Link to="/playground/money-input">MoneyInput</Link>
+              </Button>
+              <Button variant="ghost" size="sm" asChild>
+                <Link to="/">← トップへ</Link>
+              </Button>
+            </div>
           }
         />
 
