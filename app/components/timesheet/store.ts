@@ -116,11 +116,16 @@ export const useTimesheetStore = create<TimesheetState>((set, get) => ({
         ...entry,
         [field]: value,
       }
-      // 開始 or 終了が入力され、休憩が未設定の場合はデフォルト1時間
+      // description を手動編集したら aiGenerated をリセット
+      if (field === 'description') {
+        updated.aiGenerated = false
+      }
+      // 初回入力時のみ休憩を自動設定（既に両方入力済みの場合は上書きしない）
       if (
         (field === 'startTime' || field === 'endTime') &&
         value &&
-        entry.breakMinutes === 0
+        entry.breakMinutes === 0 &&
+        !(entry.startTime && entry.endTime)
       ) {
         updated.breakMinutes = 60
       }
@@ -162,7 +167,7 @@ export const useTimesheetStore = create<TimesheetState>((set, get) => ({
         const date = targets[i]
         const entry = clipboard[i % clipboard.length]
         if (date && entry) {
-          newData[date] = { ...entry }
+          newData[date] = { ...entry, aiGenerated: false }
         }
       }
       return { monthData: newData }

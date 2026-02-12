@@ -1,15 +1,18 @@
 import { parseWithZod } from '@conform-to/zod/v4'
+import { SparklesIcon } from 'lucide-react'
+import { Link } from 'react-router'
 import { PageHeader } from '~/components/layout/page-header'
 import { getMonthDates } from '~/components/timesheet'
+import { Button } from '~/components/ui/button'
 import { requireOrgMember } from '~/lib/auth-helpers.server'
-import { parseWorkHoursText } from './+ai-parse.server'
-import { toServerEntries } from './+components/data-mapping'
-import { TextImportDialog } from './+components/text-import-dialog'
-import { WorkHoursTimesheet } from './+components/work-hours-timesheet'
-import { saveEntries, saveEntry, syncMonthEntries } from './+mutations.server'
-import { getClientMonthEntries } from './+queries.server'
-import { formSchema } from './+schema'
-import type { Route } from './+types/$clientId'
+import { parseWorkHoursText } from '../+ai-parse.server'
+import { toServerEntries } from '../+components/data-mapping'
+import { TextImportDialog } from '../+components/text-import-dialog'
+import { WorkHoursTimesheet } from '../+components/work-hours-timesheet'
+import { saveEntries, saveEntry, syncMonthEntries } from '../+mutations.server'
+import { getClientMonthEntries } from '../+queries.server'
+import { formSchema } from '../+schema'
+import type { Route } from './+types/index'
 
 // saveMonthData は楽観的更新（store が正）なので revalidation 不要
 export function shouldRevalidate({
@@ -26,16 +29,17 @@ export function shouldRevalidate({
 }
 
 export const handle = {
-  breadcrumb: (data: {
-    organization: { slug: string }
-    clientEntry: { clientName: string }
-  }) => [
-    {
-      label: '稼働時間',
-      to: `/org/${data.organization.slug}/work-hours`,
-    },
-    { label: data.clientEntry.clientName },
-  ],
+  breadcrumb: (data?: {
+    organization?: { slug?: string }
+    clientEntry?: { clientName?: string }
+  }) => {
+    const slug = data?.organization?.slug
+    if (!slug) return [{ label: '稼働時間' }]
+    return [
+      { label: '稼働時間', to: `/org/${slug}/work-hours` },
+      { label: data.clientEntry?.clientName ?? '' },
+    ]
+  },
 }
 
 export async function loader({ request, params }: Route.LoaderArgs) {
@@ -189,7 +193,17 @@ export default function ClientWorkHours({
         title={clientEntry.clientName}
         subtitle="セルをクリックして編集 · Tab/Enterで移動"
         actions={
-          <TextImportDialog clientId={clientId} year={year} month={month} />
+          <div className="flex items-center gap-2">
+            <Button asChild variant="outline" size="sm" className="text-xs">
+              <Link
+                to={`/org/${orgSlug}/work-hours/${clientId}/ai-preview?year=${year}&month=${month}`}
+              >
+                <SparklesIcon className="mr-1 size-3.5" />
+                候補生成
+              </Link>
+            </Button>
+            <TextImportDialog clientId={clientId} year={year} month={month} />
+          </div>
         }
       />
 

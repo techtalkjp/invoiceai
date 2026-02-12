@@ -1,0 +1,472 @@
+import { getFormProps, useForm } from '@conform-to/react'
+import { parseWithZod } from '@conform-to/zod/v4'
+import { syncUserGitHubActivities } from '@shared/services/activity-sync'
+import {
+  CheckCircle2Icon,
+  GitBranchIcon,
+  GithubIcon,
+  Loader2Icon,
+  PlusIcon,
+  TrashIcon,
+  UnlinkIcon,
+} from 'lucide-react'
+import { Form, useActionData, useNavigation } from 'react-router'
+import { z } from 'zod'
+import { RepoSelector } from '~/components/github/repo-selector'
+import { useRepoFetcher } from '~/components/github/use-repo-fetcher'
+import { Badge } from '~/components/ui/badge'
+import { Button } from '~/components/ui/button'
+import {
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '~/components/ui/card'
+import { Label } from '~/components/ui/label'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '~/components/ui/select'
+import {
+  deleteActivitySource,
+  deleteClientSourceMapping,
+  getActivitySource,
+  getClientSourceMappings,
+  saveClientSourceMapping,
+} from '~/lib/activity-sources/activity-queries.server'
+import { requireOrgAdmin } from '~/lib/auth-helpers.server'
+import { db } from '~/lib/db/kysely'
+import { startGitHubOAuth } from '~/lib/github-oauth.server'
+import type { Route } from './+types/index'
+
+const startOAuthSchema = z.object({
+  intent: z.literal('startOAuth'),
+})
+
+const disconnectGitHubSchema = z.object({
+  intent: z.literal('disconnectGitHub'),
+})
+
+const addMappingSchema = z.object({
+  intent: z.literal('addMapping'),
+  clientId: z.string().min(1, 'クライアントを選択してください'),
+  repoFullName: z.string().min(1, 'リポジトリを入力してください'),
+})
+
+const removeMappingSchema = z.object({
+  intent: z.literal('removeMapping'),
+  clientId: z.string().min(1),
+  sourceIdentifier: z.string().min(1),
+})
+
+const syncSchema = z.object({
+  intent: z.literal('sync'),
+})
+
+const formSchema = z.discriminatedUnion('intent', [
+  startOAuthSchema,
+  disconnectGitHubSchema,
+  addMappingSchema,
+  removeMappingSchema,
+  syncSchema,
+])
+
+export const handle = {
+  breadcrumb: () => ({ label: '外部連携' }),
+}
+
+export async function loader({ request, params }: Route.LoaderArgs) {
+  const { organization, user } = await requireOrgAdmin(request, params.orgSlug)
+
+  const source = await getActivitySource(organization.id, user.id, 'github')
+  const isConnected = !!source
+
+  // クライアント一覧
+  const clients = await db
+    .selectFrom('client')
+    .select(['id', 'name'])
+    .where('organizationId', '=', organization.id)
+    .where('isActive', '=', 1)
+    .where('billingType', '=', 'time')
+    .orderBy('name', 'asc')
+    .execute()
+
+  // 既存のマッピング
+  const clientIds = clients.map((c) => c.id)
+  const mappings =
+    clientIds.length > 0
+      ? await getClientSourceMappings(clientIds, 'github')
+      : []
+
+  // GitHub username (config にキャッシュ済み)
+  let githubUsername: string | null = null
+  if (source?.config) {
+    try {
+      const config = JSON.parse(source.config) as { username?: string }
+      githubUsername = config.username ?? null
+    } catch {
+      // JSON parse error
+    }
+  }
+
+  return {
+    organization,
+    isConnected,
+    githubUsername,
+    clients,
+    mappings,
+  }
+}
+
+export async function action({ request, params }: Route.ActionArgs) {
+  const { organization, user } = await requireOrgAdmin(request, params.orgSlug)
+
+  const formData = await request.formData()
+  const submission = parseWithZod(formData, { schema: formSchema })
+
+  if (submission.status !== 'success') {
+    return { lastResult: submission.reply() }
+  }
+
+  const { intent } = submission.value
+
+  if (intent === 'startOAuth') {
+    return startGitHubOAuth({
+      request,
+      returnTo: 'integrations',
+      metadata: { orgSlug: params.orgSlug },
+      scope: 'read:user repo',
+    })
+  }
+
+  if (intent === 'disconnectGitHub') {
+    await deleteActivitySource(organization.id, user.id, 'github')
+    return { lastResult: submission.reply(), disconnected: true }
+  }
+
+  if (intent === 'addMapping') {
+    const { clientId, repoFullName } = submission.value
+    await saveClientSourceMapping(clientId, 'github', repoFullName)
+    return { lastResult: submission.reply(), mappingAdded: true }
+  }
+
+  if (intent === 'removeMapping') {
+    const { clientId, sourceIdentifier } = submission.value
+    await deleteClientSourceMapping(clientId, 'github', sourceIdentifier)
+    return { lastResult: submission.reply(), mappingRemoved: true }
+  }
+
+  if (intent === 'sync') {
+    // 過去7日間を同期
+    const end = new Date()
+    const start = new Date()
+    start.setDate(start.getDate() - 7)
+    const startDate = start.toISOString().slice(0, 10)
+    const endDate = end.toISOString().slice(0, 10)
+
+    const result = await syncUserGitHubActivities(
+      organization.id,
+      user.id,
+      startDate,
+      endDate,
+    )
+
+    if (result.error) {
+      return {
+        lastResult: submission.reply({
+          formErrors: [`同期エラー: ${result.error}`],
+        }),
+      }
+    }
+
+    return {
+      lastResult: submission.reply(),
+      synced: true,
+      insertedCount: result.inserted,
+    }
+  }
+
+  return { lastResult: submission.reply() }
+}
+
+export default function IntegrationsSettings({
+  loaderData: { isConnected, githubUsername, clients, mappings },
+  params: { orgSlug },
+}: Route.ComponentProps) {
+  const actionData = useActionData<typeof action>()
+  const navigation = useNavigation()
+  const isSubmitting = navigation.state === 'submitting'
+
+  return (
+    <>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <GitBranchIcon className="h-5 w-5" />
+          外部連携設定
+        </CardTitle>
+        <CardDescription>
+          GitHub 等の外部サービスと連携してアクティビティを自動記録します
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        {/* GitHub 連携 */}
+        <div className="space-y-3">
+          <div className="flex items-center gap-2">
+            {isConnected ? (
+              <CheckCircle2Icon className="h-5 w-5 text-emerald-600" />
+            ) : (
+              <span className="bg-muted flex h-5 w-5 items-center justify-center rounded-full text-xs font-medium">
+                1
+              </span>
+            )}
+            <h4 className="font-medium">GitHub 認証</h4>
+            {isConnected && githubUsername && (
+              <Badge variant="outline" className="text-emerald-600">
+                @{githubUsername}
+              </Badge>
+            )}
+          </div>
+
+          <div className="ml-7 space-y-3">
+            {isConnected ? (
+              <div className="flex items-center gap-3">
+                <p className="text-muted-foreground text-sm">
+                  GitHub アカウントと連携済みです。
+                </p>
+                <Form method="POST">
+                  <input type="hidden" name="intent" value="disconnectGitHub" />
+                  <Button
+                    type="submit"
+                    variant="outline"
+                    size="sm"
+                    className="text-destructive"
+                  >
+                    <UnlinkIcon className="mr-1 h-4 w-4" />
+                    連携解除
+                  </Button>
+                </Form>
+              </div>
+            ) : (
+              <>
+                <p className="text-muted-foreground text-sm">
+                  GitHub アカウントと連携して、アクティビティを自動記録します。
+                </p>
+                <Form method="POST">
+                  <input type="hidden" name="intent" value="startOAuth" />
+                  <Button type="submit" size="sm">
+                    <GithubIcon className="mr-1 h-4 w-4" />
+                    GitHub と連携
+                  </Button>
+                </Form>
+              </>
+            )}
+          </div>
+        </div>
+
+        {/* リポジトリマッピング */}
+        <div className="space-y-3">
+          <div className="flex items-center gap-2">
+            {mappings.length > 0 ? (
+              <CheckCircle2Icon className="h-5 w-5 text-emerald-600" />
+            ) : (
+              <span className="bg-muted flex h-5 w-5 items-center justify-center rounded-full text-xs font-medium">
+                2
+              </span>
+            )}
+            <h4 className="font-medium">リポジトリとクライアントの対応付け</h4>
+          </div>
+
+          {isConnected ? (
+            <div className="ml-7 space-y-3">
+              <p className="text-muted-foreground text-sm">
+                GitHub リポジトリをクライアントに対応付けると、
+                アクティビティがクライアント別に集計されます。
+              </p>
+
+              {/* 既存マッピング一覧 */}
+              {mappings.length > 0 && (
+                <div className="space-y-2">
+                  {mappings.map((m) => {
+                    const client = clients.find((c) => c.id === m.clientId)
+                    return (
+                      <div
+                        key={`${m.clientId}-${m.sourceIdentifier}`}
+                        className="flex items-center justify-between rounded-md border px-3 py-2"
+                      >
+                        <div className="text-sm">
+                          <span className="font-medium">
+                            {client?.name ?? m.clientId}
+                          </span>
+                          <span className="text-muted-foreground"> ← </span>
+                          <code className="text-xs">{m.sourceIdentifier}</code>
+                        </div>
+                        <Form method="POST">
+                          <input
+                            type="hidden"
+                            name="intent"
+                            value="removeMapping"
+                          />
+                          <input
+                            type="hidden"
+                            name="clientId"
+                            value={m.clientId}
+                          />
+                          <input
+                            type="hidden"
+                            name="sourceIdentifier"
+                            value={m.sourceIdentifier}
+                          />
+                          <Button
+                            type="submit"
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 w-7 p-0"
+                          >
+                            <TrashIcon className="h-4 w-4" />
+                          </Button>
+                        </Form>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+
+              {/* 新規マッピング追加 */}
+              <AddMappingForm orgSlug={orgSlug} clients={clients} />
+            </div>
+          ) : (
+            <p className="text-muted-foreground ml-7 text-sm">
+              まず GitHub と連携してください
+            </p>
+          )}
+        </div>
+
+        {/* 同期 */}
+        {isConnected && (
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <span className="bg-muted flex h-5 w-5 items-center justify-center rounded-full text-xs font-medium">
+                3
+              </span>
+              <h4 className="font-medium">アクティビティ同期</h4>
+            </div>
+            <div className="ml-7 space-y-3">
+              <p className="text-muted-foreground text-sm">
+                GitHub のアクティビティを取得して記録します（過去7日間）。
+              </p>
+              <Form method="POST">
+                <input type="hidden" name="intent" value="sync" />
+                <Button
+                  type="submit"
+                  variant="outline"
+                  size="sm"
+                  disabled={isSubmitting}
+                >
+                  {isSubmitting ? (
+                    <Loader2Icon className="mr-2 h-4 w-4 animate-spin" />
+                  ) : null}
+                  今すぐ同期
+                </Button>
+              </Form>
+              {actionData && 'synced' in actionData && actionData.synced && (
+                <p className="text-sm text-emerald-600">
+                  {'insertedCount' in actionData
+                    ? `${actionData.insertedCount} 件のアクティビティを追加しました`
+                    : '同期が完了しました'}
+                </p>
+              )}
+            </div>
+          </div>
+        )}
+      </CardContent>
+    </>
+  )
+}
+
+function AddMappingForm({
+  orgSlug,
+  clients,
+}: {
+  orgSlug: string
+  clients: Array<{ id: string; name: string }>
+}) {
+  const actionData = useActionData<typeof action>()
+  const [form, fields] = useForm({
+    lastResult: actionData?.lastResult,
+    onValidate: ({ formData }) =>
+      parseWithZod(formData, { schema: addMappingSchema }),
+    shouldRevalidate: 'onBlur',
+  })
+
+  const {
+    selectedOrg,
+    repoValue,
+    setRepoValue,
+    repoQuery,
+    setRepoQuery,
+    ghOrgs,
+    repos,
+    isLoadingRepos,
+    handleOrgChange,
+    handleRepoQueryChange,
+  } = useRepoFetcher(orgSlug, 'repos-fetcher')
+
+  return (
+    <Form method="POST" {...getFormProps(form)} className="space-y-3">
+      <input type="hidden" name="intent" value="addMapping" />
+      <input type="hidden" name={fields.repoFullName.name} value={repoValue} />
+
+      {/* クライアント選択 */}
+      <div className="space-y-1">
+        <Label>クライアント</Label>
+        <Select name={fields.clientId.name}>
+          <SelectTrigger>
+            <SelectValue placeholder="クライアントを選択" />
+          </SelectTrigger>
+          <SelectContent>
+            {clients.map((c) => (
+              <SelectItem key={c.id} value={c.id}>
+                {c.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        {fields.clientId.errors && (
+          <div className="text-destructive text-sm">
+            {fields.clientId.errors}
+          </div>
+        )}
+      </div>
+
+      {/* 組織 → リポジトリ選択 */}
+      <div className="flex items-end gap-2">
+        <RepoSelector
+          selectedOrg={selectedOrg}
+          onOrgChange={handleOrgChange}
+          repoValue={repoValue}
+          onRepoValueChange={setRepoValue}
+          repoQuery={repoQuery}
+          onRepoQueryChange={(v) => {
+            setRepoQuery(v)
+            handleRepoQueryChange(v)
+          }}
+          isLoadingRepos={isLoadingRepos}
+          ghOrgs={ghOrgs}
+          repos={repos}
+        />
+        <Button type="submit" size="sm">
+          <PlusIcon className="mr-1 h-4 w-4" />
+          追加
+        </Button>
+      </div>
+      {fields.repoFullName.errors && (
+        <div className="text-destructive text-sm">
+          {fields.repoFullName.errors}
+        </div>
+      )}
+    </Form>
+  )
+}

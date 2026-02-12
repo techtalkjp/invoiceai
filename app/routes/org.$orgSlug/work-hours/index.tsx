@@ -1,7 +1,7 @@
 import { parseWithZod } from '@conform-to/zod/v4'
 import { FilterIcon } from 'lucide-react'
 import { useMemo, useState } from 'react'
-import { Link } from 'react-router'
+import { Link, useActionData } from 'react-router'
 import { ContentPanel } from '~/components/layout/content-panel'
 import { ControlBar } from '~/components/layout/control-bar'
 import { MonthNav } from '~/components/layout/month-nav'
@@ -105,6 +105,7 @@ export default function WorkHours({
   loaderData: { year, month, monthDates, monthEntries, clients },
   params: { orgSlug },
 }: Route.ComponentProps) {
+  const actionData = useActionData<typeof action>()
   const [showOnlyFilled, setShowOnlyFilled] = useState(false)
 
   const filteredDates = useMemo(() => {
@@ -171,6 +172,11 @@ export default function WorkHours({
           />
         }
       >
+        {actionData?.lastResult?.error?.form && (
+          <div className="border-b bg-red-50 px-4 py-2 text-sm text-red-700">
+            {String(actionData.lastResult.error.form)}
+          </div>
+        )}
         <TimesheetGrid
           orgSlug={orgSlug}
           year={year}

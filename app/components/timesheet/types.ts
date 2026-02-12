@@ -4,6 +4,7 @@ export interface TimesheetEntry {
   endTime: string
   breakMinutes: number
   description: string
+  aiGenerated?: boolean | undefined
 }
 
 // 月データの型

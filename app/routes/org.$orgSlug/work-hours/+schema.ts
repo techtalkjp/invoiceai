@@ -1,9 +1,10 @@
 import { z } from 'zod'
 
-// 時間フォーマット（HH:MM）
+// 時間フォーマット（HH:MM、30時制対応: 00:00-29:59）
+const timeRegex = /^([01]?[0-9]|2[0-9]):[0-5][0-9]$/
 const timeSchema = z
   .string()
-  .regex(/^([01]?[0-9]|2[0-3]):[0-5][0-9]$/, '時刻形式が不正です（HH:MM）')
+  .regex(timeRegex, '時刻形式が不正です（HH:MM）')
   .optional()
 
 // 単一の稼働エントリ保存スキーマ
@@ -42,6 +43,43 @@ export const saveMonthDataSchema = z.object({
   intent: z.literal('saveMonthData'),
   clientId: z.string().min(1),
   monthData: z.string(), // JSON string of MonthData
+})
+
+// AI提案確認保存スキーマ
+export const saveAiSuggestionsSchema = z.object({
+  intent: z.literal('saveAiSuggestions'),
+  clientId: z.string().min(1),
+  entries: z
+    .string()
+    .transform((val, ctx) => {
+      try {
+        return JSON.parse(val) as unknown
+      } catch {
+        ctx.addIssue({ code: 'custom', message: 'Invalid JSON' })
+        return z.NEVER
+      }
+    })
+    .pipe(
+      z.array(
+        z.object({
+          workDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+          startTime: z.string().regex(timeRegex),
+          endTime: z.string().regex(timeRegex),
+          breakMinutes: z.number().int().min(0),
+          description: z.string(),
+        }),
+      ),
+    ),
+})
+
+export const addMappingSchema = z.object({
+  intent: z.literal('addMapping'),
+  repoFullName: z.string().min(1),
+})
+
+export const removeMappingSchema = z.object({
+  intent: z.literal('removeMapping'),
+  sourceIdentifier: z.string().min(1),
 })
 
 // フォームスキーマ（discriminated union）

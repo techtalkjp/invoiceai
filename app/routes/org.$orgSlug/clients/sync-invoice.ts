@@ -1,10 +1,10 @@
 import { requireOrgAdmin } from '~/lib/auth-helpers.server'
 import { fetchLatestInvoiceInfo, getClient } from './+queries.server'
-import type { Route } from './+types/api.sync-invoice'
+import type { Route } from './+types/sync-invoice'
 
 /**
  * クライアントの最新請求書情報を取得するリソースルート
- * GET /org/:orgSlug/clients/api/sync-invoice?clientId=xxx
+ * GET /org/:orgSlug/clients/sync-invoice?clientId=xxx
  */
 export async function loader({ request, params }: Route.LoaderArgs) {
   const { orgSlug } = params

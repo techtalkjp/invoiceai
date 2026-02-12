@@ -80,7 +80,7 @@ export const TimesheetRow = memo(function TimesheetRow({
     <div
       data-date={date}
       className={cn(
-        'grid items-center border-b transition-colors',
+        'grid items-center border-b transition-colors last:border-b-0',
         GRID_COLS,
         isOffDay && 'bg-muted/30',
         selected && 'bg-primary/5',

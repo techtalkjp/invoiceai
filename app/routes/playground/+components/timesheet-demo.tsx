@@ -1,4 +1,3 @@
-import { Shuffle } from 'lucide-react'
 import { useCallback, useMemo } from 'react'
 import { ControlBar } from '~/components/layout/control-bar'
 import { MonthNav } from '~/components/layout/month-nav'
@@ -8,12 +7,12 @@ import {
   MonthTotalDisplay,
   TimesheetArea,
   TimesheetClearAllDialog,
-  generateSampleData,
   getMonthDates,
   useTimesheetStore,
 } from '~/components/timesheet'
+import { useActivityStore } from '~/components/timesheet/activity-store'
 import { TimesheetPdfDownloadDialog } from '~/components/timesheet/pdf-download-dialog'
-import { Button } from '~/components/ui/button'
+import { GitHubAutoFillButton } from './github-autofill-button'
 import { clearAllStorage, useAutoSave } from './use-auto-save'
 
 interface TimesheetDemoProps {
@@ -45,6 +44,7 @@ export function TimesheetDemo({
   // 全クリア
   const handleClearAll = useCallback(() => {
     useTimesheetStore.getState().clearAllData()
+    useActivityStore.getState().clearActivities()
     clearAllStorage()
   }, [])
 
@@ -59,20 +59,8 @@ export function TimesheetDemo({
         }
         right={
           <>
+            <GitHubAutoFillButton year={year} month={month} />
             <FilterToggleButton />
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() =>
-                useTimesheetStore
-                  .getState()
-                  .setMonthData(generateSampleData(year, month))
-              }
-              className="text-muted-foreground"
-            >
-              <Shuffle className="size-4" />
-              サンプル
-            </Button>
             <TimesheetPdfDownloadDialog
               year={year}
               month={month}

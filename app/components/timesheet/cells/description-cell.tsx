@@ -1,7 +1,9 @@
+import { SparklesIcon } from 'lucide-react'
 import { memo, useState } from 'react'
 import { cn } from '~/lib/utils'
 import { useEntryField, useTimesheetStore } from '../store'
 import { navigateToCell } from '../utils'
+import { ActivityIndicator } from './activity-indicator'
 
 interface TimesheetDescriptionCellProps {
   date: string
@@ -14,6 +16,7 @@ export const TimesheetDescriptionCell = memo(function TimesheetDescriptionCell({
 }: TimesheetDescriptionCellProps) {
   // 自分のフィールドのみ subscribe
   const value = useEntryField(date, 'description') ?? ''
+  const aiGenerated = useEntryField(date, 'aiGenerated') ?? false
   const [isFocused, setIsFocused] = useState(false)
 
   const handleChange = (v: string) => {
@@ -31,7 +34,7 @@ export const TimesheetDescriptionCell = memo(function TimesheetDescriptionCell({
         {/* 高さを確保するための非表示のプレースホルダー（常にline-clamp-3で3行分の高さ） */}
         <div
           aria-hidden="true"
-          className="pointer-events-none invisible min-h-7 w-full min-w-32 px-2 py-1 text-base whitespace-pre-wrap"
+          className="pointer-events-none invisible min-h-7 w-full min-w-32 px-2 py-1 text-base whitespace-pre-wrap md:text-sm"
         >
           <span className="line-clamp-3">{value || '-'}</span>
         </div>
@@ -80,7 +83,7 @@ export const TimesheetDescriptionCell = memo(function TimesheetDescriptionCell({
               rows={1}
               placeholder="概要を入力"
               className={cn(
-                'absolute inset-0 field-sizing-content min-h-7 w-full min-w-32 resize-none rounded-md border px-2 py-1 text-base',
+                'absolute inset-0 field-sizing-content min-h-7 w-full min-w-32 resize-none rounded-md border px-2 py-1 text-base md:text-sm',
                 'border-primary bg-background outline-none',
               )}
             />
@@ -100,7 +103,7 @@ export const TimesheetDescriptionCell = memo(function TimesheetDescriptionCell({
               }
             }}
             className={cn(
-              'absolute inset-0 min-h-7 w-full min-w-32 cursor-text rounded-md border px-2 py-1 text-left text-base',
+              'absolute inset-0 min-h-7 w-full min-w-32 cursor-text rounded-md border px-2 py-1 text-left text-base md:text-sm',
               'bg-muted/70 border-transparent md:bg-transparent',
               'hover:border-border hover:bg-accent/50',
               'focus:border-primary focus:bg-background focus:outline-none',
@@ -111,6 +114,15 @@ export const TimesheetDescriptionCell = memo(function TimesheetDescriptionCell({
               {value || '-'}
             </span>
           </button>
+        )}
+        {/* バッジ（非フォーカス時のみ表示） */}
+        {!isFocused && (
+          <div className="absolute right-1 bottom-0.5 flex items-center gap-0.5">
+            {aiGenerated && (
+              <SparklesIcon className="text-muted-foreground/50 size-3" />
+            )}
+            <ActivityIndicator date={date} />
+          </div>
         )}
       </div>
     </div>
