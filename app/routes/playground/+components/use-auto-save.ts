@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { useActivityStore } from '~/components/timesheet/activity-store'
+import { timesheetEntrySchema } from '~/components/timesheet/schema'
 import { useTimesheetStore } from '~/components/timesheet/store'
 import type { MonthData } from '~/components/timesheet/types'
 import type { ActivityRecord } from '~/lib/activity-sources/types'
@@ -138,5 +139,38 @@ export function clearAllStorage() {
     localStorage.removeItem(ACTIVITY_STORAGE_KEY)
   } catch {
     // ignore
+  }
+}
+
+/**
+ * LocalStorage から全月データを読み込み
+ * エントリ単位で safeParse し、1エントリの不正で月全体が消えるのを防ぐ
+ */
+export function loadFromStorage(): Record<string, MonthData> {
+  if (typeof window === 'undefined') return {}
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY)
+    if (!stored) return {}
+    const parsed = JSON.parse(stored)
+    const validated: Record<string, MonthData> = {}
+    for (const [monthKey, monthValue] of Object.entries(parsed)) {
+      if (typeof monthValue !== 'object' || monthValue === null) continue
+      const monthData: MonthData = {}
+      for (const [date, entry] of Object.entries(
+        monthValue as Record<string, unknown>,
+      )) {
+        const result = timesheetEntrySchema.safeParse(entry)
+        if (result.success) {
+          monthData[date] = result.data
+        }
+        // 不正なエントリはスキップ（他のエントリは保持）
+      }
+      if (Object.keys(monthData).length > 0) {
+        validated[monthKey] = monthData
+      }
+    }
+    return validated
+  } catch {
+    return {}
   }
 }
