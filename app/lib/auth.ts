@@ -1,6 +1,6 @@
 import { betterAuth } from 'better-auth'
 import { APIError } from 'better-auth/api'
-import { admin, organization } from 'better-auth/plugins'
+import { admin, anonymous, organization } from 'better-auth/plugins'
 import { authDb } from './db/kysely'
 import { isFeatureEnabled } from './feature-flags.server'
 
@@ -17,6 +17,11 @@ export const auth = betterAuth({
     user: {
       create: {
         before: async (user) => {
+          // anonymous user は signup_enabled チェック不要
+          if (user.isAnonymous) {
+            return { data: user }
+          }
+
           // Feature flag: 新規登録が無効な場合はエラー
           const signupEnabled = await isFeatureEnabled('signup_enabled')
           if (!signupEnabled) {
@@ -98,6 +103,15 @@ export const auth = betterAuth({
           fields: {
             banReason: 'ban_reason',
             banExpires: 'ban_expires',
+          },
+        },
+      },
+    }),
+    anonymous({
+      schema: {
+        user: {
+          fields: {
+            isAnonymous: 'is_anonymous',
           },
         },
       },

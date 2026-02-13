@@ -15,6 +15,8 @@ export interface TimesheetState {
   showOnlyFilled: boolean
   // クリップボード
   clipboard: Clipboard
+  // ハイライト（インポート反映時のアニメーション用）
+  highlightedDates: string[]
   // 選択操作
   setMonthDates: (dates: string[]) => void
   setSelectedDates: (dates: string[] | ((prev: string[]) => string[])) => void
@@ -32,6 +34,8 @@ export interface TimesheetState {
     value: string | number,
   ) => void
   clearAllData: () => void
+  // ハイライト操作
+  setHighlightedDates: (dates: string[]) => void
   // クリップボード操作
   copySelection: () => void
   pasteToSelected: (weekdaysOnly?: boolean | undefined) => void
@@ -50,6 +54,8 @@ export const useTimesheetStore = create<TimesheetState>((set, get) => ({
   showOnlyFilled: false,
   // クリップボード
   clipboard: null,
+  // ハイライト
+  highlightedDates: [],
   // 選択操作
   setMonthDates: (monthDates) => set({ monthDates }),
   setSelectedDates: (dates) =>
@@ -138,6 +144,8 @@ export const useTimesheetStore = create<TimesheetState>((set, get) => ({
     })
   },
   clearAllData: () => set({ monthData: {}, selectedDates: [] }),
+  // ハイライト操作
+  setHighlightedDates: (dates) => set({ highlightedDates: dates }),
   // クリップボード操作
   copySelection: () => {
     const { selectedDates, monthData } = get()
@@ -190,6 +198,11 @@ export const useTimesheetStore = create<TimesheetState>((set, get) => ({
 // 各行が自分の選択状態のみ subscribe するセレクタ
 export function useIsSelected(date: string) {
   return useTimesheetStore((state) => state.selectedDates.includes(date))
+}
+
+// 各行がハイライト状態のみ subscribe するセレクタ
+export function useIsHighlighted(date: string) {
+  return useTimesheetStore((state) => state.highlightedDates.includes(date))
 }
 
 // フィルタリング用: データがある日付のセットを subscribe するセレクタ

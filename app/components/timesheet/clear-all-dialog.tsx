@@ -25,10 +25,11 @@ export function TimesheetClearAllDialog({
         <Button
           variant="ghost"
           size="sm"
+          title="全クリア"
           className="text-muted-foreground hover:text-destructive"
         >
           <Trash2 className="size-4" />
-          全クリア
+          クリア
         </Button>
       </AlertDialogTrigger>
       <AlertDialogContent size="sm">

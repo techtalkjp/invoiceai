@@ -176,12 +176,13 @@ export interface Organization {
 
 export interface PlaygroundAiUsage {
   createdAt: Generated<string>;
-  githubUsername: string;
+  githubUsername: string | null;
   id: string;
   requestCount: Generated<number>;
   totalInputTokens: Generated<number>;
   totalOutputTokens: Generated<number>;
   updatedAt: Generated<string>;
+  userId: string;
   yearMonth: string;
 }
 
@@ -232,6 +233,7 @@ export interface User {
   emailVerified: Generated<number>;
   id: string;
   image: string | null;
+  isAnonymous: Generated<number | null>;
   name: string;
   role: Generated<string | null>;
   updatedAt: Generated<string>;

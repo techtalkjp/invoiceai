@@ -119,6 +119,8 @@ body {
   --radius-2xl: calc(var(--radius) + 8px);
   --radius-3xl: calc(var(--radius) + 12px);
   --radius-4xl: calc(var(--radius) + 16px);
+  --animate-collapsible-down: collapsible-down 0.2s ease-out;
+  --animate-collapsible-up: collapsible-up 0.2s ease-out;
 }
 
 @layer base {
@@ -131,4 +133,35 @@ body {
   html {
     @apply font-sans;
   }
+}
+
+/* Collapsible 開閉アニメーション */
+@keyframes collapsible-down {
+  from {
+    height: 0;
+  }
+  to {
+    height: var(--radix-collapsible-content-height);
+  }
+}
+@keyframes collapsible-up {
+  from {
+    height: var(--radix-collapsible-content-height);
+  }
+  to {
+    height: 0;
+  }
+}
+
+/* インポート反映時の行ハイライトアニメーション */
+@keyframes highlight-row {
+  0% {
+    background-color: oklch(0.85 0.15 145);
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+.animate-highlight-row {
+  animation: highlight-row 1.5s ease-out;
 }

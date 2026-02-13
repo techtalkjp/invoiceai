@@ -54,7 +54,12 @@ export function TimesheetPdfDownloadDialog({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant="ghost" size="sm" className="text-muted-foreground">
+        <Button
+          variant="ghost"
+          size="sm"
+          title="PDFダウンロード"
+          className="text-muted-foreground"
+        >
           <Download className="size-4" />
           PDF
         </Button>

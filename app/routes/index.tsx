@@ -22,8 +22,8 @@ export function meta() {
 export async function loader({ request }: Route.LoaderArgs) {
   const session = await getSession(request)
 
-  // 未ログインならサインインページへ
-  if (!session?.user) {
+  // 未ログインまたは anonymous ユーザーならログイン画面を表示
+  if (!session?.user || session.user.isAnonymous) {
     return { authenticated: false }
   }
 

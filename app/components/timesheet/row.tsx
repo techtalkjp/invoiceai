@@ -6,7 +6,7 @@ import {
   TimesheetTimeCell,
   TimesheetWorkCell,
 } from './cells'
-import { useIsSelected, useTimesheetStore } from './store'
+import { useIsHighlighted, useIsSelected, useTimesheetStore } from './store'
 import { GRID_COLS } from './table'
 import { DAY_LABELS, getHolidayName, isSaturday, isSunday } from './utils'
 
@@ -20,8 +20,9 @@ interface TimesheetRowProps {
 export const TimesheetRow = memo(function TimesheetRow({
   date,
 }: TimesheetRowProps) {
-  // store から自分の選択状態のみ subscribe
+  // store から自分の選択・ハイライト状態のみ subscribe
   const selected = useIsSelected(date)
+  const highlighted = useIsHighlighted(date)
 
   // 選択操作（store から直接取得 - stable reference）
   const handleMouseDown = (e: React.MouseEvent) => {
@@ -82,6 +83,7 @@ export const TimesheetRow = memo(function TimesheetRow({
       className={cn(
         'grid items-center border-b transition-colors last:border-b-0',
         GRID_COLS,
+        highlighted && 'animate-highlight-row',
         isOffDay && 'bg-muted/30',
         selected && 'bg-primary/5',
         !selected && !isOffDay && 'odd:bg-muted/10',

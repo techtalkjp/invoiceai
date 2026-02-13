@@ -1,8 +1,12 @@
-import { adminClient, organizationClient } from 'better-auth/client/plugins'
+import {
+  adminClient,
+  anonymousClient,
+  organizationClient,
+} from 'better-auth/client/plugins'
 import { createAuthClient } from 'better-auth/react'
 
 export const authClient = createAuthClient({
-  plugins: [organizationClient(), adminClient()],
+  plugins: [organizationClient(), adminClient(), anonymousClient()],
 })
 
 export const { signIn, signOut, signUp, useSession, organization, admin } =

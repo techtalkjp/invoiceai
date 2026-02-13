@@ -15,10 +15,11 @@ export function FilterToggleButton() {
       variant={showOnlyFilled ? 'secondary' : 'ghost'}
       size="sm"
       onClick={() => useTimesheetStore.getState().setShowOnlyFilled((v) => !v)}
-      className="text-muted-foreground text-xs"
+      title="稼働日だけ表示"
+      className="text-muted-foreground"
     >
-      <FilterIcon className="size-3.5" />
-      稼働日だけ表示
+      <FilterIcon className="size-4" />
+      稼働日
     </Button>
   )
 }

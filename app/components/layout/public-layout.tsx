@@ -14,7 +14,7 @@ import { AppLogo } from './app-logo'
 const HeaderNav = memo(function HeaderNav() {
   const { data: session, isPending } = useSession()
 
-  if (session?.user) {
+  if (session?.user && !session.user.isAnonymous) {
     return (
       <nav className="flex items-center gap-2 text-sm">
         <DropdownMenu>

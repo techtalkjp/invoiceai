@@ -1,4 +1,5 @@
-import { useCallback, useMemo } from 'react'
+import { ImportIcon } from 'lucide-react'
+import { useCallback, useMemo, useState } from 'react'
 import { ControlBar } from '~/components/layout/control-bar'
 import { MonthNav } from '~/components/layout/month-nav'
 import {
@@ -12,7 +13,9 @@ import {
 } from '~/components/timesheet'
 import { useActivityStore } from '~/components/timesheet/activity-store'
 import { TimesheetPdfDownloadDialog } from '~/components/timesheet/pdf-download-dialog'
-import { GitHubAutoFillButton } from './github-autofill-button'
+import { Button } from '~/components/ui/button'
+import type { GitHubResult } from '../+lib/github-oauth.server'
+import { ImportPanel } from './import-panel'
 import { clearAllStorage, useAutoSave } from './use-auto-save'
 
 interface TimesheetDemoProps {
@@ -20,6 +23,7 @@ interface TimesheetDemoProps {
   month: number
   buildUrl: (year: number, month: number) => string
   initialData?: Record<string, MonthData> | undefined
+  githubResult?: GitHubResult | null | undefined
 }
 
 export function TimesheetDemo({
@@ -27,9 +31,13 @@ export function TimesheetDemo({
   month,
   buildUrl,
   initialData,
+  githubResult,
 }: TimesheetDemoProps) {
   const monthDates = useMemo(() => getMonthDates(year, month), [year, month])
   const monthKey = `${year}-${String(month).padStart(2, '0')}`
+
+  const [isImportOpen, setIsImportOpen] = useState(!!githubResult)
+  const defaultImportTab = githubResult ? ('github' as const) : undefined
 
   // 自動保存（debounce 付き）
   useAutoSave(monthKey)
@@ -59,7 +67,17 @@ export function TimesheetDemo({
         }
         right={
           <>
-            <GitHubAutoFillButton year={year} month={month} />
+            <Button
+              variant={isImportOpen ? 'secondary' : 'ghost'}
+              size="sm"
+              onClick={() => setIsImportOpen((v) => !v)}
+              title="インポート"
+              className="text-muted-foreground"
+            >
+              <ImportIcon className="size-4" />
+              取込
+            </Button>
+            <div className="bg-border h-4 w-px" />
             <FilterToggleButton />
             <TimesheetPdfDownloadDialog
               year={year}
@@ -69,6 +87,14 @@ export function TimesheetDemo({
             <TimesheetClearAllDialog onClearAll={handleClearAll} />
           </>
         }
+      />
+      <ImportPanel
+        year={year}
+        month={month}
+        isOpen={isImportOpen}
+        onOpenChange={setIsImportOpen}
+        defaultTab={defaultImportTab}
+        githubResult={githubResult}
       />
     </TimesheetArea>
   )
