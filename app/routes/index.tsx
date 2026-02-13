@@ -54,9 +54,12 @@ export default function Home({ loaderData }: Route.ComponentProps) {
               <Button variant="outline" asChild>
                 <Link to="/auth/signup">新規登録</Link>
               </Button>
-              <Button variant="ghost" asChild>
-                <Link to="/playground">Playground</Link>
-              </Button>
+              <Link
+                to="/playground"
+                className="text-muted-foreground hover:text-foreground text-center text-sm underline underline-offset-2"
+              >
+                Playground を試す
+              </Link>
             </CardContent>
           </Card>
         </div>

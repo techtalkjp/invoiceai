@@ -133,6 +133,12 @@ export default function SignIn() {
                   登録する
                 </Link>
               </p>
+              <Link
+                to="/playground"
+                className="text-muted-foreground hover:text-foreground text-center text-sm underline underline-offset-2"
+              >
+                Playground を試す
+              </Link>
             </CardFooter>
           </form>
         </Card>
