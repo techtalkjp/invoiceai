@@ -2,9 +2,10 @@
 
 ## 背景
 
-現在の GitHub 連携は OAuth App + `repo` スコープで実装している。
-クライアント企業の Organization の private リポジトリでの作業アクティビティを取得するには、
-Org オーナーが OAuth App を承認する必要がある。
+現在の GitHub 連携は OAuth App で実装している。
+Organizations 統合は `read:user repo` スコープ、Playground は `read:user` のみ。
+クライアント企業の Organization の private リポジトリでの作業アクティビティを取得するには
+`repo` スコープが必要だが、Org オーナーが OAuth App を承認する必要がある。
 
 ## 課題
 
