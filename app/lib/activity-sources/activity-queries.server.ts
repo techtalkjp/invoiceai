@@ -1,9 +1,60 @@
 import { db } from '~/lib/db/kysely'
-import type { ActivityRecord } from './types'
+import type { ActivityRecord, PrAction, ReviewState } from './types'
+
+/**
+ * DB row → typed ActivityRecord
+ */
+export function parseActivityRow(row: {
+  eventType: string
+  eventDate: string
+  eventTimestamp: string
+  repo: string | null
+  title: string | null
+  url: string | null
+  metadata: string | null
+}): ActivityRecord {
+  const base = {
+    eventDate: row.eventDate,
+    eventTimestamp: row.eventTimestamp,
+    repo: row.repo,
+    title: row.title,
+    url: row.url,
+  }
+  let meta: Record<string, unknown> | null = null
+  if (row.metadata) {
+    try {
+      meta = JSON.parse(row.metadata) as Record<string, unknown>
+    } catch {
+      // 不正な JSON（例: "[object Object]"）は無視
+    }
+  }
+  switch (row.eventType) {
+    case 'pr':
+      return {
+        ...base,
+        eventType: 'pr',
+        metadata: { action: (meta?.action as PrAction) ?? 'opened' },
+      }
+    case 'review':
+      return {
+        ...base,
+        eventType: 'review',
+        metadata: { state: (meta?.state as ReviewState) ?? 'COMMENTED' },
+      }
+    case 'issue_comment':
+      return { ...base, eventType: 'issue_comment', metadata: null }
+    default:
+      return {
+        ...base,
+        eventType: 'commit',
+        metadata: { oid: (meta?.oid as string) ?? '' },
+      }
+  }
+}
 
 /**
  * アクティビティを一括挿入（重複はスキップ）
- * UNIQUE INDEX (org, user, source_type, event_type, event_timestamp, repo) で重複排除
+ * UNIQUE INDEX (org, user, event_type, event_timestamp, repo) で重複排除
  * SQLite パラメータ上限を考慮して 90 行ずつチャンク分割
  */
 export async function insertActivities(
@@ -22,14 +73,13 @@ export async function insertActivities(
       id: crypto.randomUUID(),
       organizationId,
       userId,
-      sourceType: record.sourceType,
       eventType: record.eventType,
       eventDate: record.eventDate,
       eventTimestamp: record.eventTimestamp,
       repo: record.repo ?? '',
       title: record.title,
       url: record.url ?? null,
-      metadata: record.metadata,
+      metadata: record.metadata ? JSON.stringify(record.metadata) : null,
     }))
 
     const result = await db
@@ -40,7 +90,6 @@ export async function insertActivities(
           .columns([
             'organizationId',
             'userId',
-            'sourceType',
             'eventType',
             'eventTimestamp',
             'repo',
@@ -70,7 +119,6 @@ export function getActivities(
     .selectFrom('activity')
     .select([
       'id',
-      'sourceType',
       'eventType',
       'eventDate',
       'eventTimestamp',

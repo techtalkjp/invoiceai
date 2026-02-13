@@ -82,6 +82,13 @@ export const removeMappingSchema = z.object({
   sourceIdentifier: z.string().min(1),
 })
 
+// GitHub候補生成スキーマ
+export const suggestFromGitHubSchema = z.object({
+  intent: z.literal('suggestFromGitHub'),
+  year: z.coerce.number().int(),
+  month: z.coerce.number().int().min(1).max(12),
+})
+
 // フォームスキーマ（discriminated union）
 export const formSchema = z.discriminatedUnion('intent', [
   saveEntrySchema,
@@ -89,6 +96,9 @@ export const formSchema = z.discriminatedUnion('intent', [
   deleteEntrySchema,
   parseTextSchema,
   saveMonthDataSchema,
+  addMappingSchema,
+  removeMappingSchema,
+  suggestFromGitHubSchema,
 ])
 
 // 型定義

@@ -2,7 +2,12 @@
 export type { Clipboard, MonthData, TimesheetEntry } from './types'
 
 // Store
-export { useEntryField, useIsSelected, useTimesheetStore } from './store'
+export {
+  useActivitiesForDate,
+  useEntryField,
+  useIsSelected,
+  useTimesheetStore,
+} from './store'
 export type { TimesheetState } from './store'
 
 // Utils

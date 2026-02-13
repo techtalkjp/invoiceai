@@ -34,7 +34,6 @@ export interface Activity {
   metadata: string | null;
   organizationId: string;
   repo: string | null;
-  sourceType: string;
   title: string | null;
   url: string | null;
   userId: string;

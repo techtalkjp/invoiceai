@@ -84,16 +84,7 @@ export async function loadGitHubWithSuggestions(
     return {
       githubResult: {
         entries: suggestion.entries,
-        activities: activities.map((a) => ({
-          sourceType: 'github' as const,
-          eventType: a.eventType,
-          eventDate: a.eventDate,
-          eventTimestamp: a.eventTimestamp,
-          repo: a.repo,
-          title: a.title,
-          url: a.url,
-          metadata: a.metadata,
-        })),
+        activities,
         reasoning: suggestion.reasoning,
         username,
         activityCount: activities.length,

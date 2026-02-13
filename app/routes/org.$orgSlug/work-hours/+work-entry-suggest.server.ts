@@ -1,15 +1,7 @@
 import { google } from '@ai-sdk/google'
 import { generateText } from 'ai'
+import type { ActivityRecord } from '~/lib/activity-sources/types'
 import { dayjs } from '~/utils/dayjs'
-
-interface Activity {
-  eventDate: string
-  eventTimestamp: string
-  eventType: string
-  repo: string | null
-  title: string | null
-  metadata: string | null
-}
 
 export type SuggestedEntry = {
   workDate: string
@@ -52,7 +44,7 @@ function minutesToHHMM(minutes: number): string {
 /**
  * アクティビティから作業内容を機械的に生成（フォールバック用）
  */
-function buildMechanicalDescription(activities: Activity[]): string {
+function buildMechanicalDescription(activities: ActivityRecord[]): string {
   const parts: string[] = []
 
   // イベントタイプ別に集計
@@ -83,15 +75,7 @@ function buildMechanicalDescription(activities: Activity[]): string {
     for (const p of prs) {
       const title = p.title ?? ''
       if (!title) continue
-      let action: string | null = null
-      if (p.metadata) {
-        try {
-          const meta = JSON.parse(p.metadata) as { action?: string }
-          action = meta.action ?? null
-        } catch {
-          // ignore
-        }
-      }
+      const action = p.metadata.action
       const prev = seen.get(title)
       // merged > closed > opened の優先度
       if (
@@ -99,7 +83,7 @@ function buildMechanicalDescription(activities: Activity[]): string {
         action === 'merged' ||
         (action === 'closed' && prev !== 'merged')
       ) {
-        seen.set(title, action ?? 'opened')
+        seen.set(title, action)
       }
     }
     const titles: string[] = []
@@ -133,7 +117,7 @@ type DescriptionResult = {
 }
 
 async function buildDescription(
-  activities: Activity[],
+  activities: ActivityRecord[],
   useAi = true,
 ): Promise<DescriptionResult> {
   const fallback = buildMechanicalDescription(activities)
@@ -197,13 +181,13 @@ async function buildDescription(
  * @param aiDaysLimit AI生成を許可する日数。Infinity=無制限、0=AI不使用。省略時は無制限。
  */
 export async function suggestWorkEntriesFromActivities(
-  activities: Activity[],
+  activities: ActivityRecord[],
   options?: { aiDaysLimit?: number | undefined } | undefined,
 ): Promise<SuggestResult> {
   const aiDaysLimit = options?.aiDaysLimit ?? Number.POSITIVE_INFINITY
 
   // 日付ごとにグループ化
-  const byDate = new Map<string, Activity[]>()
+  const byDate = new Map<string, ActivityRecord[]>()
   for (const a of activities) {
     const existing = byDate.get(a.eventDate) ?? []
     existing.push(a)
@@ -222,7 +206,7 @@ export async function suggestWorkEntriesFromActivities(
   let aiDayIndex = 0
   const tasks: Array<{
     date: string
-    acts: Activity[]
+    acts: ActivityRecord[]
     useAi: boolean
   }> = []
   for (const [date, acts] of sortedDates) {
@@ -233,7 +217,7 @@ export async function suggestWorkEntriesFromActivities(
 
   async function processDay(task: {
     date: string
-    acts: Activity[]
+    acts: ActivityRecord[]
     useAi: boolean
   }): Promise<EntryWithTokens> {
     const timestamps = task.acts

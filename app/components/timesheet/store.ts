@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import type { ActivityRecord } from '~/lib/activity-sources/types'
 import type { Clipboard, MonthData, TimesheetEntry } from './types'
 import { isWeekday } from './utils'
 
@@ -17,6 +18,8 @@ export interface TimesheetState {
   clipboard: Clipboard
   // ハイライト（インポート反映時のアニメーション用）
   highlightedDates: string[]
+  // アクティビティ（GitHub コミット/PR 等）
+  activitiesByDate: Record<string, ActivityRecord[]>
   // 選択操作
   setMonthDates: (dates: string[]) => void
   setSelectedDates: (dates: string[] | ((prev: string[]) => string[])) => void
@@ -36,6 +39,10 @@ export interface TimesheetState {
   clearAllData: () => void
   // ハイライト操作
   setHighlightedDates: (dates: string[]) => void
+  // アクティビティ操作
+  setActivities: (activities: ActivityRecord[]) => void
+  setActivitiesByDate: (byDate: Record<string, ActivityRecord[]>) => void
+  clearActivities: () => void
   // クリップボード操作
   copySelection: () => void
   pasteToSelected: (weekdaysOnly?: boolean | undefined) => void
@@ -56,6 +63,8 @@ export const useTimesheetStore = create<TimesheetState>((set, get) => ({
   clipboard: null,
   // ハイライト
   highlightedDates: [],
+  // アクティビティ
+  activitiesByDate: {},
   // 選択操作
   setMonthDates: (monthDates) => set({ monthDates }),
   setSelectedDates: (dates) =>
@@ -143,9 +152,25 @@ export const useTimesheetStore = create<TimesheetState>((set, get) => ({
       }
     })
   },
-  clearAllData: () => set({ monthData: {}, selectedDates: [] }),
+  clearAllData: () =>
+    set({ monthData: {}, selectedDates: [], activitiesByDate: {} }),
   // ハイライト操作
   setHighlightedDates: (dates) => set({ highlightedDates: dates }),
+  // アクティビティ操作
+  setActivities: (activities) => {
+    const byDate: Record<string, ActivityRecord[]> = {}
+    for (const a of activities) {
+      let arr = byDate[a.eventDate]
+      if (!arr) {
+        arr = []
+        byDate[a.eventDate] = arr
+      }
+      arr.push(a)
+    }
+    set({ activitiesByDate: byDate })
+  },
+  setActivitiesByDate: (byDate) => set({ activitiesByDate: byDate }),
+  clearActivities: () => set({ activitiesByDate: {} }),
   // クリップボード操作
   copySelection: () => {
     const { selectedDates, monthData } = get()
@@ -217,6 +242,11 @@ export function useFilledDatesKey() {
     }
     return parts.join(',')
   })
+}
+
+// 各日のアクティビティのみ subscribe するセレクタ
+export function useActivitiesForDate(date: string) {
+  return useTimesheetStore((state) => state.activitiesByDate[date])
 }
 
 // 各セルが自分のフィールドのみ subscribe するセレクタ

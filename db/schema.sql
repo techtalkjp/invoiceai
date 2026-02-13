@@ -274,7 +274,6 @@ CREATE TABLE IF NOT EXISTS "activity" (
   "id" TEXT PRIMARY KEY NOT NULL,
   "organization_id" TEXT NOT NULL REFERENCES "organization"("id") ON DELETE CASCADE,
   "user_id" TEXT NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
-  "source_type" TEXT NOT NULL,
   "event_type" TEXT NOT NULL,
   "event_date" TEXT NOT NULL,
   "event_timestamp" TEXT NOT NULL,
@@ -287,10 +286,8 @@ CREATE TABLE IF NOT EXISTS "activity" (
 
 CREATE INDEX IF NOT EXISTS "activity_org_user_date_idx"
   ON "activity"("organization_id", "user_id", "event_date");
-CREATE INDEX IF NOT EXISTS "activity_source_type_idx"
-  ON "activity"("organization_id", "user_id", "source_type");
 CREATE UNIQUE INDEX IF NOT EXISTS "activity_unique_event_idx"
-  ON "activity"("organization_id", "user_id", "source_type", "event_type", "event_timestamp", "repo");
+  ON "activity"("organization_id", "user_id", "event_type", "event_timestamp", "repo");
 
 -- Playground AI usage tracking
 CREATE TABLE IF NOT EXISTS "playground_ai_usage" (

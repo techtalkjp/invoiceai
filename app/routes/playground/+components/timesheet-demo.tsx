@@ -11,7 +11,6 @@ import {
   getMonthDates,
   useTimesheetStore,
 } from '~/components/timesheet'
-import { useActivityStore } from '~/components/timesheet/activity-store'
 import { TimesheetPdfDownloadDialog } from '~/components/timesheet/pdf-download-dialog'
 import { Button } from '~/components/ui/button'
 import type { GitHubResult } from '../+lib/github-oauth.server'
@@ -52,7 +51,6 @@ export function TimesheetDemo({
   // 全クリア
   const handleClearAll = useCallback(() => {
     useTimesheetStore.getState().clearAllData()
-    useActivityStore.getState().clearActivities()
     clearAllStorage()
   }, [])
 

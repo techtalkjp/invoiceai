@@ -14,7 +14,7 @@ import {
 } from '~/components/ui/popover'
 import type { ActivityRecord } from '~/lib/activity-sources/types'
 import { dayjs } from '~/utils/dayjs'
-import { useActivityStore } from '../activity-store'
+import { useActivitiesForDate } from '../store'
 
 const EVENT_ICONS: Record<
   string,
@@ -26,34 +26,19 @@ const EVENT_ICONS: Record<
   issue_comment: MessageSquareIcon,
 }
 
-function parsePrAction(metadata: string | null): string | null {
-  if (!metadata) return null
-  try {
-    const parsed = JSON.parse(metadata) as { action?: string }
-    return parsed.action ?? null
-  } catch {
-    return null
-  }
-}
-
 function getIconForItem(
   item: ActivityRecord,
 ): React.ComponentType<{ className?: string }> {
   if (item.eventType === 'pr') {
-    const action = parsePrAction(item.metadata)
-    if (action === 'merged') return GitMergeIcon
-    if (action === 'closed') return GitPullRequestClosedIcon
+    if (item.metadata.action === 'merged') return GitMergeIcon
+    if (item.metadata.action === 'closed') return GitPullRequestClosedIcon
   }
   return EVENT_ICONS[item.eventType] ?? MessageSquareIcon
 }
 
 function getPrActionLabel(item: ActivityRecord): string | null {
   if (item.eventType !== 'pr') return null
-  const action = parsePrAction(item.metadata)
-  if (action === 'merged') return 'merged'
-  if (action === 'closed') return 'closed'
-  if (action === 'opened') return 'opened'
-  return null
+  return item.metadata.action
 }
 
 function repoShortName(repo: string | null): string {
@@ -82,7 +67,7 @@ export const ActivityIndicator = memo(function ActivityIndicator({
 }: {
   date: string
 }) {
-  const activities = useActivityStore((s) => s.activitiesByDate[date])
+  const activities = useActivitiesForDate(date)
   if (!activities || activities.length === 0) return null
 
   const sorted = sortByTimestamp(activities)

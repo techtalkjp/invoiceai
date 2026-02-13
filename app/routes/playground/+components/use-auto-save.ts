@@ -1,5 +1,4 @@
 import { useEffect, useRef } from 'react'
-import { useActivityStore } from '~/components/timesheet/activity-store'
 import { timesheetEntrySchema } from '~/components/timesheet/schema'
 import { useTimesheetStore } from '~/components/timesheet/store'
 import type { MonthData } from '~/components/timesheet/types'
@@ -10,29 +9,38 @@ const ACTIVITY_STORAGE_KEY = 'invoiceai-playground-activities'
 
 /**
  * store の monthData と activitiesByDate を監視し、変更があれば LocalStorage に保存する
- * debounce 付きで頻繁な保存を防ぐ
+ * debounce 付きで頻繁な保存を防ぐ（単一サブスクリプション）
  *
  * useFetcher/clientAction を使わず直接 localStorage を操作することで、
  * React Router の revalidation や fetcher state 変更による再レンダリングを完全に回避する。
  */
 export function useAutoSave(monthKey: string) {
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const lastSavedRef = useRef<string>('')
+  const lastEntriesRef = useRef<string>('')
+  const lastActivitiesRef = useRef<string>('')
 
   useEffect(() => {
     const unsubscribe = useTimesheetStore.subscribe((state) => {
-      const monthData = state.monthData
-      const serialized = JSON.stringify(monthData)
+      const entries = JSON.stringify(state.monthData)
+      const activities = JSON.stringify(state.activitiesByDate)
 
-      if (serialized === lastSavedRef.current) return
+      const entriesChanged = entries !== lastEntriesRef.current
+      const activitiesChanged = activities !== lastActivitiesRef.current
+      if (!entriesChanged && !activitiesChanged) return
 
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current)
       }
 
       timeoutRef.current = setTimeout(() => {
-        lastSavedRef.current = serialized
-        saveMonthToStorage(monthKey, monthData)
+        if (entriesChanged) {
+          lastEntriesRef.current = entries
+          saveMonthToStorage(monthKey, state.monthData)
+        }
+        if (activitiesChanged) {
+          lastActivitiesRef.current = activities
+          saveActivitiesToStorage(monthKey, state.activitiesByDate)
+        }
       }, 500)
     })
 
@@ -40,34 +48,6 @@ export function useAutoSave(monthKey: string) {
       unsubscribe()
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current)
-      }
-    }
-  }, [monthKey])
-
-  // アクティビティの自動保存
-  const activityTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const lastActivityRef = useRef<string>('')
-
-  useEffect(() => {
-    const unsubscribe = useActivityStore.subscribe((state) => {
-      const serialized = JSON.stringify(state.activitiesByDate)
-
-      if (serialized === lastActivityRef.current) return
-
-      if (activityTimeoutRef.current) {
-        clearTimeout(activityTimeoutRef.current)
-      }
-
-      activityTimeoutRef.current = setTimeout(() => {
-        lastActivityRef.current = serialized
-        saveActivitiesToStorage(monthKey, state.activitiesByDate)
-      }, 500)
-    })
-
-    return () => {
-      unsubscribe()
-      if (activityTimeoutRef.current) {
-        clearTimeout(activityTimeoutRef.current)
       }
     }
   }, [monthKey])

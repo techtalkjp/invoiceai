@@ -1,3 +1,4 @@
+import { ImportIcon } from 'lucide-react'
 import { useCallback, useMemo, useState } from 'react'
 import { ControlBar } from '~/components/layout/control-bar'
 import { MonthNav } from '~/components/layout/month-nav'
@@ -10,8 +11,11 @@ import {
   useTimesheetStore,
 } from '~/components/timesheet'
 import { TimesheetPdfDownloadDialog } from '~/components/timesheet/pdf-download-dialog'
+import { Button } from '~/components/ui/button'
+import type { ActivityRecord } from '~/lib/activity-sources/types'
 import type { MonthEntry } from '../+schema'
 import { toMonthData } from './data-mapping'
+import { ImportPanel } from './import-panel'
 import { SaveStatusIndicator } from './save-status-indicator'
 import { useWorkHoursAutoSave } from './use-work-hours-auto-save'
 
@@ -23,7 +27,11 @@ interface WorkHoursTimesheetProps {
   organizationName: string
   clientName: string
   staffName: string
+  activitiesByDate?: Record<string, ActivityRecord[]> | undefined
   buildUrl: (year: number, month: number) => string
+  orgSlug: string
+  hasGitHubPat: boolean
+  mappings: Array<{ clientId: string; sourceIdentifier: string }>
 }
 
 export function WorkHoursTimesheet({
@@ -34,9 +42,14 @@ export function WorkHoursTimesheet({
   organizationName,
   clientName,
   staffName,
+  activitiesByDate,
   buildUrl,
+  orgSlug,
+  hasGitHubPat,
+  mappings,
 }: WorkHoursTimesheetProps) {
   const monthDates = useMemo(() => getMonthDates(year, month), [year, month])
+  const [isImportOpen, setIsImportOpen] = useState(false)
 
   // 自動保存
   const {
@@ -47,9 +60,11 @@ export function WorkHoursTimesheet({
 
   // サーバーデータを store にセット
   useState(() => {
+    const store = useTimesheetStore.getState()
     const data = toMonthData(clientEntry.entries)
-    useTimesheetStore.getState().setMonthData(data)
-    useTimesheetStore.getState().setMonthDates(monthDates)
+    store.setMonthData(data)
+    store.setMonthDates(monthDates)
+    store.setActivitiesByDate(activitiesByDate ?? {})
     initializeLastSaved(JSON.stringify(data))
   })
 
@@ -73,6 +88,16 @@ export function WorkHoursTimesheet({
         }
         right={
           <>
+            <Button
+              variant={isImportOpen ? 'secondary' : 'ghost'}
+              size="sm"
+              onClick={() => setIsImportOpen((v) => !v)}
+              className="text-muted-foreground text-xs"
+            >
+              <ImportIcon className="size-3.5" />
+              取込
+            </Button>
+            <div className="bg-border h-4 w-px" />
             <FilterToggleButton />
             <TimesheetPdfDownloadDialog
               year={year}
@@ -83,6 +108,16 @@ export function WorkHoursTimesheet({
             <TimesheetClearAllDialog onClearAll={handleClearAll} />
           </>
         }
+      />
+      <ImportPanel
+        clientId={clientId}
+        year={year}
+        month={month}
+        orgSlug={orgSlug}
+        isOpen={isImportOpen}
+        onOpenChange={setIsImportOpen}
+        hasGitHubPat={hasGitHubPat}
+        mappings={mappings}
       />
     </TimesheetArea>
   )

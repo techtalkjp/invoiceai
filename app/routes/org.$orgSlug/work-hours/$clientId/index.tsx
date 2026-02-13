@@ -1,20 +1,26 @@
 import { parseWithZod } from '@conform-to/zod/v4'
-import { SparklesIcon } from 'lucide-react'
-import { Link } from 'react-router'
 import { PageHeader } from '~/components/layout/page-header'
 import { getMonthDates } from '~/components/timesheet'
-import { Button } from '~/components/ui/button'
+import {
+  deleteClientSourceMapping,
+  getActivitySource,
+  getClientSourceMappings,
+  saveClientSourceMapping,
+} from '~/lib/activity-sources/activity-queries.server'
+import { decrypt } from '~/lib/activity-sources/encryption.server'
+import { fetchGitHubActivities } from '~/lib/activity-sources/github.server'
+import type { ActivityRecord } from '~/lib/activity-sources/types'
 import { requireOrgMember } from '~/lib/auth-helpers.server'
 import { parseWorkHoursText } from '../+ai-parse.server'
 import { toServerEntries } from '../+components/data-mapping'
-import { TextImportDialog } from '../+components/text-import-dialog'
 import { WorkHoursTimesheet } from '../+components/work-hours-timesheet'
 import { saveEntries, saveEntry, syncMonthEntries } from '../+mutations.server'
 import { getClientMonthEntries } from '../+queries.server'
 import { formSchema } from '../+schema'
+import { suggestWorkEntriesFromActivities } from '../+work-entry-suggest.server'
 import type { Route } from './+types/index'
 
-// saveMonthData は楽観的更新（store が正）なので revalidation 不要
+// saveMonthData / suggestFromGitHub は楽観的更新なので revalidation 不要
 export function shouldRevalidate({
   formData,
   defaultShouldRevalidate,
@@ -22,7 +28,8 @@ export function shouldRevalidate({
   formData?: FormData
   defaultShouldRevalidate: boolean
 }) {
-  if (formData?.get('intent') === 'saveMonthData') {
+  const intent = formData?.get('intent')
+  if (intent === 'saveMonthData' || intent === 'suggestFromGitHub') {
     return false
   }
   return defaultShouldRevalidate
@@ -56,16 +63,48 @@ export async function loader({ request, params }: Route.LoaderArgs) {
     ? Number.parseInt(monthParam, 10)
     : now.getMonth() + 1
 
-  const clientEntry = await getClientMonthEntries(
-    organization.id,
-    user.id,
-    clientId,
-    year,
-    month,
-  )
+  const [clientEntry, mappings, source] = await Promise.all([
+    getClientMonthEntries(organization.id, user.id, clientId, year, month),
+    getClientSourceMappings([clientId], 'github'),
+    getActivitySource(organization.id, user.id, 'github'),
+  ])
 
   if (!clientEntry) {
     throw new Response('クライアントが見つかりません', { status: 404 })
+  }
+
+  // マッピング済みリポジトリのアクティビティを GitHub API から取得
+  const activitiesByDate: Record<string, ActivityRecord[]> = {}
+  const mappedRepos = new Set(mappings.map((m) => m.sourceIdentifier))
+  if (mappedRepos.size > 0 && source?.credentials) {
+    try {
+      const pat = decrypt(source.credentials)
+      // ParseJSONResultsPlugin により config は既にパース済みオブジェクト
+      const config = source.config as { username?: string } | null
+      const username = config?.username
+      if (username) {
+        const startDate = `${year}-${String(month).padStart(2, '0')}-01`
+        const lastDay = new Date(year, month, 0).getDate()
+        const endDate = `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`
+        const allActivities = await fetchGitHubActivities(
+          pat,
+          username,
+          startDate,
+          endDate,
+        )
+        for (const a of allActivities) {
+          if (!a.repo || !mappedRepos.has(a.repo)) continue
+          let arr = activitiesByDate[a.eventDate]
+          if (!arr) {
+            arr = []
+            activitiesByDate[a.eventDate] = arr
+          }
+          arr.push(a)
+        }
+      }
+    } catch {
+      // PAT 復号失敗時はアクティビティなしで続行
+    }
   }
 
   const monthDates = getMonthDates(year, month)
@@ -77,11 +116,14 @@ export async function loader({ request, params }: Route.LoaderArgs) {
     month,
     monthDates,
     clientEntry,
+    activitiesByDate,
+    hasGitHubPat: !!source,
+    mappings,
   }
 }
 
 export async function action({ request, params }: Route.ActionArgs) {
-  const { orgSlug } = params
+  const { orgSlug, clientId } = params
   const { organization, user } = await requireOrgMember(request, orgSlug)
 
   const formData = await request.formData()
@@ -89,7 +131,7 @@ export async function action({ request, params }: Route.ActionArgs) {
   // saveMonthData は FormData で直接送信される（conform 経由ではない）
   const intent = formData.get('intent')
   if (intent === 'saveMonthData') {
-    const clientId = formData.get('clientId') as string
+    const formClientId = formData.get('clientId') as string
     const yearMonth = (formData.get('yearMonth') as string) || undefined
     const monthDataJson = formData.get('monthData') as string
     try {
@@ -102,11 +144,11 @@ export async function action({ request, params }: Route.ActionArgs) {
           description: string
         }
       >
-      const entries = toServerEntries(clientId, monthData)
+      const entries = toServerEntries(formClientId, monthData)
       await syncMonthEntries(
         organization.id,
         user.id,
-        clientId,
+        formClientId,
         entries,
         yearMonth,
       )
@@ -114,6 +156,75 @@ export async function action({ request, params }: Route.ActionArgs) {
     } catch {
       return { success: false, error: '保存に失敗しました' }
     }
+  }
+
+  // suggestFromGitHub は conform 経由せず直接処理
+  if (intent === 'suggestFromGitHub') {
+    const year = Number(formData.get('year'))
+    const month = Number(formData.get('month'))
+
+    const mappings = await getClientSourceMappings([clientId], 'github')
+    const mappedRepos = new Set(mappings.map((m) => m.sourceIdentifier))
+
+    if (mappedRepos.size === 0) {
+      return { suggestion: null, noActivities: true }
+    }
+
+    // activity_source から PAT + username を取得して GitHub API を直接呼出し
+    const source = await getActivitySource(organization.id, user.id, 'github')
+    if (!source?.credentials) {
+      return { suggestion: null, noActivities: true }
+    }
+
+    let pat: string
+    try {
+      pat = decrypt(source.credentials)
+    } catch {
+      return { suggestion: null, noActivities: true }
+    }
+
+    // ParseJSONResultsPlugin により config は既にパース済みオブジェクト
+    const config = source.config as { username?: string } | null
+    const username = config?.username
+    if (!username) {
+      return { suggestion: null, noActivities: true }
+    }
+
+    const startDate = `${year}-${String(month).padStart(2, '0')}-01`
+    const lastDay = new Date(year, month, 0).getDate()
+    const endDate = `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`
+
+    const allActivities = await fetchGitHubActivities(
+      pat,
+      username,
+      startDate,
+      endDate,
+    )
+    const activities = allActivities.filter(
+      (a) => a.repo && mappedRepos.has(a.repo),
+    )
+
+    if (activities.length === 0) {
+      return { suggestion: null, noActivities: true }
+    }
+
+    const suggestion = await suggestWorkEntriesFromActivities(activities)
+    return { suggestion }
+  }
+
+  // addMapping / removeMapping は conform 経由せず直接処理
+  if (intent === 'addMapping') {
+    const repoFullName = formData.get('repoFullName') as string
+    if (!repoFullName) return { error: 'リポジトリを選択してください' }
+    await saveClientSourceMapping(clientId, 'github', repoFullName)
+    return { mappingUpdated: true }
+  }
+
+  if (intent === 'removeMapping') {
+    const sourceIdentifier = formData.get('sourceIdentifier') as string
+    if (!sourceIdentifier) return { error: '対象が見つかりません' }
+    await deleteClientSourceMapping(clientId, 'github', sourceIdentifier)
+    return { mappingUpdated: true }
   }
 
   const submission = parseWithZod(formData, { schema: formSchema })
@@ -124,7 +235,7 @@ export async function action({ request, params }: Route.ActionArgs) {
 
   if (submission.value.intent === 'saveEntry') {
     const {
-      clientId,
+      clientId: entryClientId,
       workDate,
       startTime,
       endTime,
@@ -132,7 +243,7 @@ export async function action({ request, params }: Route.ActionArgs) {
       description,
     } = submission.value
     await saveEntry(organization.id, user.id, {
-      clientId,
+      clientId: entryClientId,
       workDate,
       ...(startTime !== undefined && { startTime }),
       ...(endTime !== undefined && { endTime }),
@@ -184,7 +295,16 @@ export async function action({ request, params }: Route.ActionArgs) {
 }
 
 export default function ClientWorkHours({
-  loaderData: { organization, user, year, month, clientEntry },
+  loaderData: {
+    organization,
+    user,
+    year,
+    month,
+    clientEntry,
+    activitiesByDate,
+    hasGitHubPat,
+    mappings,
+  },
   params: { orgSlug, clientId },
 }: Route.ComponentProps) {
   return (
@@ -192,19 +312,6 @@ export default function ClientWorkHours({
       <PageHeader
         title={clientEntry.clientName}
         subtitle="セルをクリックして編集 · Tab/Enterで移動"
-        actions={
-          <div className="flex items-center gap-2">
-            <Button asChild variant="outline" size="sm" className="text-xs">
-              <Link
-                to={`/org/${orgSlug}/work-hours/${clientId}/ai-preview?year=${year}&month=${month}`}
-              >
-                <SparklesIcon className="mr-1 size-3.5" />
-                候補生成
-              </Link>
-            </Button>
-            <TextImportDialog clientId={clientId} year={year} month={month} />
-          </div>
-        }
       />
 
       <WorkHoursTimesheet
@@ -215,9 +322,13 @@ export default function ClientWorkHours({
         organizationName={organization.name}
         clientName={clientEntry.clientName}
         staffName={user.name}
+        activitiesByDate={activitiesByDate}
         buildUrl={(y, m) =>
           `/org/${orgSlug}/work-hours/${clientId}?year=${y}&month=${m}`
         }
+        orgSlug={orgSlug}
+        hasGitHubPat={hasGitHubPat}
+        mappings={mappings}
       />
     </div>
   )

@@ -1,4 +1,4 @@
-import type { ActivityRecord } from './types'
+import type { ActivityRecord, ReviewState } from './types'
 
 const GITHUB_API = 'https://api.github.com'
 
@@ -333,14 +333,13 @@ export async function fetchGitHubActivities(
         if (eventDate < startDate || eventDate > endDate) continue
         const firstLine = commit.message.split('\n')[0] ?? ''
         records.push({
-          sourceType: 'github',
           eventType: 'commit',
           eventDate,
           eventTimestamp: commit.authoredDate,
           repo,
           title: firstLine,
           url: commit.url,
-          metadata: JSON.stringify({ oid: commit.oid.slice(0, 7) }),
+          metadata: { oid: commit.oid.slice(0, 7) },
         })
       }
     }
@@ -351,42 +350,39 @@ export async function fetchGitHubActivities(
     const createdDate = isoToJstDate(pr.createdAt)
     if (createdDate >= startDate && createdDate <= endDate) {
       records.push({
-        sourceType: 'github',
         eventType: 'pr',
         eventDate: createdDate,
         eventTimestamp: pr.createdAt,
         repo: pr.repository.nameWithOwner,
         title: pr.title,
         url: pr.url,
-        metadata: JSON.stringify({ action: 'opened' }),
+        metadata: { action: 'opened' },
       })
     }
     if (pr.merged && pr.mergedAt) {
       const mergedDate = isoToJstDate(pr.mergedAt)
       if (mergedDate >= startDate && mergedDate <= endDate) {
         records.push({
-          sourceType: 'github',
           eventType: 'pr',
           eventDate: mergedDate,
           eventTimestamp: pr.mergedAt,
           repo: pr.repository.nameWithOwner,
           title: pr.title,
           url: pr.url,
-          metadata: JSON.stringify({ action: 'merged' }),
+          metadata: { action: 'merged' },
         })
       }
     } else if (pr.state === 'CLOSED' && pr.closedAt) {
       const closedDate = isoToJstDate(pr.closedAt)
       if (closedDate >= startDate && closedDate <= endDate) {
         records.push({
-          sourceType: 'github',
           eventType: 'pr',
           eventDate: closedDate,
           eventTimestamp: pr.closedAt,
           repo: pr.repository.nameWithOwner,
           title: pr.title,
           url: pr.url,
-          metadata: JSON.stringify({ action: 'closed' }),
+          metadata: { action: 'closed' },
         })
       }
     }
@@ -398,14 +394,15 @@ export async function fetchGitHubActivities(
     const eventDate = isoToJstDate(review.occurredAt)
     if (eventDate < startDate || eventDate > endDate) continue
     records.push({
-      sourceType: 'github',
       eventType: 'review',
       eventDate,
       eventTimestamp: review.occurredAt,
       repo: review.pullRequest.repository.nameWithOwner,
       title: review.pullRequest.title,
       url: review.pullRequest.url,
-      metadata: JSON.stringify({ state: review.pullRequestReview.state }),
+      metadata: {
+        state: review.pullRequestReview.state as ReviewState,
+      },
     })
   }
 
@@ -414,7 +411,6 @@ export async function fetchGitHubActivities(
     const eventDate = isoToJstDate(comment.createdAt)
     if (eventDate < startDate || eventDate > endDate) continue
     records.push({
-      sourceType: 'github',
       eventType: 'issue_comment',
       eventDate,
       eventTimestamp: comment.createdAt,

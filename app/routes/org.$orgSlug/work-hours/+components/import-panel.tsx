@@ -2,42 +2,42 @@ import { GithubIcon, SparklesIcon } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { useFetcher } from 'react-router'
 import { toast } from 'sonner'
-import { useTimesheetStore } from '~/components/timesheet'
 import { Collapsible, CollapsibleContent } from '~/components/ui/collapsible'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '~/components/ui/tabs'
-import type { GitHubResult } from '../+lib/github-oauth.server'
-import type { ParsedWorkEntry } from '../../org.$orgSlug/work-hours/+ai-parse.server'
+import type { ParsedWorkEntry } from '../+ai-parse.server'
 import { applyEntries } from './apply-entries'
 import { GitHubTab } from './github-tab'
 import { TextTab } from './text-tab'
-import { saveActivities } from './use-auto-save'
 
 interface ImportPanelProps {
+  clientId: string
   year: number
   month: number
+  orgSlug: string
   isOpen: boolean
   onOpenChange: (open: boolean) => void
-  defaultTab?: 'text' | 'github' | undefined
-  githubResult?: GitHubResult | null | undefined
+  hasGitHubPat: boolean
+  mappings: Array<{ clientId: string; sourceIdentifier: string }>
 }
 
 export function ImportPanel({
+  clientId,
   year,
   month,
+  orgSlug,
   isOpen,
   onOpenChange,
-  defaultTab,
-  githubResult,
+  hasGitHubPat,
+  mappings,
 }: ImportPanelProps) {
   const [inputText, setInputText] = useState('')
-  // テキスト解析の結果を反映済みかどうか追跡
   const appliedRef = useRef(false)
 
   const parseFetcher = useFetcher<{
     entries?: ParsedWorkEntry[]
     parseErrors?: string[]
     error?: string
-  }>({ key: 'parse-text-playground' })
+  }>({ key: `parse-text-${clientId}` })
 
   const isParsing = parseFetcher.state !== 'idle'
 
@@ -55,7 +55,7 @@ export function ImportPanel({
     )
   }
 
-  // fetcher result との同期: 解析完了時に即反映
+  // 解析完了時に即反映
   useEffect(() => {
     if (parseFetcher.state !== 'idle' || appliedRef.current) return
     if (!parseFetcher.data?.entries) return
@@ -81,20 +81,18 @@ export function ImportPanel({
     onOpenChange(false)
   }, [parseFetcher.state, parseFetcher.data, onOpenChange])
 
-  const handleApplyGitHub = () => {
-    if (!githubResult?.entries.length) return
-
-    // アクティビティを store にセット + localStorage に保存（indicator 表示用）
-    if (githubResult.activities) {
-      useTimesheetStore.getState().setActivities(githubResult.activities)
-      const monthKey = `${year}-${String(month).padStart(2, '0')}`
-      saveActivities(monthKey, useTimesheetStore.getState().activitiesByDate)
-    }
-
-    applyEntries(githubResult.entries)
-    toast.success(
-      `@${githubResult.username}: ${githubResult.entries.length}件を反映しました`,
-    )
+  const handleApplyGitHub = (
+    entries: Array<{
+      workDate: string
+      startTime: string
+      endTime: string
+      breakMinutes: number
+      description: string
+    }>,
+  ) => {
+    if (entries.length === 0) return
+    applyEntries(entries)
+    toast.success(`${entries.length}件を反映しました`)
     onOpenChange(false)
   }
 
@@ -102,7 +100,7 @@ export function ImportPanel({
     <Collapsible open={isOpen} onOpenChange={onOpenChange}>
       <CollapsibleContent>
         <div className="bg-muted/30 rounded-md border p-3">
-          <Tabs defaultValue={defaultTab ?? 'text'}>
+          <Tabs defaultValue="text">
             <TabsList className="mb-3">
               <TabsTrigger value="text">
                 <SparklesIcon className="size-4" />
@@ -127,9 +125,12 @@ export function ImportPanel({
 
             <TabsContent value="github">
               <GitHubTab
+                clientId={clientId}
                 year={year}
                 month={month}
-                githubResult={githubResult}
+                orgSlug={orgSlug}
+                hasGitHubPat={hasGitHubPat}
+                mappings={mappings}
                 onApply={handleApplyGitHub}
               />
             </TabsContent>

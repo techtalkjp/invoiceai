@@ -32,8 +32,18 @@
 
 ## DB Clients (`app/lib/db/kysely.ts`)
 
-- `db`: app queries with `CamelCasePlugin` (camelCase columns).
-- `authDb`: better-auth queries (snake_case, no plugin).
+- `db`: app queries with `CamelCasePlugin` + `ParseJSONResultsPlugin`
+- `authDb`: better-auth queries (snake_case, no plugin)
+
+### Kysely 注意点
+
+- **`db`（アプリ用）**: `CamelCasePlugin` + `ParseJSONResultsPlugin`
+  - カラム名: `snake_case` → `camelCase` 自動変換。クエリ内でもキャメルケースで書く
+  - JSON カラム（`config`, `metadata` 等）: 取得時に自動パース済み。`JSON.parse()` 不要。キャストして直接アクセス（例: `row.config as { key?: string } | null`）
+  - `JSON.parse()` を二重に呼ぶと `"[object Object]" is not valid JSON` エラーになる
+- **`authDb`（better-auth 用）**: プラグインなし
+  - カラム名: `snake_case` のまま
+  - JSON カラム: 生の文字列。`JSON.parse()` が必要
 
 ## Route Colocation (react-router-auto-routes)
 

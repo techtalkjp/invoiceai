@@ -2,12 +2,12 @@ import { data, Link, redirect } from 'react-router'
 import { toast } from 'sonner'
 import { PageHeader } from '~/components/layout/page-header'
 import { PublicLayout } from '~/components/layout/public-layout'
+import { useTimesheetStore } from '~/components/timesheet'
 import { authClient } from '~/lib/auth-client'
 import { TimesheetDemo } from './+components/timesheet-demo'
 import {
   loadActivitiesFromStorage,
   loadFromStorage,
-  saveActivities,
 } from './+components/use-auto-save'
 import type { GitHubResult } from './+lib/github-oauth.server'
 import { buildPlaygroundUrl, resolveYearMonth } from './+lib/url-utils'
@@ -74,18 +74,12 @@ export async function clientLoader({
     window.history.replaceState(null, '', cleanUrl.toString())
   }
 
+  // localStorage から保存済みアクティビティを復元
+  // （githubResult のアクティビティは Import パネルの「反映」ボタンで store に入る）
   const monthKey = `${year}-${String(month).padStart(2, '0')}`
-  const { useActivityStore } =
-    await import('~/components/timesheet/activity-store')
-
-  if (githubResult) {
-    useActivityStore.getState().setActivities(githubResult.activities)
-    saveActivities(monthKey, useActivityStore.getState().activitiesByDate)
-  } else {
-    const savedActivities = loadActivitiesFromStorage(monthKey)
-    if (savedActivities) {
-      useActivityStore.getState().setActivitiesByDate(savedActivities)
-    }
+  const savedActivities = loadActivitiesFromStorage(monthKey)
+  if (savedActivities) {
+    useTimesheetStore.getState().setActivitiesByDate(savedActivities)
   }
 
   return { storedData, year, month, githubResult }

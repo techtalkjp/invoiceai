@@ -109,14 +109,13 @@ export async function action({ request }: Route.ActionArgs) {
       payload.commits?.map((commit) => {
         const eventDate = isoToJstDate(commit.timestamp)
         return {
-          sourceType: 'github',
-          eventType: 'commit',
+          eventType: 'commit' as const,
           eventDate,
           eventTimestamp: commit.timestamp,
           repo: repoFullName,
           title: commit.message.split('\n')[0] ?? null,
           url: commit.url ?? null,
-          metadata: JSON.stringify({ oid: commit.id.slice(0, 7) }),
+          metadata: { oid: commit.id.slice(0, 7) },
         }
       }) ?? []
 
