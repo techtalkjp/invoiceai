@@ -86,7 +86,7 @@ export default function SignUp({ loaderData }: Route.ComponentProps) {
           return
         }
 
-        navigate('/')
+        navigate('/setup')
       } catch {
         setServerError('登録に失敗しました')
         setIsLoading(false)

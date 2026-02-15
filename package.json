@@ -13,6 +13,7 @@
     "cli:google": "tsx src/google-auth.ts",
     "cli:invoice": "tsx src/create-invoice.ts",
     "cli:activity": "tsx src/sync-activities.ts",
+    "cli": "tsx src/cli.ts",
     "test": "vitest",
     "test:watch": "vitest --watch",
     "cli:typecheck": "tsc -p tsconfig.json",
@@ -21,8 +22,9 @@
     "format:fix": "prettier . --write --experimental-cli",
     "typecheck": "react-router typegen && tsc",
     "validate": "run-p format lint && run-p typecheck",
-    "db:push": "atlas schema apply --env local --auto-approve",
+    "db:push": "atlas schema apply --env local --auto-approve && pnpm -s db:seed:local",
     "db:push:production": "dotenv -e .env.production -- atlas schema apply --env production --auto-approve",
+    "db:seed:local": "tsx src/db-seed.ts",
     "db:types": "kysely-codegen --dialect libsql --camel-case --url file:db/local.db --out-file app/lib/db/types.ts",
     "prepare": "husky"
   },

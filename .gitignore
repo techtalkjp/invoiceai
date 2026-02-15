@@ -29,6 +29,7 @@ terraform/.terraform.lock.hcl
 
 # Local Database
 db/local.db
+db/*.db
 
 # references
 z/

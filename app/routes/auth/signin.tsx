@@ -1,7 +1,7 @@
 import { getFormProps, getInputProps, useForm } from '@conform-to/react'
 import { parseWithZod } from '@conform-to/zod/v4'
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router'
+import { Link, useNavigate, useSearchParams } from 'react-router'
 import { z } from 'zod'
 import { PublicLayout } from '~/components/layout/public-layout'
 import { PasswordInput } from '~/components/password-input'
@@ -30,6 +30,7 @@ export const formSchema = z.object({
 
 export default function SignIn() {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const [serverError, setServerError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
 
@@ -62,7 +63,8 @@ export default function SignIn() {
           return
         }
 
-        navigate('/')
+        const callbackURL = searchParams.get('callbackURL')
+        navigate(callbackURL ?? '/')
       } catch {
         setServerError('ログインに失敗しました')
         setIsLoading(false)

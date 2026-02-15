@@ -145,3 +145,10 @@ org.$orgSlug/
 
 - Copy `.env.example` → `.env` and set freee/Google OAuth.
 - Never log tokens or commit `.env`.
+
+## Engineering Policy (Root-Cause First)
+
+- その場しのぎのフォールバックや暫定逃げは採用しない。必ず根本原因に対処する。
+- 一時的回避ではなく、再発防止まで含めて実装する（初期化、運用コマンド、検証手順を整備）。
+- データ初期化が必要な機能は、`db:push` 後に利用可能な状態になるまで自動化する。
+- 「次回も同じ作業が必要」な手順はコード化し、手動運用に残さない。

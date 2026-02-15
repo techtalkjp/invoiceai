@@ -143,3 +143,212 @@ export async function getUserOrganizations(userId: string) {
     .orderBy('member.createdAt', 'asc')
     .execute()
 }
+
+export async function getActiveClientCount(
+  organizationId: string,
+): Promise<number> {
+  const row = await db
+    .selectFrom('client')
+    .select((eb) => eb.fn.count<string>('id').as('count'))
+    .where('organizationId', '=', organizationId)
+    .where('isActive', '=', 1)
+    .executeTakeFirst()
+
+  return Number(row?.count ?? 0)
+}
+
+type OrganizationMetadata = {
+  setupCompletedUserIds?: string[]
+  workspaceNameConfirmedUserIds?: string[]
+}
+
+function parseOrganizationMetadata(raw: unknown): OrganizationMetadata {
+  if (!raw) return {}
+
+  if (typeof raw === 'object' && raw !== null) {
+    return raw as OrganizationMetadata
+  }
+
+  if (typeof raw === 'string') {
+    try {
+      return JSON.parse(raw) as OrganizationMetadata
+    } catch {
+      return {}
+    }
+  }
+
+  return {}
+}
+
+export async function hasUserCompletedSetup(
+  organizationId: string,
+  userId: string,
+): Promise<boolean> {
+  const org = await db
+    .selectFrom('organization')
+    .select('metadata')
+    .where('id', '=', organizationId)
+    .executeTakeFirst()
+
+  const metadata = parseOrganizationMetadata(org?.metadata)
+  return (metadata.setupCompletedUserIds ?? []).includes(userId)
+}
+
+export async function markUserSetupCompleted(
+  organizationId: string,
+  userId: string,
+): Promise<void> {
+  const org = await db
+    .selectFrom('organization')
+    .select('metadata')
+    .where('id', '=', organizationId)
+    .executeTakeFirst()
+
+  const metadata = parseOrganizationMetadata(org?.metadata)
+  const setupCompletedUserIds = Array.from(
+    new Set([...(metadata.setupCompletedUserIds ?? []), userId]),
+  )
+
+  await db
+    .updateTable('organization')
+    .set({
+      metadata: JSON.stringify({
+        ...metadata,
+        setupCompletedUserIds,
+      }),
+      updatedAt: new Date().toISOString(),
+    })
+    .where('id', '=', organizationId)
+    .execute()
+}
+
+export async function hasUserConfirmedWorkspaceName(
+  organizationId: string,
+  userId: string,
+): Promise<boolean> {
+  const org = await db
+    .selectFrom('organization')
+    .select('metadata')
+    .where('id', '=', organizationId)
+    .executeTakeFirst()
+
+  const metadata = parseOrganizationMetadata(org?.metadata)
+  return (metadata.workspaceNameConfirmedUserIds ?? []).includes(userId)
+}
+
+export async function markUserWorkspaceNameConfirmed(
+  organizationId: string,
+  userId: string,
+): Promise<void> {
+  const org = await db
+    .selectFrom('organization')
+    .select('metadata')
+    .where('id', '=', organizationId)
+    .executeTakeFirst()
+
+  const metadata = parseOrganizationMetadata(org?.metadata)
+  const workspaceNameConfirmedUserIds = Array.from(
+    new Set([...(metadata.workspaceNameConfirmedUserIds ?? []), userId]),
+  )
+
+  await db
+    .updateTable('organization')
+    .set({
+      metadata: JSON.stringify({
+        ...metadata,
+        workspaceNameConfirmedUserIds,
+      }),
+      updatedAt: new Date().toISOString(),
+    })
+    .where('id', '=', organizationId)
+    .execute()
+}
+
+function toSlug(input: string): string {
+  const normalized = input
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 40)
+
+  return normalized || 'org'
+}
+
+async function generateUniqueOrganizationSlug(base: string): Promise<string> {
+  for (let i = 0; i < 1000; i += 1) {
+    const candidate = i === 0 ? base : `${base}-${i + 1}`
+    const exists = await db
+      .selectFrom('organization')
+      .select('id')
+      .where('slug', '=', candidate)
+      .executeTakeFirst()
+    if (!exists) {
+      return candidate
+    }
+  }
+
+  return `${base}-${crypto.randomUUID().slice(0, 8)}`
+}
+
+/**
+ * ユーザーが所属組織を1件も持たない場合、初回組織を自動作成して owner として所属させる
+ */
+export async function ensureUserHasOrganization(user: {
+  id: string
+  name: string
+  email: string
+}) {
+  const existing = await getFirstOrganization(user.id)
+  if (existing) {
+    return existing
+  }
+
+  const now = new Date().toISOString()
+  const baseSlug = toSlug(user.email.split('@')[0] || user.name)
+  const slug = await generateUniqueOrganizationSlug(baseSlug)
+  const organizationId = crypto.randomUUID()
+
+  await db.transaction().execute(async (trx) => {
+    const alreadyMember = await trx
+      .selectFrom('member')
+      .select('id')
+      .where('userId', '=', user.id)
+      .executeTakeFirst()
+
+    if (alreadyMember) {
+      return
+    }
+
+    await trx
+      .insertInto('organization')
+      .values({
+        id: organizationId,
+        name: `${user.name} の組織`,
+        slug,
+        freeeCompanyId: null,
+        createdAt: now,
+        updatedAt: now,
+      })
+      .execute()
+
+    await trx
+      .insertInto('member')
+      .values({
+        id: crypto.randomUUID(),
+        organizationId,
+        userId: user.id,
+        role: 'owner',
+        createdAt: now,
+        updatedAt: now,
+      })
+      .execute()
+  })
+
+  const created = await getFirstOrganization(user.id)
+  if (!created) {
+    throw new Error('初回組織の作成に失敗しました。')
+  }
+  return created
+}

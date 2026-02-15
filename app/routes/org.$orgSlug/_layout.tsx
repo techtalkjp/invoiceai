@@ -10,6 +10,7 @@ import {
 import { Link, NavLink, Outlet, useNavigate } from 'react-router'
 import { AppLogo } from '~/components/layout/app-logo'
 import { Header } from '~/components/layout/header'
+import { Button } from '~/components/ui/button'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -34,7 +35,9 @@ import {
 } from '~/components/ui/sidebar'
 import { signOut } from '~/lib/auth-client'
 import {
+  getActiveClientCount,
   getUserOrganizations,
+  hasUserCompletedSetup,
   requireOrgMember,
 } from '~/lib/auth-helpers.server'
 import type { Route } from './+types/_layout'
@@ -54,12 +57,40 @@ export async function loader({ request, params }: Route.LoaderArgs) {
   )
 
   const organizations = await getUserOrganizations(user.id)
+  const isBillingStaff =
+    membership.role === 'owner' || membership.role === 'admin'
+  let showSetupResume = false
+  let setupResumeMessage = 'CLI接続を完了すると、セットアップが完了します。'
+  if (isBillingStaff) {
+    const [clientCount, setupCompleted] = await Promise.all([
+      getActiveClientCount(organization.id),
+      hasUserCompletedSetup(organization.id, user.id),
+    ])
+    showSetupResume = !setupCompleted
+    if (clientCount === 0) {
+      setupResumeMessage =
+        'まずクライアントを1件作成してください。作成後にCLI接続へ進めます。'
+    }
+  }
 
-  return { user, organization, membership, organizations }
+  return {
+    user,
+    organization,
+    membership,
+    organizations,
+    showSetupResume,
+    setupResumeMessage,
+  }
 }
 
 export default function OrgLayout({
-  loaderData: { user, organization, membership },
+  loaderData: {
+    user,
+    organization,
+    membership,
+    showSetupResume,
+    setupResumeMessage,
+  },
 }: Route.ComponentProps) {
   const navigate = useNavigate()
   const isOwner = membership.role === 'owner'
@@ -243,6 +274,19 @@ export default function OrgLayout({
       <SidebarInset>
         <Header />
         <div className="flex-1 overflow-y-auto p-3 md:p-6">
+          {showSetupResume && (
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-white p-3">
+              <div className="grid gap-0.5">
+                <p className="text-sm font-medium">初期設定の続きがあります</p>
+                <p className="text-muted-foreground text-xs">
+                  {setupResumeMessage}
+                </p>
+              </div>
+              <Button size="sm" asChild>
+                <Link to="/setup">初期設定を再開</Link>
+              </Button>
+            </div>
+          )}
           <Outlet context={{ organization, membership, user }} />
         </div>
       </SidebarInset>

@@ -1,6 +1,6 @@
 import { db } from './db/kysely'
-
-export type FeatureFlagKey = 'signup_enabled'
+import { FEATURE_FLAGS, type FeatureFlagKey } from './feature-flags'
+export type { FeatureFlagKey } from './feature-flags'
 
 export async function isFeatureEnabled(key: FeatureFlagKey): Promise<boolean> {
   const flag = await db
@@ -28,9 +28,23 @@ export async function getFeatureFlags() {
 }
 
 export async function setFeatureFlag(key: FeatureFlagKey, enabled: boolean) {
+  const now = new Date().toISOString()
+
   await db
-    .updateTable('featureFlag')
-    .set({ defaultValue: enabled ? 1 : 0, updatedAt: new Date().toISOString() })
-    .where('key', '=', key)
+    .insertInto('featureFlag')
+    .values({
+      id: key,
+      key,
+      description: FEATURE_FLAGS[key].description,
+      defaultValue: enabled ? 1 : 0,
+      createdAt: now,
+      updatedAt: now,
+    })
+    .onConflict((oc) =>
+      oc.column('key').doUpdateSet({
+        defaultValue: enabled ? 1 : 0,
+        updatedAt: now,
+      }),
+    )
     .execute()
 }

@@ -9,7 +9,11 @@ import {
   CardHeader,
   CardTitle,
 } from '~/components/ui/card'
-import { getFirstOrganization, getSession } from '~/lib/auth-helpers.server'
+import {
+  ensureUserHasOrganization,
+  getActiveClientCount,
+  getSession,
+} from '~/lib/auth-helpers.server'
 import type { Route } from './+types/index'
 
 export function meta() {
@@ -27,9 +31,17 @@ export async function loader({ request }: Route.LoaderArgs) {
     return { authenticated: false }
   }
 
-  // ログイン済みなら組織ダッシュボードへ
-  const org = await getFirstOrganization(session.user.id)
+  // ログイン済みなら初回組織を保証して組織ダッシュボードへ
+  const org = await ensureUserHasOrganization({
+    id: session.user.id,
+    name: session.user.name,
+    email: session.user.email,
+  })
   if (org?.slug) {
+    const clientCount = await getActiveClientCount(org.id)
+    if (clientCount === 0) {
+      throw redirect('/setup')
+    }
     throw redirect(`/org/${org.slug}`)
   }
 
