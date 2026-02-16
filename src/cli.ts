@@ -109,7 +109,7 @@ async function selectRepositories(
 
   const preserved = new Map(
     existingMappings
-      .filter((mapping) => !force)
+      .filter(() => !force)
       .map((mapping) => [mapping.path, mapping]),
   )
 
