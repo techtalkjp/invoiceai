@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import type { InvoiceClient } from './invoice-service'
-import { createClientInvoice } from './invoice-service'
+import type { InvoiceClient } from './service'
+import { createClientInvoice } from './service'
 
 const client: InvoiceClient = {
   freeePartnerId: 10,

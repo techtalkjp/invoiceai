@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { createFreeeClient } from './freee'
+import { createFreeeClient } from './client'
 
 type MockResponse = {
   ok: boolean

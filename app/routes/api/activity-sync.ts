@@ -1,6 +1,6 @@
-import { syncAllGitHubActivities } from '@shared/services/activity-sync'
 import { timingSafeEqual } from 'node:crypto'
 import { data } from 'react-router'
+import { syncAllGitHubActivities } from '~/lib/activity-sources/activity-sync.server'
 import type { Route } from './+types/activity-sync'
 
 /**

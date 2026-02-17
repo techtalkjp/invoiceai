@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { listInvoices } from './freee-listing'
+import { listInvoices } from './listing'
 
 describe('listInvoices', () => {
   it('paginates, sorts by billing_date desc, and limits results', async () => {

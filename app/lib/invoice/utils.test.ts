@@ -1,21 +1,13 @@
 import { describe, expect, it } from 'vitest'
-import type { Client } from '../clients'
 import {
   generateSubject,
   getBillingDate,
   getMonthSheetName,
   getPaymentDate,
-} from './invoice-utils'
+} from './utils'
 
-const sampleClient: Client = {
-  id: 'sample',
-  name: 'Sample',
-  freeePartnerName: 'Sample Inc.',
-  freeePartnerId: 1,
-  hourlyRate: 1000,
-  hasWorkDescription: true,
+const sampleClient = {
   invoiceSubjectTemplate: '案件 {year}-{month}',
-  invoiceNote: '',
 }
 
 describe('invoice utils', () => {

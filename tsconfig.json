@@ -9,8 +9,7 @@
     "types": ["node", "vite/client", "vitest/globals"],
     "baseUrl": ".",
     "paths": {
-      "~/*": ["./app/*"],
-      "@shared/*": ["./src/*"]
+      "~/*": ["./app/*"]
     },
     "strict": true,
     "noUncheckedIndexedAccess": true,

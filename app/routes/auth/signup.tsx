@@ -1,7 +1,7 @@
 import { getFormProps, getInputProps, useForm } from '@conform-to/react'
 import { parseWithZod } from '@conform-to/zod/v4'
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router'
+import { Link, useNavigate, useSearchParams } from 'react-router'
 import { z } from 'zod'
 import { PublicLayout } from '~/components/layout/public-layout'
 import { PasswordInput } from '~/components/password-input'
@@ -51,6 +51,7 @@ export const formSchema = z
 export default function SignUp({ loaderData }: Route.ComponentProps) {
   const { signupEnabled } = loaderData
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const [serverError, setServerError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
 
@@ -86,7 +87,8 @@ export default function SignUp({ loaderData }: Route.ComponentProps) {
           return
         }
 
-        navigate('/setup')
+        const callbackURL = searchParams.get('callbackURL')
+        navigate(callbackURL ?? '/setup')
       } catch {
         setServerError('登録に失敗しました')
         setIsLoading(false)
@@ -202,7 +204,7 @@ export default function SignUp({ loaderData }: Route.ComponentProps) {
               <p className="text-muted-foreground text-center text-sm">
                 すでにアカウントをお持ちですか？{' '}
                 <Link
-                  to="/auth/signin"
+                  to={`/auth/signin${searchParams.has('callbackURL') ? `?callbackURL=${encodeURIComponent(searchParams.get('callbackURL') ?? '')}` : ''}`}
                   className="text-primary hover:underline"
                 >
                   ログイン

@@ -129,7 +129,7 @@ export default function SignIn() {
               <p className="text-muted-foreground text-center text-sm">
                 アカウントをお持ちでないですか？{' '}
                 <Link
-                  to="/auth/signup"
+                  to={`/auth/signup${searchParams.has('callbackURL') ? `?callbackURL=${encodeURIComponent(searchParams.get('callbackURL') ?? '')}` : ''}`}
                   className="text-primary hover:underline"
                 >
                   登録する

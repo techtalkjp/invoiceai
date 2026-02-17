@@ -1,14 +1,5 @@
 import { getFormProps, useForm } from '@conform-to/react'
 import { parseWithZod } from '@conform-to/zod/v4'
-import {
-  getBillingDate,
-  getPaymentDate,
-  type PaymentTerms,
-} from '@shared/core/invoice-utils'
-import {
-  createClientInvoice,
-  updateClientInvoice,
-} from '@shared/services/invoice-service'
 import { Form, Link, useActionData, useNavigation } from 'react-router'
 import { BillingTypeBadge } from '~/components/billing-type-badge'
 import { ContentPanel } from '~/components/layout/content-panel'
@@ -26,6 +17,12 @@ import {
 } from '~/components/ui/select'
 import { requireOrgMember } from '~/lib/auth-helpers.server'
 import { db } from '~/lib/db/kysely'
+import { createClientInvoice, updateClientInvoice } from '~/lib/invoice/service'
+import {
+  getBillingDate,
+  getPaymentDate,
+  type PaymentTerms,
+} from '~/lib/invoice/utils'
 import { getFreeeClientForOrganization } from '~/utils/freee.server'
 import {
   formatYearMonth,

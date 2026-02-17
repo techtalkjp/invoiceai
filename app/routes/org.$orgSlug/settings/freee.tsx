@@ -1,9 +1,5 @@
 import { getFormProps, getInputProps, useForm } from '@conform-to/react'
 import { parseWithZod } from '@conform-to/zod/v4'
-import {
-  buildFreeeAuthUrl,
-  requestFreeeTokenWithCode,
-} from '@shared/services/freee-oauth'
 import { CheckCircle2Icon, ExternalLinkIcon, RefreshCwIcon } from 'lucide-react'
 import { Form, useActionData } from 'react-router'
 import { z } from 'zod'
@@ -26,6 +22,7 @@ import {
 } from '~/components/ui/select'
 import { requireOrgAdmin } from '~/lib/auth-helpers.server'
 import { db } from '~/lib/db/kysely'
+import { buildFreeeAuthUrl, requestFreeeTokenWithCode } from '~/lib/freee/oauth'
 import {
   getProviderToken,
   saveProviderToken,

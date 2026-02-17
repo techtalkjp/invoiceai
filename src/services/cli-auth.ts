@@ -1,6 +1,6 @@
 import { createServer } from 'node:http'
 import { openBrowser } from '../adapters/cli'
-import { saveConfig } from './cli-config'
+import { saveAuth } from './cli-config'
 
 const DEFAULT_PORT = 8791
 const DEFAULT_SERVER_URL =
@@ -79,6 +79,6 @@ export async function cliLogin(
     }, 120_000)
   })
 
-  saveConfig({ token, serverUrl })
+  saveAuth(token, serverUrl)
   console.log('ログインに成功しました')
 }

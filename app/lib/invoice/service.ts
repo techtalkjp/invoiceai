@@ -3,7 +3,7 @@ import {
   getBillingDate,
   getPaymentDate,
   type PaymentTerms,
-} from '../core/invoice-utils'
+} from './utils'
 
 /**
  * 請求書作成に必要なクライアント情報
