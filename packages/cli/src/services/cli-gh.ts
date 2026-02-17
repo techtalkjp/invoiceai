@@ -141,9 +141,7 @@ export function fetchReviewsSince(
           state: 'COMMENTED', // search API では state を取得できないのでデフォルト
           submittedAt: since, // 正確な日時は個別 API が必要
         })
-      } catch {
-        continue
-      }
+      } catch {}
     }
     return reviews
   } catch {
@@ -197,9 +195,7 @@ export function fetchCommentsSince(
           issueUrl: item.html_url,
           createdAt: item.created_at,
         })
-      } catch {
-        continue
-      }
+      } catch {}
     }
     return comments
   } catch {
