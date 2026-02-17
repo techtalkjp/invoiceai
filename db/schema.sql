@@ -289,6 +289,38 @@ CREATE INDEX IF NOT EXISTS "activity_org_user_date_idx"
 CREATE UNIQUE INDEX IF NOT EXISTS "activity_unique_event_idx"
   ON "activity"("organization_id", "user_id", "event_type", "event_timestamp", "repo");
 
+-- GitHub App installation (per organization)
+CREATE TABLE IF NOT EXISTS "github_installation" (
+  "id" TEXT PRIMARY KEY NOT NULL,
+  "organization_id" TEXT NOT NULL REFERENCES "organization"("id") ON DELETE CASCADE,
+  "installation_id" INTEGER NOT NULL UNIQUE,
+  "account_login" TEXT NOT NULL,
+  "target_type" TEXT NOT NULL,
+  "permissions" TEXT,
+  "repository_selection" TEXT,
+  "suspended_at" TEXT,
+  "created_at" TEXT NOT NULL DEFAULT (datetime('now')),
+  "updated_at" TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS "github_installation_org_idx"
+  ON "github_installation"("organization_id");
+
+-- GitHub username ↔ InvoiceAI user mapping (per organization)
+CREATE TABLE IF NOT EXISTS "github_user_mapping" (
+  "id" TEXT PRIMARY KEY NOT NULL,
+  "organization_id" TEXT NOT NULL REFERENCES "organization"("id") ON DELETE CASCADE,
+  "user_id" TEXT NOT NULL REFERENCES "user"("id") ON DELETE CASCADE,
+  "github_username" TEXT NOT NULL,
+  "created_at" TEXT NOT NULL DEFAULT (datetime('now')),
+  "updated_at" TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS "github_user_mapping_org_user_idx"
+  ON "github_user_mapping"("organization_id", "user_id");
+CREATE INDEX IF NOT EXISTS "github_user_mapping_username_idx"
+  ON "github_user_mapping"("organization_id", "github_username");
+
 -- Playground AI usage tracking
 CREATE TABLE IF NOT EXISTS "playground_ai_usage" (
   "id" TEXT PRIMARY KEY NOT NULL,

@@ -66,15 +66,12 @@ function AddRepoForm({
   clientId: string
 }) {
   const {
-    selectedOrg,
     repoValue,
     setRepoValue,
     repoQuery,
     setRepoQuery,
-    ghOrgs,
     repos,
     isLoadingRepos,
-    handleOrgChange,
     handleRepoQueryChange,
   } = useRepoFetcher(orgSlug, `repos-fetcher-${clientId}`)
 
@@ -84,8 +81,6 @@ function AddRepoForm({
       <input type="hidden" name="repoFullName" value={repoValue} />
 
       <RepoSelector
-        selectedOrg={selectedOrg}
-        onOrgChange={handleOrgChange}
         repoValue={repoValue}
         onRepoValueChange={setRepoValue}
         repoQuery={repoQuery}
@@ -94,7 +89,6 @@ function AddRepoForm({
           handleRepoQueryChange(v)
         }}
         isLoadingRepos={isLoadingRepos}
-        ghOrgs={ghOrgs}
         repos={repos}
       />
       <Button type="submit" size="sm" disabled={!repoValue}>

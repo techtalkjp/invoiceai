@@ -4,7 +4,7 @@ import { getActivitiesByMonth } from '~/lib/activity-sources/activity-queries.se
 import { runCli } from './cli/run'
 import {
   syncAllGitHubActivities,
-  syncUserGitHubActivities,
+  syncOrgGitHubActivities,
 } from './services/activity-sync'
 
 function getDateRange(monthArg?: string): {
@@ -44,44 +44,32 @@ function main() {
 
   cli
     .command('sync', 'GitHubアクティビティを同期')
-    .option('--org <orgId>', '組織ID')
-    .option('--user <userId>', 'ユーザーID')
+    .option('--org <orgId>', '組織ID (省略時は全組織)')
     .option('--month <YYYY-MM>', '対象月 (省略時は過去7日間)')
-    .action(
-      async (options: { org?: string; user?: string; month?: string }) => {
-        const { startDate, endDate } = getDateRange(options.month)
-        console.log(`同期期間: ${startDate} ～ ${endDate}`)
+    .action(async (options: { org?: string; month?: string }) => {
+      const { startDate, endDate } = getDateRange(options.month)
+      console.log(`同期期間: ${startDate} ～ ${endDate}`)
 
-        if ((options.org && !options.user) || (!options.org && options.user)) {
-          console.error('--org と --user は両方指定してください')
-          process.exit(1)
+      if (options.org) {
+        const results = await syncOrgGitHubActivities(
+          options.org,
+          startDate,
+          endDate,
+        )
+        for (const r of results) {
+          const status = r.error ? `エラー: ${r.error}` : `${r.inserted} 件追加`
+          console.log(`  [${r.userId}] ${status}`)
         }
-
-        if (options.org && options.user) {
-          const result = await syncUserGitHubActivities(
-            options.org,
-            options.user,
-            startDate,
-            endDate,
-          )
-          if (result.error) {
-            console.error(`エラー: ${result.error}`)
-          } else {
-            console.log(`${result.inserted} 件のアクティビティを追加しました`)
-          }
-        } else {
-          console.log('全ユーザーのアクティビティを同期中...')
-          const results = await syncAllGitHubActivities(startDate, endDate)
-          for (const r of results) {
-            const status = r.error
-              ? `エラー: ${r.error}`
-              : `${r.inserted} 件追加`
-            console.log(`  [${r.organizationId}/${r.userId}] ${status}`)
-          }
-          console.log(`合計: ${results.length} ユーザーを処理しました`)
+      } else {
+        console.log('全組織のアクティビティを同期中...')
+        const results = await syncAllGitHubActivities(startDate, endDate)
+        for (const r of results) {
+          const status = r.error ? `エラー: ${r.error}` : `${r.inserted} 件追加`
+          console.log(`  [${r.organizationId}/${r.userId}] ${status}`)
         }
-      },
-    )
+        console.log(`合計: ${results.length} ユーザーを処理しました`)
+      }
+    })
 
   cli
     .command('activities', 'アクティビティ一覧を表示')

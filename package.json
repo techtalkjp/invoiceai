@@ -26,6 +26,7 @@
     "db:push:production": "dotenv -e .env.production -- atlas schema apply --env production --auto-approve",
     "db:seed:local": "tsx src/db-seed.ts",
     "db:types": "kysely-codegen --dialect libsql --camel-case --url file:db/local.db --out-file app/lib/db/types.ts",
+    "tunnel": "dotenv -- bash -c 'ngrok http --url=$NGROK_DOMAIN 5173'",
     "prepare": "husky"
   },
   "keywords": [],
@@ -54,6 +55,7 @@
     "dayjs": "1.11.19",
     "dotenv": "17.2.3",
     "isbot": "5.1.34",
+    "jsonwebtoken": "9.0.3",
     "kysely": "0.28.10",
     "kysely-libsql": "0.7.1",
     "lucide-react": "0.563.0",
@@ -80,6 +82,7 @@
     "@biomejs/biome": "2.3.13",
     "@react-router/dev": "7.13.0",
     "@tailwindcss/vite": "4.1.13",
+    "@types/jsonwebtoken": "9.0.10",
     "@types/node": "25.1.0",
     "@types/react": "19.2.10",
     "@types/react-dom": "19.2.3",

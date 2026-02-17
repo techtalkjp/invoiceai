@@ -1,49 +1,71 @@
-import { getActivitySource } from '~/lib/activity-sources/activity-queries.server'
-import { decrypt } from '~/lib/activity-sources/encryption.server'
-import {
-  fetchGitHubOrgs,
-  fetchGitHubUsername,
-  fetchRecentRepos,
-  searchRepos,
-} from '~/lib/activity-sources/github.server'
 import { requireOrgMember } from '~/lib/auth-helpers.server'
+import { getGitHubTokenForOrg } from '~/lib/github-app/get-token-for-org.server'
 import type { Route } from './+types/repos'
 
+interface GitHubRepo {
+  full_name: string
+  pushed_at: string | null
+}
+
+const headers = (token: string) => ({
+  Authorization: `Bearer ${token}`,
+  Accept: 'application/vnd.github+json',
+  'X-GitHub-Api-Version': '2022-11-28',
+})
+
 /**
- * Resource route: GitHub 組織一覧 + リポジトリ一覧
+ * Resource route: GitHub リポジトリ一覧
  *
- * GET /org/:orgSlug/settings/integrations/repos?ghOrg=xxx&q=keyword
+ * GET /org/:orgSlug/settings/integrations/repos?q=keyword
+ *
+ * Installation Token でアクセス可能なリポジトリを返す
  */
 export async function loader({ request, params }: Route.LoaderArgs) {
-  const { organization, user } = await requireOrgMember(request, params.orgSlug)
+  const { organization } = await requireOrgMember(request, params.orgSlug)
 
-  const source = await getActivitySource(organization.id, user.id, 'github')
-  if (!source) {
-    return { ghOrgs: [], repos: [], error: null as string | null }
+  let token: string
+  try {
+    token = await getGitHubTokenForOrg(organization.id)
+  } catch {
+    return { repos: [], error: 'not_installed' as const }
   }
 
   const url = new URL(request.url)
-  const ghOrg = url.searchParams.get('ghOrg')
-  const q = url.searchParams.get('q')
+  const q = url.searchParams.get('q')?.toLowerCase()
 
   try {
-    const pat = decrypt(source.credentials)
-    const [orgs, username] = await Promise.all([
-      fetchGitHubOrgs(pat),
-      fetchGitHubUsername(pat),
-    ])
-    const repos = q
-      ? await searchRepos(pat, q, ghOrg ?? undefined, username)
-      : await fetchRecentRepos(pat, ghOrg ?? undefined)
-    return { ghOrgs: orgs, repos, error: null as string | null }
-  } catch (e) {
-    const message = e instanceof Error ? e.message : 'Unknown error'
-    const isAuthError =
-      message.includes('401') || message.includes('Bad credentials')
-    return {
-      ghOrgs: [],
-      repos: [],
-      error: isAuthError ? 'token_expired' : 'fetch_failed',
+    // Installation Token ではリポジトリ一覧を取得
+    const res = await fetch(
+      'https://api.github.com/installation/repositories?per_page=100&sort=pushed&direction=desc',
+      { headers: headers(token) },
+    )
+
+    if (!res.ok) {
+      return { repos: [], error: 'fetch_failed' as const }
     }
+
+    const data = (await res.json()) as {
+      repositories: GitHubRepo[]
+    }
+
+    let repos = data.repositories
+      .map((r) => ({
+        fullName: r.full_name,
+        pushedAt: r.pushed_at,
+      }))
+      .sort((a, b) => {
+        const ta = a.pushedAt ?? ''
+        const tb = b.pushedAt ?? ''
+        return tb.localeCompare(ta)
+      })
+
+    // クエリがあればフィルタ（ソート順は維持）
+    if (q) {
+      repos = repos.filter((r) => r.fullName.toLowerCase().includes(q))
+    }
+
+    return { repos, error: null }
+  } catch {
+    return { repos: [], error: 'fetch_failed' as const }
   }
 }

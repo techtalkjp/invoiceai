@@ -1,7 +1,7 @@
 import { getFormProps, useForm } from '@conform-to/react'
 import { parseWithZod } from '@conform-to/zod/v4'
-import { syncUserGitHubActivities } from '@shared/services/activity-sync'
 import {
+  AlertTriangleIcon,
   CheckCircle2Icon,
   GitBranchIcon,
   GithubIcon,
@@ -9,8 +9,16 @@ import {
   PlusIcon,
   TrashIcon,
   UnlinkIcon,
+  UsersIcon,
 } from 'lucide-react'
-import { Form, useActionData, useNavigation } from 'react-router'
+import { useEffect, useState } from 'react'
+import {
+  Form,
+  redirect,
+  useActionData,
+  useFetcher,
+  useNavigation,
+} from 'react-router'
 import { z } from 'zod'
 import { RepoSelector } from '~/components/github/repo-selector'
 import { useRepoFetcher } from '~/components/github/use-repo-fetcher'
@@ -31,47 +39,58 @@ import {
   SelectValue,
 } from '~/components/ui/select'
 import {
-  deleteActivitySource,
   deleteClientSourceMapping,
-  getActivitySource,
   getClientSourceMappings,
   saveClientSourceMapping,
 } from '~/lib/activity-sources/activity-queries.server'
 import { requireOrgAdmin } from '~/lib/auth-helpers.server'
 import { db } from '~/lib/db/kysely'
-import { startGitHubOAuth } from '~/lib/github-oauth.server'
+import {
+  deleteInstallationFromGitHub,
+  listAppInstallations,
+} from '~/lib/github-app/api.server'
+import { buildGitHubAppInstallUrl } from '~/lib/github-app/install-url.server'
+import {
+  deleteAllUserMappings,
+  deleteGitHubInstallation,
+  getGitHubInstallation,
+  getUserMappings,
+  saveGitHubInstallation,
+  saveUserMapping,
+} from '~/lib/github-app/queries.server'
 import type { Route } from './+types/index'
 
-const startOAuthSchema = z.object({
-  intent: z.literal('startOAuth'),
+const installGitHubAppSchema = z.object({
+  intent: z.literal('installGitHubApp'),
 })
 
-const disconnectGitHubSchema = z.object({
-  intent: z.literal('disconnectGitHub'),
+const disconnectGitHubAppSchema = z.object({
+  intent: z.literal('disconnectGitHubApp'),
 })
 
-const addMappingSchema = z.object({
-  intent: z.literal('addMapping'),
+const saveUserMappingsSchema = z.object({
+  intent: z.literal('saveUserMappings'),
+  mappings: z.string().min(1),
+})
+
+const addRepoMappingSchema = z.object({
+  intent: z.literal('addRepoMapping'),
   clientId: z.string().min(1, 'クライアントを選択してください'),
   repoFullName: z.string().min(1, 'リポジトリを入力してください'),
 })
 
-const removeMappingSchema = z.object({
-  intent: z.literal('removeMapping'),
+const removeRepoMappingSchema = z.object({
+  intent: z.literal('removeRepoMapping'),
   clientId: z.string().min(1),
   sourceIdentifier: z.string().min(1),
 })
 
-const syncSchema = z.object({
-  intent: z.literal('sync'),
-})
-
 const formSchema = z.discriminatedUnion('intent', [
-  startOAuthSchema,
-  disconnectGitHubSchema,
-  addMappingSchema,
-  removeMappingSchema,
-  syncSchema,
+  installGitHubAppSchema,
+  disconnectGitHubAppSchema,
+  saveUserMappingsSchema,
+  addRepoMappingSchema,
+  removeRepoMappingSchema,
 ])
 
 export const handle = {
@@ -79,10 +98,22 @@ export const handle = {
 }
 
 export async function loader({ request, params }: Route.LoaderArgs) {
-  const { organization, user } = await requireOrgAdmin(request, params.orgSlug)
+  const { organization } = await requireOrgAdmin(request, params.orgSlug)
 
-  const source = await getActivitySource(organization.id, user.id, 'github')
-  const isConnected = !!source
+  const installation = await getGitHubInstallation(organization.id)
+  const isInstalled = !!installation
+
+  // 組織メンバー一覧
+  const members = await db
+    .selectFrom('member')
+    .innerJoin('user', 'user.id', 'member.userId')
+    .select(['member.userId', 'user.name', 'user.email'])
+    .where('member.organizationId', '=', organization.id)
+    .orderBy('user.name', 'asc')
+    .execute()
+
+  // ユーザーマッピング
+  const userMappings = isInstalled ? await getUserMappings(organization.id) : []
 
   // クライアント一覧
   const clients = await db
@@ -94,35 +125,31 @@ export async function loader({ request, params }: Route.LoaderArgs) {
     .orderBy('name', 'asc')
     .execute()
 
-  // 既存のマッピング
   const clientIds = clients.map((c) => c.id)
-  const mappings =
+  const repoMappings =
     clientIds.length > 0
       ? await getClientSourceMappings(clientIds, 'github')
       : []
 
-  // GitHub username (config にキャッシュ済み)
-  let githubUsername: string | null = null
-  if (source?.config) {
-    try {
-      const config = JSON.parse(source.config) as { username?: string }
-      githubUsername = config.username ?? null
-    } catch {
-      // JSON parse error
-    }
-  }
-
   return {
     organization,
-    isConnected,
-    githubUsername,
+    isInstalled,
+    installation: installation
+      ? {
+          accountLogin: installation.accountLogin,
+          repositorySelection: installation.repositorySelection,
+          suspendedAt: installation.suspendedAt,
+        }
+      : null,
+    members,
+    userMappings,
     clients,
-    mappings,
+    repoMappings,
   }
 }
 
 export async function action({ request, params }: Route.ActionArgs) {
-  const { organization, user } = await requireOrgAdmin(request, params.orgSlug)
+  const { organization } = await requireOrgAdmin(request, params.orgSlug)
 
   const formData = await request.formData()
   const submission = parseWithZod(formData, { schema: formSchema })
@@ -133,70 +160,82 @@ export async function action({ request, params }: Route.ActionArgs) {
 
   const { intent } = submission.value
 
-  if (intent === 'startOAuth') {
-    return startGitHubOAuth({
-      request,
-      returnTo: 'integrations',
-      metadata: { orgSlug: params.orgSlug },
-      scope: 'read:user repo',
-    })
+  if (intent === 'installGitHubApp') {
+    // まず既存のインストールを自動検出
+    try {
+      const installations = await listAppInstallations()
+      const first = installations[0]
+      if (first) {
+        // 既存インストールを紐付ける
+        await saveGitHubInstallation(organization.id, first)
+        return { lastResult: submission.reply() }
+      }
+    } catch {
+      // API エラー時はインストール URL にフォールバック
+    }
+    const url = buildGitHubAppInstallUrl(params.orgSlug)
+    return redirect(url)
   }
 
-  if (intent === 'disconnectGitHub') {
-    await deleteActivitySource(organization.id, user.id, 'github')
-    return { lastResult: submission.reply(), disconnected: true }
-  }
-
-  if (intent === 'addMapping') {
-    const { clientId, repoFullName } = submission.value
-    await saveClientSourceMapping(clientId, 'github', repoFullName)
-    return { lastResult: submission.reply(), mappingAdded: true }
-  }
-
-  if (intent === 'removeMapping') {
-    const { clientId, sourceIdentifier } = submission.value
-    await deleteClientSourceMapping(clientId, 'github', sourceIdentifier)
-    return { lastResult: submission.reply(), mappingRemoved: true }
-  }
-
-  if (intent === 'sync') {
-    // 過去7日間を同期
-    const end = new Date()
-    const start = new Date()
-    start.setDate(start.getDate() - 7)
-    const startDate = start.toISOString().slice(0, 10)
-    const endDate = end.toISOString().slice(0, 10)
-
-    const result = await syncUserGitHubActivities(
-      organization.id,
-      user.id,
-      startDate,
-      endDate,
-    )
-
-    if (result.error) {
-      return {
-        lastResult: submission.reply({
-          formErrors: [`同期エラー: ${result.error}`],
-        }),
+  if (intent === 'disconnectGitHubApp') {
+    const installation = await getGitHubInstallation(organization.id)
+    if (installation) {
+      try {
+        await deleteInstallationFromGitHub(installation.installationId)
+      } catch {
+        // GitHub 側の削除に失敗しても DB 側は解除する
       }
     }
+    await deleteGitHubInstallation(organization.id)
+    await deleteAllUserMappings(organization.id)
+    return { lastResult: submission.reply() }
+  }
 
-    return {
-      lastResult: submission.reply(),
-      synced: true,
-      insertedCount: result.inserted,
+  if (intent === 'saveUserMappings') {
+    const entries = JSON.parse(submission.value.mappings) as Array<{
+      userId: string
+      githubUsername: string
+    }>
+    // 既存のマッピングを全削除して再作成
+    await deleteAllUserMappings(organization.id)
+    for (const entry of entries) {
+      if (entry.githubUsername.trim()) {
+        await saveUserMapping(
+          organization.id,
+          entry.userId,
+          entry.githubUsername.trim(),
+        )
+      }
     }
+    return { lastResult: submission.reply() }
+  }
+
+  if (intent === 'addRepoMapping') {
+    const { clientId, repoFullName } = submission.value
+    await saveClientSourceMapping(clientId, 'github', repoFullName)
+    return { lastResult: submission.reply() }
+  }
+
+  if (intent === 'removeRepoMapping') {
+    const { clientId, sourceIdentifier } = submission.value
+    await deleteClientSourceMapping(clientId, 'github', sourceIdentifier)
+    return { lastResult: submission.reply() }
   }
 
   return { lastResult: submission.reply() }
 }
 
 export default function IntegrationsSettings({
-  loaderData: { isConnected, githubUsername, clients, mappings },
+  loaderData: {
+    isInstalled,
+    installation,
+    members,
+    userMappings,
+    clients,
+    repoMappings,
+  },
   params: { orgSlug },
 }: Route.ComponentProps) {
-  const actionData = useActionData<typeof action>()
   const navigation = useNavigation()
   const isSubmitting = navigation.state === 'submitting'
 
@@ -208,41 +247,52 @@ export default function IntegrationsSettings({
           外部連携設定
         </CardTitle>
         <CardDescription>
-          GitHub 等の外部サービスと連携してアクティビティを自動記録します
+          GitHub App を組織にインストールしてアクティビティを自動記録します
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
-        {/* GitHub 連携 */}
+        {/* Step 1: GitHub App インストール */}
         <div className="space-y-3">
           <div className="flex items-center gap-2">
-            {isConnected ? (
+            {isInstalled ? (
               <CheckCircle2Icon className="h-5 w-5 text-emerald-600" />
             ) : (
               <span className="bg-muted flex h-5 w-5 items-center justify-center rounded-full text-xs font-medium">
                 1
               </span>
             )}
-            <h4 className="font-medium">GitHub 認証</h4>
-            {isConnected && githubUsername && (
+            <h4 className="font-medium">GitHub App</h4>
+            {isInstalled && installation && (
               <Badge variant="outline" className="text-emerald-600">
-                @{githubUsername}
+                {installation.accountLogin}
               </Badge>
+            )}
+            {installation?.suspendedAt && (
+              <Badge variant="destructive">一時停止中</Badge>
             )}
           </div>
 
           <div className="ml-7 space-y-3">
-            {isConnected ? (
+            {isInstalled ? (
               <div className="flex items-center gap-3">
                 <p className="text-muted-foreground text-sm">
-                  GitHub アカウントと連携済みです。
+                  GitHub App がインストール済みです
+                  {installation?.repositorySelection === 'all'
+                    ? '（全リポジトリ）'
+                    : '（選択されたリポジトリ）'}
                 </p>
                 <Form method="POST">
-                  <input type="hidden" name="intent" value="disconnectGitHub" />
+                  <input
+                    type="hidden"
+                    name="intent"
+                    value="disconnectGitHubApp"
+                  />
                   <Button
                     type="submit"
                     variant="outline"
                     size="sm"
                     className="text-destructive"
+                    disabled={isSubmitting}
                   >
                     <UnlinkIcon className="mr-1 h-4 w-4" />
                     連携解除
@@ -252,13 +302,19 @@ export default function IntegrationsSettings({
             ) : (
               <>
                 <p className="text-muted-foreground text-sm">
-                  GitHub アカウントと連携して、アクティビティを自動記録します。
+                  GitHub App
+                  をインストールして、リポジトリへの読み取りアクセスを許可します。
+                  書き込み権限は一切要求しません。
                 </p>
                 <Form method="POST">
-                  <input type="hidden" name="intent" value="startOAuth" />
-                  <Button type="submit" size="sm">
-                    <GithubIcon className="mr-1 h-4 w-4" />
-                    GitHub と連携
+                  <input type="hidden" name="intent" value="installGitHubApp" />
+                  <Button type="submit" size="sm" disabled={isSubmitting}>
+                    {isSubmitting ? (
+                      <Loader2Icon className="mr-1 h-4 w-4 animate-spin" />
+                    ) : (
+                      <GithubIcon className="mr-1 h-4 w-4" />
+                    )}
+                    GitHub App をインストール
                   </Button>
                 </Form>
               </>
@@ -266,30 +322,61 @@ export default function IntegrationsSettings({
           </div>
         </div>
 
-        {/* リポジトリマッピング */}
+        {/* Step 2: ユーザーマッピング */}
         <div className="space-y-3">
           <div className="flex items-center gap-2">
-            {mappings.length > 0 ? (
+            {userMappings.length > 0 ? (
               <CheckCircle2Icon className="h-5 w-5 text-emerald-600" />
             ) : (
               <span className="bg-muted flex h-5 w-5 items-center justify-center rounded-full text-xs font-medium">
                 2
               </span>
             )}
+            <h4 className="font-medium">ユーザーマッピング</h4>
+          </div>
+
+          {isInstalled ? (
+            <div className="ml-7 space-y-3">
+              <p className="text-muted-foreground text-sm">
+                組織メンバーと GitHub
+                ユーザー名を対応付けて、アクティビティを正しく記録します。
+              </p>
+              <UserMappingForm
+                orgSlug={orgSlug}
+                members={members}
+                existingMappings={userMappings}
+              />
+            </div>
+          ) : (
+            <p className="text-muted-foreground ml-7 text-sm">
+              まず GitHub App をインストールしてください
+            </p>
+          )}
+        </div>
+
+        {/* Step 3: リポジトリマッピング */}
+        <div className="space-y-3">
+          <div className="flex items-center gap-2">
+            {repoMappings.length > 0 ? (
+              <CheckCircle2Icon className="h-5 w-5 text-emerald-600" />
+            ) : (
+              <span className="bg-muted flex h-5 w-5 items-center justify-center rounded-full text-xs font-medium">
+                3
+              </span>
+            )}
             <h4 className="font-medium">リポジトリとクライアントの対応付け</h4>
           </div>
 
-          {isConnected ? (
+          {isInstalled ? (
             <div className="ml-7 space-y-3">
               <p className="text-muted-foreground text-sm">
                 GitHub リポジトリをクライアントに対応付けると、
                 アクティビティがクライアント別に集計されます。
               </p>
 
-              {/* 既存マッピング一覧 */}
-              {mappings.length > 0 && (
+              {repoMappings.length > 0 && (
                 <div className="space-y-2">
-                  {mappings.map((m) => {
+                  {repoMappings.map((m) => {
                     const client = clients.find((c) => c.id === m.clientId)
                     return (
                       <div
@@ -307,7 +394,7 @@ export default function IntegrationsSettings({
                           <input
                             type="hidden"
                             name="intent"
-                            value="removeMapping"
+                            value="removeRepoMapping"
                           />
                           <input
                             type="hidden"
@@ -334,59 +421,147 @@ export default function IntegrationsSettings({
                 </div>
               )}
 
-              {/* 新規マッピング追加 */}
-              <AddMappingForm orgSlug={orgSlug} clients={clients} />
+              <AddRepoMappingForm orgSlug={orgSlug} clients={clients} />
             </div>
           ) : (
             <p className="text-muted-foreground ml-7 text-sm">
-              まず GitHub と連携してください
+              まず GitHub App をインストールしてください
             </p>
           )}
         </div>
-
-        {/* 同期 */}
-        {isConnected && (
-          <div className="space-y-3">
-            <div className="flex items-center gap-2">
-              <span className="bg-muted flex h-5 w-5 items-center justify-center rounded-full text-xs font-medium">
-                3
-              </span>
-              <h4 className="font-medium">アクティビティ同期</h4>
-            </div>
-            <div className="ml-7 space-y-3">
-              <p className="text-muted-foreground text-sm">
-                GitHub のアクティビティを取得して記録します（過去7日間）。
-              </p>
-              <Form method="POST">
-                <input type="hidden" name="intent" value="sync" />
-                <Button
-                  type="submit"
-                  variant="outline"
-                  size="sm"
-                  disabled={isSubmitting}
-                >
-                  {isSubmitting ? (
-                    <Loader2Icon className="mr-2 h-4 w-4 animate-spin" />
-                  ) : null}
-                  今すぐ同期
-                </Button>
-              </Form>
-              {actionData && 'synced' in actionData && actionData.synced && (
-                <p className="text-sm text-emerald-600">
-                  {'insertedCount' in actionData
-                    ? `${actionData.insertedCount} 件のアクティビティを追加しました`
-                    : '同期が完了しました'}
-                </p>
-              )}
-            </div>
-          </div>
-        )}
       </CardContent>
     </>
   )
 }
 
-function AddMappingForm({
+function UserMappingForm({
+  orgSlug,
+  members,
+  existingMappings,
+}: {
+  orgSlug: string
+  members: Array<{ userId: string; name: string | null; email: string }>
+  existingMappings: Array<{ userId: string; githubUsername: string }>
+}) {
+  const navigation = useNavigation()
+  const isSubmitting = navigation.state === 'submitting'
+  const fetcher = useFetcher<{
+    contributors: Array<{ login: string; avatarUrl: string }>
+    error: 'token_failed' | 'repos_failed' | 'no_repos' | 'fetch_failed' | null
+  }>({ key: 'contributors' })
+  const mappingMap = new Map(
+    existingMappings.map((m) => [m.userId, m.githubUsername]),
+  )
+  const [values, setValues] = useState<Record<string, string>>(() => {
+    const initial: Record<string, string> = {}
+    for (const m of members) {
+      initial[m.userId] = mappingMap.get(m.userId) ?? ''
+    }
+    return initial
+  })
+
+  // コントリビューター一覧を取得
+  useEffect(() => {
+    if (fetcher.state === 'idle' && !fetcher.data) {
+      fetcher.load(`/org/${orgSlug}/settings/integrations/contributors`)
+    }
+  }, [fetcher, orgSlug])
+
+  const contributors = fetcher.data?.contributors ?? []
+  const contributorError = fetcher.data?.error ?? null
+
+  const errorMessages: Record<string, string> = {
+    token_failed:
+      'GitHub トークンの取得に失敗しました。連携を再設定してください。',
+    repos_failed: 'リポジトリ一覧の取得に失敗しました。',
+    no_repos:
+      'アクセス可能なリポジトリがありません。GitHub App のリポジトリ設定を確認してください。',
+    fetch_failed: 'コントリビューター情報の取得に失敗しました。',
+  }
+
+  const mappingsJson = JSON.stringify(
+    members.map((m) => ({
+      userId: m.userId,
+      githubUsername: values[m.userId] ?? '',
+    })),
+  )
+
+  return (
+    <Form method="POST" className="space-y-3">
+      <input type="hidden" name="intent" value="saveUserMappings" />
+      <input type="hidden" name="mappings" value={mappingsJson} />
+
+      {contributorError && (
+        <div className="flex items-center gap-2 rounded-md border border-yellow-200 bg-yellow-50 px-3 py-2 text-sm text-yellow-800 dark:border-yellow-800 dark:bg-yellow-950 dark:text-yellow-200">
+          <AlertTriangleIcon className="h-4 w-4 shrink-0" />
+          {errorMessages[contributorError]}
+        </div>
+      )}
+
+      <div className="space-y-2">
+        {members.map((m) => (
+          <div key={m.userId} className="flex items-center gap-3">
+            <div className="flex w-[180px] items-center gap-2 text-sm">
+              <UsersIcon className="text-muted-foreground h-4 w-4 shrink-0" />
+              <span className="truncate font-medium">{m.name ?? m.email}</span>
+            </div>
+            <span className="text-muted-foreground text-sm">→</span>
+            <div className="flex items-center gap-1">
+              <Select
+                value={values[m.userId] ?? ''}
+                onValueChange={(v) =>
+                  setValues((prev) => ({ ...prev, [m.userId]: v }))
+                }
+              >
+                <SelectTrigger className="w-[200px]">
+                  <SelectValue placeholder="GitHub ユーザーを選択" />
+                </SelectTrigger>
+                <SelectContent>
+                  {contributors.map((c) => (
+                    <SelectItem key={c.login} value={c.login}>
+                      <div className="flex items-center gap-2">
+                        <img
+                          src={c.avatarUrl}
+                          alt=""
+                          className="h-4 w-4 rounded-full"
+                        />
+                        {c.login}
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {values[m.userId] && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 w-7 p-0"
+                  onClick={() =>
+                    setValues((prev) => ({ ...prev, [m.userId]: '' }))
+                  }
+                >
+                  <TrashIcon className="h-3.5 w-3.5" />
+                </Button>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <Button type="submit" size="sm" disabled={isSubmitting}>
+        {isSubmitting ? (
+          <Loader2Icon className="mr-1 h-4 w-4 animate-spin" />
+        ) : (
+          <CheckCircle2Icon className="mr-1 h-4 w-4" />
+        )}
+        保存
+      </Button>
+    </Form>
+  )
+}
+
+function AddRepoMappingForm({
   orgSlug,
   clients,
 }: {
@@ -397,29 +572,43 @@ function AddMappingForm({
   const [form, fields] = useForm({
     lastResult: actionData?.lastResult,
     onValidate: ({ formData }) =>
-      parseWithZod(formData, { schema: addMappingSchema }),
+      parseWithZod(formData, { schema: addRepoMappingSchema }),
     shouldRevalidate: 'onBlur',
   })
 
   const {
-    selectedOrg,
     repoValue,
     setRepoValue,
     repoQuery,
     setRepoQuery,
-    ghOrgs,
     repos,
+    error: repoError,
     isLoadingRepos,
-    handleOrgChange,
     handleRepoQueryChange,
   } = useRepoFetcher(orgSlug, 'repos-fetcher')
 
+  const repoErrorMessages: Record<string, string> = {
+    not_installed:
+      'GitHub App がインストールされていません。連携を設定してください。',
+    token_expired:
+      'GitHub トークンの有効期限が切れています。連携を再設定してください。',
+    fetch_failed: 'リポジトリ一覧の取得に失敗しました。',
+  }
+
+  if (repoError) {
+    return (
+      <div className="flex items-center gap-2 rounded-md border border-yellow-200 bg-yellow-50 px-3 py-2 text-sm text-yellow-800 dark:border-yellow-800 dark:bg-yellow-950 dark:text-yellow-200">
+        <AlertTriangleIcon className="h-4 w-4 shrink-0" />
+        {repoErrorMessages[repoError] ?? repoError}
+      </div>
+    )
+  }
+
   return (
     <Form method="POST" {...getFormProps(form)} className="space-y-3">
-      <input type="hidden" name="intent" value="addMapping" />
+      <input type="hidden" name="intent" value="addRepoMapping" />
       <input type="hidden" name={fields.repoFullName.name} value={repoValue} />
 
-      {/* クライアント選択 */}
       <div className="space-y-1">
         <Label>クライアント</Label>
         <Select name={fields.clientId.name}>
@@ -441,11 +630,8 @@ function AddMappingForm({
         )}
       </div>
 
-      {/* 組織 → リポジトリ選択 */}
       <div className="flex items-end gap-2">
         <RepoSelector
-          selectedOrg={selectedOrg}
-          onOrgChange={handleOrgChange}
           repoValue={repoValue}
           onRepoValueChange={setRepoValue}
           repoQuery={repoQuery}
@@ -454,7 +640,6 @@ function AddMappingForm({
             handleRepoQueryChange(v)
           }}
           isLoadingRepos={isLoadingRepos}
-          ghOrgs={ghOrgs}
           repos={repos}
         />
         <Button type="submit" size="sm">

@@ -9,111 +9,99 @@ import {
 } from '~/components/ui/combobox'
 import { Input } from '~/components/ui/input'
 import { Label } from '~/components/ui/label'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '~/components/ui/select'
 
 interface RepoSelectorProps {
-  selectedOrg: string
-  onOrgChange: (org: string) => void
   repoValue: string
   onRepoValueChange: (value: string) => void
   repoQuery: string
   onRepoQueryChange: (value: string) => void
   isLoadingRepos: boolean
-  ghOrgs: Array<{ login: string }>
-  repos: Array<{ fullName: string }>
+  repos: Array<{ fullName: string; pushedAt: string | null }>
+}
+
+function formatRelativeDate(dateStr: string | null): string {
+  if (!dateStr) return ''
+  const date = new Date(dateStr)
+  const now = new Date()
+  const diffMs = now.getTime() - date.getTime()
+  const diffMin = Math.floor(diffMs / 60000)
+  const diffHours = Math.floor(diffMin / 60)
+  const diffDays = Math.floor(diffHours / 24)
+  const diffMonths = Math.floor(diffDays / 30)
+  const diffYears = Math.floor(diffDays / 365)
+
+  if (diffMin < 1) return 'たった今'
+  if (diffMin < 60) return `${diffMin}分前`
+  if (diffHours < 24) return `${diffHours}時間前`
+  if (diffDays < 30) return `${diffDays}日前`
+  if (diffMonths < 12) return `${diffMonths}ヶ月前`
+  return `${diffYears}年前`
 }
 
 /**
- * GitHub 組織選択 + リポジトリ検索 Combobox の共通 UI
+ * GitHub リポジトリ検索 Combobox
  */
 export function RepoSelector({
-  selectedOrg,
-  onOrgChange,
   repoValue,
   onRepoValueChange,
   repoQuery,
   onRepoQueryChange,
   isLoadingRepos,
-  ghOrgs,
   repos,
 }: RepoSelectorProps) {
   return (
-    <div className="flex items-end gap-2">
-      {ghOrgs.length > 0 && (
-        <div className="w-[180px] space-y-1">
-          <Label>GitHub 組織</Label>
-          <Select value={selectedOrg} onValueChange={onOrgChange}>
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="__personal__">個人</SelectItem>
-              {ghOrgs.map((org) => (
-                <SelectItem key={org.login} value={org.login}>
-                  {org.login}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+    <div className="flex-1 space-y-1">
+      <Label>リポジトリ</Label>
+      {isLoadingRepos && repos.length === 0 && !repoQuery ? (
+        <div className="border-input flex h-9 items-center rounded-md border px-3">
+          <Loader2Icon className="text-muted-foreground h-4 w-4 animate-spin" />
+          <span className="text-muted-foreground ml-2 text-sm">
+            読み込み中...
+          </span>
         </div>
-      )}
-      <div className="flex-1 space-y-1">
-        <Label>リポジトリ</Label>
-        {isLoadingRepos && repos.length === 0 && !repoQuery ? (
-          <div className="border-input flex h-9 items-center rounded-md border px-3">
-            <Loader2Icon className="text-muted-foreground h-4 w-4 animate-spin" />
-            <span className="text-muted-foreground ml-2 text-sm">
-              読み込み中...
-            </span>
-          </div>
-        ) : repos.length > 0 || repoQuery ? (
-          <Combobox
-            value={repoValue}
-            onValueChange={(v) => {
-              onRepoValueChange(v ?? '')
-              onRepoQueryChange(v ?? '')
-            }}
-          >
-            <ComboboxInput
-              placeholder="リポジトリを検索..."
-              value={repoQuery}
-              onChange={(e) => onRepoQueryChange(e.target.value)}
-            />
-            <ComboboxContent>
-              <ComboboxList>
-                <ComboboxEmpty>
-                  {isLoadingRepos ? '検索中...' : '見つかりません'}
-                </ComboboxEmpty>
-                {repos.map((r) => (
-                  <ComboboxItem key={r.fullName} value={r.fullName}>
-                    {r.fullName}
-                  </ComboboxItem>
-                ))}
-                {!repoQuery && repos.length >= 20 && (
-                  <div className="text-muted-foreground px-2 py-1.5 text-xs">
-                    最新20件を表示中。キーワードで検索できます
-                  </div>
-                )}
-              </ComboboxList>
-            </ComboboxContent>
-          </Combobox>
-        ) : (
-          <Input
-            placeholder="owner/repo"
-            value={repoValue}
-            onChange={(e) => {
-              onRepoValueChange(e.target.value)
-              onRepoQueryChange(e.target.value)
-            }}
+      ) : repos.length > 0 || repoQuery ? (
+        <Combobox
+          value={repoValue}
+          onValueChange={(v) => {
+            onRepoValueChange(v ?? '')
+            onRepoQueryChange(v ?? '')
+          }}
+        >
+          <ComboboxInput
+            placeholder="リポジトリを検索..."
+            value={repoQuery}
+            onChange={(e) => onRepoQueryChange(e.target.value)}
           />
-        )}
-      </div>
+          <ComboboxContent>
+            <ComboboxList>
+              <ComboboxEmpty>
+                {isLoadingRepos ? '検索中...' : '見つかりません'}
+              </ComboboxEmpty>
+              {repos.map((r) => (
+                <ComboboxItem key={r.fullName} value={r.fullName}>
+                  <div className="flex w-full items-center justify-between">
+                    <span>{r.fullName}</span>
+                    {r.pushedAt && (
+                      <span className="text-muted-foreground ml-2 text-xs">
+                        {formatRelativeDate(r.pushedAt)}
+                      </span>
+                    )}
+                  </div>
+                </ComboboxItem>
+              ))}
+            </ComboboxList>
+          </ComboboxContent>
+        </Combobox>
+      ) : (
+        <Input
+          placeholder="owner/repo"
+          value={repoValue}
+          onChange={(e) => {
+            onRepoValueChange(e.target.value)
+            onRepoQueryChange(e.target.value)
+          }}
+        />
+      )}
     </div>
   )
 }

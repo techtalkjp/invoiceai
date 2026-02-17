@@ -173,6 +173,28 @@ export interface Organization {
   updatedAt: Generated<string>;
 }
 
+export interface GithubInstallation {
+  id: string;
+  organizationId: string;
+  installationId: number;
+  accountLogin: string;
+  targetType: string;
+  permissions: string | null;
+  repositorySelection: string | null;
+  suspendedAt: string | null;
+  createdAt: Generated<string>;
+  updatedAt: Generated<string>;
+}
+
+export interface GithubUserMapping {
+  id: string;
+  organizationId: string;
+  userId: string;
+  githubUsername: string;
+  createdAt: Generated<string>;
+  updatedAt: Generated<string>;
+}
+
 export interface PlaygroundAiUsage {
   createdAt: Generated<string>;
   githubUsername: string | null;
@@ -270,6 +292,8 @@ export interface DB {
   client: Client;
   clientSourceMapping: ClientSourceMapping;
   featureFlag: FeatureFlag;
+  githubInstallation: GithubInstallation;
+  githubUserMapping: GithubUserMapping;
   invitation: Invitation;
   invoice: Invoice;
   invoiceLine: InvoiceLine;

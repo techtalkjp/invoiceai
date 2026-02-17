@@ -11,7 +11,7 @@ const DEFAULT_SERVER_URL =
  * 1. ローカルにHTTPサーバーを立てる
  * 2. ブラウザで /auth/cli-callback?port=PORT を開く
  * 3. ブラウザ側でログイン → セッショントークンをローカルサーバーに POST
- * 4. トークンを credentials.json に保存
+ * 4. 認証情報を credentials.json に保存
  */
 export async function cliLogin(
   serverUrl: string = DEFAULT_SERVER_URL,
