@@ -3,8 +3,10 @@ import { PageHeader } from '~/components/layout/page-header'
 import { getMonthDates } from '~/components/timesheet'
 import {
   deleteClientSourceMapping,
+  getActivitiesByMonth,
   getActivitySource,
   getClientSourceMappings,
+  parseActivityRow,
   saveClientSourceMapping,
 } from '~/lib/activity-sources/activity-queries.server'
 import { decrypt } from '~/lib/activity-sources/encryption.server'
@@ -73,38 +75,23 @@ export async function loader({ request, params }: Route.LoaderArgs) {
     throw new Response('クライアントが見つかりません', { status: 404 })
   }
 
-  // マッピング済みリポジトリのアクティビティを GitHub API から取得
+  // DB に保存済みのアクティビティを取得（CLI 同期 or cron 同期で保存されたもの）
+  const dbActivities = await getActivitiesByMonth(
+    organization.id,
+    user.id,
+    year,
+    month,
+  )
+
   const activitiesByDate: Record<string, ActivityRecord[]> = {}
-  const mappedRepos = new Set(mappings.map((m) => m.sourceIdentifier))
-  if (mappedRepos.size > 0 && source?.credentials) {
-    try {
-      const pat = decrypt(source.credentials)
-      // ParseJSONResultsPlugin により config は既にパース済みオブジェクト
-      const config = source.config as { username?: string } | null
-      const username = config?.username
-      if (username) {
-        const startDate = `${year}-${String(month).padStart(2, '0')}-01`
-        const lastDay = new Date(year, month, 0).getDate()
-        const endDate = `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`
-        const allActivities = await fetchGitHubActivities(
-          pat,
-          username,
-          startDate,
-          endDate,
-        )
-        for (const a of allActivities) {
-          if (!a.repo || !mappedRepos.has(a.repo)) continue
-          let arr = activitiesByDate[a.eventDate]
-          if (!arr) {
-            arr = []
-            activitiesByDate[a.eventDate] = arr
-          }
-          arr.push(a)
-        }
-      }
-    } catch {
-      // PAT 復号失敗時はアクティビティなしで続行
+  for (const row of dbActivities) {
+    const record = parseActivityRow(row)
+    let arr = activitiesByDate[record.eventDate]
+    if (!arr) {
+      arr = []
+      activitiesByDate[record.eventDate] = arr
     }
+    arr.push(record)
   }
 
   const monthDates = getMonthDates(year, month)

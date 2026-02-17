@@ -11,7 +11,7 @@ export function parseActivityRow(row: {
   repo: string | null
   title: string | null
   url: string | null
-  metadata: string | null
+  metadata: unknown
 }): ActivityRecord {
   const base = {
     eventDate: row.eventDate,
@@ -20,12 +20,15 @@ export function parseActivityRow(row: {
     title: row.title,
     url: row.url,
   }
+  // ParseJSONResultsPlugin により metadata は既にパース済みオブジェクトの場合がある
   let meta: Record<string, unknown> | null = null
-  if (row.metadata) {
+  if (row.metadata && typeof row.metadata === 'object') {
+    meta = row.metadata as Record<string, unknown>
+  } else if (typeof row.metadata === 'string') {
     try {
       meta = JSON.parse(row.metadata) as Record<string, unknown>
     } catch {
-      // 不正な JSON（例: "[object Object]"）は無視
+      // 不正な JSON は無視
     }
   }
   switch (row.eventType) {
