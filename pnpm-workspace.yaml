@@ -1,3 +1,12 @@
+packages:
+  - 'packages/*'
+catalogs:
+  default:
+    '@types/node': '25.1.0'
+    tsup: '8.5.0'
+    tsx: '4.21.0'
+    typescript: '5.9.3'
+    vitest: '4.0.18'
 onlyBuiltDependencies:
   - '@tailwindcss/oxide'
   - esbuild

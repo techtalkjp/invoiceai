@@ -9,6 +9,7 @@ node_modules/
 # Output
 output/
 build/
+dist/
 .react-router/
 
 # Terraform
@@ -23,6 +24,9 @@ terraform/.terraform.lock.hcl
 .vscode/
 *.swp
 *.swo
+
+# Turbo
+.turbo
 
 # OS
 .DS_Store

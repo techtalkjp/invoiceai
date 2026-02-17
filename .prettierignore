@@ -1,2 +1,3 @@
 pnpm-lock.yaml
 app/lib/db/types.ts
+**/dist
