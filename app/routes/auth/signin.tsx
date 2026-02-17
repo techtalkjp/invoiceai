@@ -17,6 +17,7 @@ import {
 import { Input } from '~/components/ui/input'
 import { Label } from '~/components/ui/label'
 import { signIn } from '~/lib/auth-client'
+import { getSafeCallbackURL } from '~/lib/safe-redirect'
 
 export const formSchema = z.object({
   email: z.email({
@@ -63,8 +64,11 @@ export default function SignIn() {
           return
         }
 
-        const callbackURL = searchParams.get('callbackURL')
-        navigate(callbackURL ?? '/')
+        const callbackURL = getSafeCallbackURL(
+          searchParams.get('callbackURL'),
+          '/',
+        )
+        navigate(callbackURL)
       } catch {
         setServerError('ログインに失敗しました')
         setIsLoading(false)

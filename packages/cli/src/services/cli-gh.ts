@@ -114,7 +114,7 @@ export function fetchReviewsSince(
         '-f',
         'per_page=100',
         '--jq',
-        '.items[] | {number, title, html_url, pull_request}',
+        '.items[] | {number, title, html_url, pull_request, updated_at}',
       ],
       {
         encoding: 'utf-8',
@@ -132,6 +132,7 @@ export function fetchReviewsSince(
           title: string
           html_url: string
           pull_request?: { url: string }
+          updated_at: string
         }
         if (!item.pull_request) continue
         reviews.push({
@@ -139,7 +140,7 @@ export function fetchReviewsSince(
           prTitle: item.title,
           prUrl: item.html_url,
           state: 'COMMENTED', // search API では state を取得できないのでデフォルト
-          submittedAt: since, // 正確な日時は個別 API が必要
+          submittedAt: item.updated_at,
         })
       } catch {}
     }

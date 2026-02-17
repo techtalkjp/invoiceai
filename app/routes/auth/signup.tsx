@@ -18,6 +18,7 @@ import { Input } from '~/components/ui/input'
 import { Label } from '~/components/ui/label'
 import { signUp } from '~/lib/auth-client'
 import { isFeatureEnabled } from '~/lib/feature-flags.server'
+import { getSafeCallbackURL } from '~/lib/safe-redirect'
 import type { Route } from './+types/signup'
 
 export async function loader() {
@@ -87,8 +88,11 @@ export default function SignUp({ loaderData }: Route.ComponentProps) {
           return
         }
 
-        const callbackURL = searchParams.get('callbackURL')
-        navigate(callbackURL ?? '/setup')
+        const callbackURL = getSafeCallbackURL(
+          searchParams.get('callbackURL'),
+          '/setup',
+        )
+        navigate(callbackURL)
       } catch {
         setServerError('登録に失敗しました')
         setIsLoading(false)

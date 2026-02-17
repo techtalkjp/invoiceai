@@ -1,6 +1,8 @@
 import { data } from 'react-router'
-import { auth } from '~/lib/auth'
-import { ensureUserHasOrganization } from '~/lib/auth-helpers.server'
+import {
+  ensureUserHasOrganization,
+  requireCliAuth,
+} from '~/lib/auth-helpers.server'
 import { db } from '~/lib/db/kysely'
 import type { Route } from './+types/me'
 
@@ -11,10 +13,7 @@ import type { Route } from './+types/me'
  * Header: Authorization: Bearer <session-token>
  */
 export async function loader({ request }: Route.LoaderArgs) {
-  const session = await auth.api.getSession({ headers: request.headers })
-  if (!session?.user) {
-    throw data({ error: 'Unauthorized' }, { status: 401 })
-  }
+  const session = await requireCliAuth(request)
 
   await ensureUserHasOrganization({
     id: session.user.id,

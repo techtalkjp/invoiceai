@@ -1,7 +1,7 @@
 import { data } from 'react-router'
 import { insertActivities } from '~/lib/activity-sources/activity-queries.server'
 import type { ActivityRecord } from '~/lib/activity-sources/types'
-import { auth } from '~/lib/auth'
+import { requireCliAuth } from '~/lib/auth-helpers.server'
 import { db } from '~/lib/db/kysely'
 import { saveEntries } from '../../org.$orgSlug/work-hours/+mutations.server'
 import { suggestWorkEntriesFromActivities } from '../../org.$orgSlug/work-hours/+work-entry-suggest.server'
@@ -22,10 +22,7 @@ interface SyncRequestBody {
  * Body: { orgSlug, clientId, remoteUrl, activities[] }
  */
 export async function action({ request }: Route.ActionArgs) {
-  const session = await auth.api.getSession({ headers: request.headers })
-  if (!session?.user) {
-    throw data({ error: 'Unauthorized' }, { status: 401 })
-  }
+  const session = await requireCliAuth(request)
 
   const body = (await request.json()) as SyncRequestBody
   const { orgSlug, clientId, activities } = body

@@ -1,5 +1,5 @@
 import { data } from 'react-router'
-import { auth } from '~/lib/auth'
+import { requireCliAuth } from '~/lib/auth-helpers.server'
 import { db } from '~/lib/db/kysely'
 import type { Route } from './+types/create-org'
 
@@ -11,10 +11,7 @@ import type { Route } from './+types/create-org'
  * Body: { name }
  */
 export async function action({ request }: Route.ActionArgs) {
-  const session = await auth.api.getSession({ headers: request.headers })
-  if (!session?.user) {
-    throw data({ error: 'Unauthorized' }, { status: 401 })
-  }
+  const session = await requireCliAuth(request)
 
   const body = (await request.json()) as { name: string }
 
@@ -26,28 +23,28 @@ export async function action({ request }: Route.ActionArgs) {
   const orgId = crypto.randomUUID()
   const now = new Date().toISOString()
 
-  // 組織作成
-  await db
-    .insertInto('organization')
-    .values({
-      id: orgId,
-      name: body.name,
-      slug,
-      createdAt: now,
-    })
-    .execute()
+  await db.transaction().execute(async (trx) => {
+    await trx
+      .insertInto('organization')
+      .values({
+        id: orgId,
+        name: body.name,
+        slug,
+        createdAt: now,
+      })
+      .execute()
 
-  // ユーザーを owner として追加
-  await db
-    .insertInto('member')
-    .values({
-      id: crypto.randomUUID(),
-      organizationId: orgId,
-      userId: session.user.id,
-      role: 'owner',
-      createdAt: now,
-    })
-    .execute()
+    await trx
+      .insertInto('member')
+      .values({
+        id: crypto.randomUUID(),
+        organizationId: orgId,
+        userId: session.user.id,
+        role: 'owner',
+        createdAt: now,
+      })
+      .execute()
+  })
 
   return data({ id: orgId, slug, name: body.name })
 }

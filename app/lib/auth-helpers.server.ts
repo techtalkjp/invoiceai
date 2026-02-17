@@ -1,4 +1,4 @@
-import { redirect } from 'react-router'
+import { data, redirect } from 'react-router'
 import { auth } from './auth'
 import { db } from './db/kysely'
 
@@ -23,6 +23,18 @@ interface OrgContext {
  */
 export async function getSession(request: Request) {
   return await auth.api.getSession({ headers: request.headers })
+}
+
+/**
+ * CLI API 用認証。未認証なら 401 JSON レスポンスを返す。
+ * Web ページ用の requireAuth と異なり、リダイレクトではなくエラーを投げる。
+ */
+export async function requireCliAuth(request: Request): Promise<AuthSession> {
+  const session = await getSession(request)
+  if (!session?.user) {
+    throw data({ error: 'Unauthorized' }, { status: 401 })
+  }
+  return session
 }
 
 /**

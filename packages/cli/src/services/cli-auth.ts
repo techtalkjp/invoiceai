@@ -1,3 +1,4 @@
+import { randomBytes } from 'node:crypto'
 import { createServer } from 'node:http'
 import { openBrowser } from '../adapters/cli'
 import { saveAuth } from './cli-config'
@@ -8,20 +9,24 @@ const DEFAULT_SERVER_URL =
 
 /**
  * CLI ログインフロー:
- * 1. ローカルにHTTPサーバーを立てる
- * 2. ブラウザで /auth/cli-callback?port=PORT を開く
- * 3. ブラウザ側でログイン → セッショントークンをローカルサーバーに POST
- * 4. 認証情報を credentials.json に保存
+ * 1. ローカルにHTTPサーバーを立てる（state パラメータで token injection を防止）
+ * 2. ブラウザで /auth/cli-callback?port=PORT&state=STATE を開く
+ * 3. ブラウザ側でログイン → セッショントークン + state をローカルサーバーに POST
+ * 4. state を検証し、認証情報を credentials.json に保存
  */
 export async function cliLogin(
   serverUrl: string = DEFAULT_SERVER_URL,
 ): Promise<void> {
   const port = DEFAULT_PORT
+  const state = randomBytes(32).toString('hex')
 
   const token = await new Promise<string>((resolve, reject) => {
+    let timeoutId: ReturnType<typeof setTimeout>
+
     const server = createServer((req, res) => {
-      // CORS を許可（ブラウザからのリクエスト）
-      res.setHeader('Access-Control-Allow-Origin', '*')
+      // CORS: サーバーURLのオリジンのみ許可
+      const allowedOrigin = new URL(serverUrl).origin
+      res.setHeader('Access-Control-Allow-Origin', allowedOrigin)
       res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
       res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
 
@@ -38,10 +43,19 @@ export async function cliLogin(
         })
         req.on('end', () => {
           try {
-            const data = JSON.parse(body) as { token?: string }
+            const data = JSON.parse(body) as {
+              token?: string
+              state?: string
+            }
+            if (data.state !== state) {
+              res.writeHead(403, { 'Content-Type': 'application/json' })
+              res.end(JSON.stringify({ error: 'invalid state' }))
+              return
+            }
             if (data.token) {
               res.writeHead(200, { 'Content-Type': 'application/json' })
               res.end(JSON.stringify({ ok: true }))
+              clearTimeout(timeoutId)
               server.close()
               resolve(data.token)
             } else {
@@ -64,7 +78,7 @@ export async function cliLogin(
     })
 
     server.listen(port, () => {
-      const callbackUrl = `${serverUrl}/auth/cli-callback?port=${port}`
+      const callbackUrl = `${serverUrl}/auth/cli-callback?port=${port}&state=${state}`
       console.log(`ブラウザでログインしてください...`)
       openBrowser(callbackUrl).catch(() => {
         console.log(`ブラウザが開けない場合は以下のURLを開いてください:`)
@@ -73,7 +87,7 @@ export async function cliLogin(
     })
 
     // 2分でタイムアウト
-    setTimeout(() => {
+    timeoutId = setTimeout(() => {
       server.close()
       reject(new Error('ログインがタイムアウトしました（2分）'))
     }, 120_000)

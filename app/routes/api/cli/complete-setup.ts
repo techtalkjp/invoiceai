@@ -1,8 +1,8 @@
 import { data } from 'react-router'
-import { auth } from '~/lib/auth'
 import {
   markUserSetupCompleted,
   markUserWorkspaceNameConfirmed,
+  requireCliAuth,
 } from '~/lib/auth-helpers.server'
 import { db } from '~/lib/db/kysely'
 import type { Route } from './+types/complete-setup'
@@ -18,10 +18,7 @@ import type { Route } from './+types/complete-setup'
  * これにより、後から Web にアクセスしたときに setup フローに飛ばされない。
  */
 export async function action({ request }: Route.ActionArgs) {
-  const session = await auth.api.getSession({ headers: request.headers })
-  if (!session?.user) {
-    throw data({ error: 'Unauthorized' }, { status: 401 })
-  }
+  const session = await requireCliAuth(request)
 
   const body = (await request.json()) as { organizationId: string }
 

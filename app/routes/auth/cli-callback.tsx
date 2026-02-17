@@ -22,6 +22,7 @@ import { authClient } from '~/lib/auth-client'
 export default function CliCallback() {
   const [searchParams] = useSearchParams()
   const port = searchParams.get('port')
+  const state = searchParams.get('state')
   const [status, setStatus] = useState<
     'checking' | 'sending' | 'done' | 'error'
   >('checking')
@@ -41,7 +42,7 @@ export default function CliCallback() {
           const res = await fetch(`http://localhost:${port}/callback`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ token }),
+            body: JSON.stringify({ token, state }),
           })
           if (res.ok) return true
         } catch {
@@ -65,7 +66,7 @@ export default function CliCallback() {
         const session = await authClient.getSession()
         if (!session.data) {
           // 未ログイン → signup へリダイレクト（既存ユーザーは signup 画面からログインへ遷移可能）
-          const callbackURL = `/auth/cli-callback?port=${port}`
+          const callbackURL = `/auth/cli-callback?port=${port}${state ? `&state=${state}` : ''}`
           window.location.href = `/auth/signup?callbackURL=${encodeURIComponent(callbackURL)}`
           return
         }
@@ -79,12 +80,17 @@ export default function CliCallback() {
         if (ok) {
           setStatus('done')
         } else {
-          // CLI が既にトークンを受信して終了した可能性が高い
-          setStatus('done')
+          setStatus('error')
+          setErrorMessage(
+            'CLI へのトークン送信に失敗しました。ターミナルで CLI が起動しているか確認してください。',
+          )
         }
       } catch {
         if (!cancelled) {
-          setStatus('done')
+          setStatus('error')
+          setErrorMessage(
+            'トークン送信中にエラーが発生しました。もう一度お試しください。',
+          )
         }
       }
     }
@@ -93,7 +99,7 @@ export default function CliCallback() {
     return () => {
       cancelled = true
     }
-  }, [port])
+  }, [port, state])
 
   return (
     <PublicLayout>
