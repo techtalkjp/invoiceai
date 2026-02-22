@@ -92,7 +92,7 @@ export function WorkHoursTimesheet({
               variant={isImportOpen ? 'secondary' : 'ghost'}
               size="sm"
               onClick={() => setIsImportOpen((v) => !v)}
-              className="text-muted-foreground text-xs"
+              className="text-muted-foreground"
             >
               <ImportIcon className="size-3.5" />
               取込
