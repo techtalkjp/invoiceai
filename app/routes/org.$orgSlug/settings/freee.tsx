@@ -56,10 +56,21 @@ const setCompanySchema = z.object({
   freeeCompanyId: z.coerce.number().int().positive(),
 })
 
+const fetchTemplatesSchema = z.object({
+  intent: z.literal('fetchTemplates'),
+})
+
+const setTemplateSchema = z.object({
+  intent: z.literal('setTemplate'),
+  freeeTemplateId: z.coerce.number().int().positive(),
+})
+
 const formSchema = z.discriminatedUnion('intent', [
   authCodeSchema,
   fetchCompaniesSchema,
   setCompanySchema,
+  fetchTemplatesSchema,
+  setTemplateSchema,
 ])
 
 export const handle = {
@@ -164,6 +175,42 @@ export async function action({ request, params }: Route.ActionArgs) {
     return { lastResult: submission.reply(), companySet: true }
   }
 
+  if (intent === 'fetchTemplates') {
+    if (!organization.freeeCompanyId) {
+      return {
+        lastResult: submission.reply({
+          formErrors: ['先に会社を設定してください'],
+        }),
+      }
+    }
+    try {
+      const freee = await getFreeeClientForOrganization(organization.id)
+      const { templates } = await freee.getInvoiceTemplates(
+        organization.freeeCompanyId,
+      )
+      return { lastResult: submission.reply(), templates }
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'freee API エラー'
+      return {
+        lastResult: submission.reply({ formErrors: [message] }),
+      }
+    }
+  }
+
+  if (intent === 'setTemplate') {
+    const { freeeTemplateId } = submission.value
+    const now = new Date().toISOString()
+
+    await db
+      .updateTable('organization')
+      .set({ freeeTemplateId, updatedAt: now })
+      .where('id', '=', organization.id)
+      .execute()
+
+    return { lastResult: submission.reply(), templateSet: true }
+  }
+
   return { lastResult: submission.reply() }
 }
 
@@ -174,6 +221,8 @@ export default function FreeeSettings({
 
   const companies =
     actionData && 'companies' in actionData ? actionData.companies : null
+  const templates =
+    actionData && 'templates' in actionData ? actionData.templates : null
   const isAuthenticated =
     hasToken ||
     (actionData && 'authenticated' in actionData && actionData.authenticated)
@@ -299,6 +348,82 @@ export default function FreeeSettings({
           ) : (
             <p className="text-muted-foreground ml-7 text-sm">
               まず freee 認証を完了してください
+            </p>
+          )}
+        </div>
+        {/* ステップ3: テンプレート選択 */}
+        <div className="space-y-3">
+          <div className="flex items-center gap-2">
+            {organization.freeeTemplateId ? (
+              <CheckCircle2Icon className="h-5 w-5 text-emerald-600" />
+            ) : (
+              <span className="bg-muted flex h-5 w-5 items-center justify-center rounded-full text-xs font-medium">
+                3
+              </span>
+            )}
+            <h4 className="font-medium">請求書テンプレートを選択</h4>
+            {organization.freeeTemplateId && (
+              <Badge variant="outline" className="text-emerald-600">
+                設定済み (ID: {organization.freeeTemplateId})
+              </Badge>
+            )}
+          </div>
+          {organization.freeeCompanyId ? (
+            <div className="ml-7 space-y-3">
+              <p className="text-muted-foreground text-sm">
+                請求書作成時に使用するテンプレートを選択します。
+              </p>
+              <Form method="POST">
+                <input type="hidden" name="intent" value="fetchTemplates" />
+                <Button type="submit" variant="outline" size="sm">
+                  <RefreshCwIcon className="mr-2 h-4 w-4" />
+                  テンプレート一覧を取得
+                </Button>
+              </Form>
+
+              {templates && templates.length > 0 && (
+                <Form method="POST" className="flex items-end gap-2">
+                  <input type="hidden" name="intent" value="setTemplate" />
+                  <div className="flex-1">
+                    <Select name="freeeTemplateId">
+                      <SelectTrigger>
+                        <SelectValue placeholder="テンプレートを選択" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {templates.map((template) => (
+                          <SelectItem
+                            key={template.id}
+                            value={template.id.toString()}
+                          >
+                            {template.name} (ID: {template.id})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <Button type="submit" size="sm">
+                    設定
+                  </Button>
+                </Form>
+              )}
+
+              {templates && templates.length === 0 && (
+                <p className="text-muted-foreground text-sm">
+                  テンプレートが見つかりませんでした
+                </p>
+              )}
+
+              {actionData &&
+                'templateSet' in actionData &&
+                actionData.templateSet && (
+                  <p className="text-sm text-emerald-600">
+                    テンプレートを設定しました
+                  </p>
+                )}
+            </div>
+          ) : (
+            <p className="text-muted-foreground ml-7 text-sm">
+              まず会社を設定してください
             </p>
           )}
         </div>

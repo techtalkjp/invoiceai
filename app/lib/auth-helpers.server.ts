@@ -11,6 +11,7 @@ interface OrgContext {
     name: string
     slug: string | null
     freeeCompanyId: number | null
+    freeeTemplateId: number | null
   }
   membership: {
     id: string
@@ -64,6 +65,7 @@ export async function requireOrgMember(
       'organization.name as orgName',
       'organization.slug as orgSlug',
       'organization.freeeCompanyId',
+      'organization.freeeTemplateId',
       'member.id as memberId',
       'member.role',
     ])
@@ -82,6 +84,7 @@ export async function requireOrgMember(
       name: result.orgName,
       slug: result.orgSlug,
       freeeCompanyId: result.freeeCompanyId,
+      freeeTemplateId: result.freeeTemplateId,
     },
     membership: {
       id: result.memberId,

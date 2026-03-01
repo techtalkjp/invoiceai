@@ -74,7 +74,7 @@ export type InvoiceApiResult = {
 
 export type InvoiceDeps = {
   getCompanyId: () => number
-  getTemplateId: () => number
+  getTemplateId: () => number | null
   getTotalHours: () => number
   getPreviousInvoice: () => Promise<PreviousInvoice | null>
   createInvoice: (params: InvoiceApiParams) => Promise<InvoiceApiResult>
@@ -199,7 +199,7 @@ async function buildInvoiceParams(
 
   const params: InvoiceApiParams = {
     company_id: companyId,
-    template_id: templateId,
+    ...(templateId != null && { template_id: templateId }),
     billing_date: getBillingDate(year, month),
     payment_date: getPaymentDate(year, month, client.paymentTerms),
     partner_id: client.freeePartnerId,
