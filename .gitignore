@@ -28,9 +28,13 @@ terraform/.terraform.lock.hcl
 .DS_Store
 
 # Local Database
-db/local.db
+db/*.db*
 
 # references
 z/
 .vercel
 .env*.local
+
+.entire
+.turbo
+.serena
