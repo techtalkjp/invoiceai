@@ -14,11 +14,16 @@ import {
 import type { TimesheetEntry } from './types'
 import { getHolidayName } from './utils'
 
-// クライアント側: Google Fonts CDN でフォント登録
-Font.register({
-  family: 'NotoSansJP',
-  src: 'https://fonts.gstatic.com/s/notosansjp/v52/-F6jfjtqLzI2JPCgQBnw7HFyzSD-AsregP8VFBEj75s.ttf',
-})
+// クライアント側のみ: フォント登録
+// サーバー側では registerPdfFontServer() がローカルのフルフォントを登録する。
+// Google Fonts CDN はサブセット配信のため、一部の漢字が中華フォントにフォールバックする。
+// public/fonts/ に配置したフルフォントを使用する。
+if (typeof window !== 'undefined') {
+  Font.register({
+    family: 'NotoSansJP',
+    src: '/fonts/NotoSansJP-Regular.ttf',
+  })
+}
 
 // --- 共通型定義 ---
 
