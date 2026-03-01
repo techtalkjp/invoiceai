@@ -165,6 +165,7 @@ export interface MonthlyStatus {
 export interface Organization {
   createdAt: Generated<string>;
   freeeCompanyId: number | null;
+  freeeTemplateId: number | null;
   id: string;
   logo: string | null;
   metadata: string | null;

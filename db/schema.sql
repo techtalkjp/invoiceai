@@ -59,6 +59,7 @@ CREATE TABLE IF NOT EXISTS "organization" (
   "logo" TEXT,
   "metadata" TEXT,
   "freee_company_id" INTEGER,
+  "freee_template_id" INTEGER,
   "created_at" TEXT NOT NULL DEFAULT (datetime('now')),
   "updated_at" TEXT NOT NULL DEFAULT (datetime('now'))
 );

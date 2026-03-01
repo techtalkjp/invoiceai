@@ -199,7 +199,7 @@ export async function action({ request, params }: Route.ActionArgs) {
     // 共通の deps（PDF は今回使わないので除外）
     const baseDeps = {
       getCompanyId: () => freeeCompanyId,
-      getTemplateId: () => Number(process.env.FREEE_TEMPLATE_ID),
+      getTemplateId: () => organization.freeeTemplateId,
       getTotalHours: () => totalHours,
       getPreviousInvoice: async () => {
         if (!client.freeePartnerId) return null
