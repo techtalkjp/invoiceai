@@ -115,7 +115,11 @@ export default function GeneralSettings({
     defaultValue: {
       name: organization.name,
       slug: organization.slug ?? '',
-      timezone: organization.timezone,
+      timezone: (TIMEZONE_OPTIONS as readonly string[]).includes(
+        organization.timezone,
+      )
+        ? organization.timezone
+        : 'Asia/Tokyo',
     },
     onValidate: ({ formData }) =>
       parseWithZod(formData, { schema: formSchema }),
@@ -151,7 +155,7 @@ export default function GeneralSettings({
               name={fields.timezone.name}
               defaultValue={fields.timezone.initialValue ?? 'Asia/Tokyo'}
             >
-              <SelectTrigger>
+              <SelectTrigger id={fields.timezone.id}>
                 <SelectValue placeholder="タイムゾーンを選択" />
               </SelectTrigger>
               <SelectContent>
