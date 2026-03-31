@@ -11,9 +11,33 @@ import {
 } from '~/components/ui/card'
 import { Input } from '~/components/ui/input'
 import { Label } from '~/components/ui/label'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '~/components/ui/select'
 import { requireOrgAdmin } from '~/lib/auth-helpers.server'
 import { db } from '~/lib/db/kysely'
 import type { Route } from './+types/general'
+
+const TIMEZONE_OPTIONS = [
+  'Asia/Tokyo',
+  'America/New_York',
+  'America/Chicago',
+  'America/Denver',
+  'America/Los_Angeles',
+  'Europe/London',
+  'Europe/Paris',
+  'Europe/Berlin',
+  'Asia/Shanghai',
+  'Asia/Seoul',
+  'Asia/Singapore',
+  'Australia/Sydney',
+  'Pacific/Auckland',
+  'UTC',
+] as const
 
 const formSchema = z.object({
   name: z.string().min(1, '組織名を入力してください'),
@@ -21,6 +45,7 @@ const formSchema = z.object({
     .string()
     .min(1, 'スラッグを入力してください')
     .regex(/^[a-z0-9-]+$/, '小文字英数字とハイフンのみ使用できます'),
+  timezone: z.string().min(1, 'タイムゾーンを選択してください'),
 })
 
 export const handle = {
@@ -44,7 +69,7 @@ export async function action({ request, params }: Route.ActionArgs) {
     return { lastResult: submission.reply() }
   }
 
-  const { name, slug } = submission.value
+  const { name, slug, timezone } = submission.value
 
   // スラッグの重複チェック（自分以外）
   if (slug !== organization.slug) {
@@ -67,7 +92,7 @@ export async function action({ request, params }: Route.ActionArgs) {
   const now = new Date().toISOString()
   await db
     .updateTable('organization')
-    .set({ name, slug, updatedAt: now })
+    .set({ name, slug, timezone, updatedAt: now })
     .where('id', '=', organization.id)
     .execute()
 
@@ -88,6 +113,7 @@ export default function GeneralSettings({
     defaultValue: {
       name: organization.name,
       slug: organization.slug ?? '',
+      timezone: organization.timezone,
     },
     onValidate: ({ formData }) =>
       parseWithZod(formData, { schema: formSchema }),
@@ -115,6 +141,31 @@ export default function GeneralSettings({
               URLに使用されます（例: /org/{fields.slug.value || 'your-org'}）
             </p>
             <div className="text-destructive text-sm">{fields.slug.errors}</div>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor={fields.timezone.id}>タイムゾーン</Label>
+            <Select
+              name={fields.timezone.name}
+              defaultValue={fields.timezone.initialValue ?? 'Asia/Tokyo'}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="タイムゾーンを選択" />
+              </SelectTrigger>
+              <SelectContent>
+                {TIMEZONE_OPTIONS.map((tz) => (
+                  <SelectItem key={tz} value={tz}>
+                    {tz}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-muted-foreground text-xs">
+              月次請求や稼働時間の「今日」の判定に使用されます
+            </p>
+            <div className="text-destructive text-sm">
+              {fields.timezone.errors}
+            </div>
           </div>
 
           {actionData?.success && (

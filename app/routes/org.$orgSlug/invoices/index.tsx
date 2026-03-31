@@ -37,8 +37,8 @@ import { buildInvoiceEmail } from '~/utils/email-template'
 import {
   formatYearMonth,
   formatYearMonthLabel,
-  getPreviousMonth,
-  getRecentMonths,
+  getPreviousMonthTz,
+  getRecentMonthsTz,
   parseYearMonthId,
 } from '~/utils/month'
 import {
@@ -56,12 +56,12 @@ export async function loader({ request, params }: Route.LoaderArgs) {
   const { organization } = await requireOrgMember(request, orgSlug)
 
   const url = new URL(request.url)
-  const now = new Date()
-  const prev = getPreviousMonth()
+  const tz = organization.timezone
+  const prev = getPreviousMonthTz(tz)
   const prevMonthId = formatYearMonth(prev.year, prev.month)
   const selectedMonthParam = url.searchParams.get('month')
   // 当月から過去12ヶ月を表示（月末に当月分の請求書を作ることもあるため）
-  const months = getRecentMonths(12, now)
+  const months = getRecentMonthsTz(12, tz)
   const selectedMonth =
     months.find((m) => m.id === selectedMonthParam)?.id ?? prevMonthId
 

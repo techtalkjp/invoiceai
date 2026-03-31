@@ -7,12 +7,13 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '~/components/ui/popover'
-import { formatYearMonthLabel } from '~/utils/month'
+import { formatYearMonthLabel, getNowInTimezone } from '~/utils/month'
 
 interface MonthNavProps {
   year: number
   month: number
   buildUrl: (year: number, month: number) => string
+  timezone?: string | undefined
 }
 
 const MONTH_NAMES = [
@@ -30,7 +31,7 @@ const MONTH_NAMES = [
   '12月',
 ]
 
-export function MonthNav({ year, month, buildUrl }: MonthNavProps) {
+export function MonthNav({ year, month, buildUrl, timezone }: MonthNavProps) {
   const navigate = useNavigate()
   const [open, setOpen] = useState(false)
   const [pickerYear, setPickerYear] = useState(year)
@@ -40,9 +41,14 @@ export function MonthNav({ year, month, buildUrl }: MonthNavProps) {
   const nextMonth = month === 12 ? 1 : month + 1
   const nextYear = month === 12 ? year + 1 : year
 
-  const now = new Date()
-  const todayYear = now.getFullYear()
-  const todayMonth = now.getMonth() + 1
+  const now = timezone
+    ? getNowInTimezone(timezone)
+    : (() => {
+        const d = new Date()
+        return { year: d.getFullYear(), month: d.getMonth() + 1 }
+      })()
+  const todayYear = now.year
+  const todayMonth = now.month
   const isCurrentMonth = year === todayYear && month === todayMonth
 
   const label = formatYearMonthLabel(year, month)
