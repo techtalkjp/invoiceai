@@ -60,6 +60,7 @@ CREATE TABLE IF NOT EXISTS "organization" (
   "metadata" TEXT,
   "freee_company_id" INTEGER,
   "freee_template_id" INTEGER,
+  "timezone" TEXT NOT NULL DEFAULT 'Asia/Tokyo',
   "created_at" TEXT NOT NULL DEFAULT (datetime('now')),
   "updated_at" TEXT NOT NULL DEFAULT (datetime('now'))
 );

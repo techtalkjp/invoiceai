@@ -1,3 +1,5 @@
+import { dayjs } from './dayjs'
+
 export function padMonth(month: number) {
   return String(month).padStart(2, '0')
 }
@@ -10,23 +12,47 @@ export function formatYearMonthLabel(year: number, month: number) {
   return `${year}年${month}月`
 }
 
-export function getPreviousMonth(from = new Date()) {
-  const year = from.getFullYear()
-  const month = from.getMonth() + 1
+/**
+ * 指定タイムゾーンでの現在の年・月を取得する。
+ * 省略時はシステムのローカル時刻を使用。
+ */
+export function getNowInTimezone(timezone?: string | undefined) {
+  if (timezone) {
+    const d = dayjs().tz(timezone)
+    return { year: d.year(), month: d.month() + 1 }
+  }
+  const d = new Date()
+  return { year: d.getFullYear(), month: d.getMonth() + 1 }
+}
+
+export type YearMonth = { year: number; month: number }
+
+export function getPreviousMonth(from?: Date | YearMonth | undefined) {
+  const { year, month } =
+    from instanceof Date
+      ? { year: from.getFullYear(), month: from.getMonth() + 1 }
+      : (from ?? getNowInTimezone())
   const prevMonth = month === 1 ? 12 : month - 1
   const prevYear = month === 1 ? year - 1 : year
   return { year: prevYear, month: prevMonth }
 }
 
-export function getRecentMonths(count: number, from = new Date()) {
+export function getRecentMonths(
+  count: number,
+  from?: Date | YearMonth | undefined,
+) {
+  const resolved =
+    from instanceof Date
+      ? { year: from.getFullYear(), month: from.getMonth() + 1 }
+      : (from ?? getNowInTimezone())
   const months: Array<{
     id: string
     year: number
     month: number
     label: string
   }> = []
-  let year = from.getFullYear()
-  let month = from.getMonth() + 1
+  let year = resolved.year
+  let month = resolved.month
 
   for (let i = 0; i < count; i += 1) {
     const id = formatYearMonth(year, month)

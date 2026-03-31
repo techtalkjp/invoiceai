@@ -11,6 +11,7 @@ import { decrypt } from '~/lib/activity-sources/encryption.server'
 import { fetchGitHubActivities } from '~/lib/activity-sources/github.server'
 import type { ActivityRecord } from '~/lib/activity-sources/types'
 import { requireOrgMember } from '~/lib/auth-helpers.server'
+import { getNowInTimezone } from '~/utils/month'
 import { parseWorkHoursText } from '../+ai-parse.server'
 import { toServerEntries } from '../+components/data-mapping'
 import { WorkHoursTimesheet } from '../+components/work-hours-timesheet'
@@ -57,11 +58,14 @@ export async function loader({ request, params }: Route.LoaderArgs) {
   const yearParam = url.searchParams.get('year')
   const monthParam = url.searchParams.get('month')
 
-  const now = new Date()
-  const year = yearParam ? Number.parseInt(yearParam, 10) : now.getFullYear()
-  const month = monthParam
-    ? Number.parseInt(monthParam, 10)
-    : now.getMonth() + 1
+  const now = getNowInTimezone(organization.timezone)
+  const parsedYear = Number.parseInt(yearParam ?? '', 10)
+  const parsedMonth = Number.parseInt(monthParam ?? '', 10)
+  const year = Number.isFinite(parsedYear) ? parsedYear : now.year
+  const month =
+    Number.isFinite(parsedMonth) && parsedMonth >= 1 && parsedMonth <= 12
+      ? parsedMonth
+      : now.month
 
   const [clientEntry, mappings, source] = await Promise.all([
     getClientMonthEntries(organization.id, user.id, clientId, year, month),
@@ -329,6 +333,7 @@ export default function ClientWorkHours({
         orgSlug={orgSlug}
         hasGitHubPat={hasGitHubPat}
         mappings={mappings}
+        timezone={organization.timezone}
       />
     </div>
   )

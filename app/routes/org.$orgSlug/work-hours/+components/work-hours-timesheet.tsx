@@ -32,6 +32,7 @@ interface WorkHoursTimesheetProps {
   orgSlug: string
   hasGitHubPat: boolean
   mappings: Array<{ clientId: string; sourceIdentifier: string }>
+  timezone?: string | undefined
 }
 
 export function WorkHoursTimesheet({
@@ -47,6 +48,7 @@ export function WorkHoursTimesheet({
   orgSlug,
   hasGitHubPat,
   mappings,
+  timezone,
 }: WorkHoursTimesheetProps) {
   const monthDates = useMemo(() => getMonthDates(year, month), [year, month])
   const [isImportOpen, setIsImportOpen] = useState(false)
@@ -79,7 +81,12 @@ export function WorkHoursTimesheet({
       <ControlBar
         left={
           <>
-            <MonthNav year={year} month={month} buildUrl={buildUrl} />
+            <MonthNav
+              year={year}
+              month={month}
+              buildUrl={buildUrl}
+              timezone={timezone}
+            />
             <div className="flex items-center gap-3">
               <MonthTotalDisplay monthDates={monthDates} />
               <SaveStatusIndicator fetcherKey={saveFetcherKey} />

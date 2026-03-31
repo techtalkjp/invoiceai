@@ -171,6 +171,7 @@ export interface Organization {
   metadata: string | null;
   name: string;
   slug: string | null;
+  timezone: Generated<string>;
   updatedAt: Generated<string>;
 }
 

@@ -10,6 +10,7 @@ import { DurationDisplay } from '~/components/time/duration-display'
 import { getMonthDates } from '~/components/timesheet'
 import { Button } from '~/components/ui/button'
 import { requireOrgMember } from '~/lib/auth-helpers.server'
+import { getNowInTimezone } from '~/utils/month'
 import { TimesheetGrid } from './+components/timesheet-grid'
 import { saveEntry } from './+mutations.server'
 import { getMonthEntries, getTimeBasedClients } from './+queries.server'
@@ -28,11 +29,14 @@ export async function loader({ request, params }: Route.LoaderArgs) {
   const yearParam = url.searchParams.get('year')
   const monthParam = url.searchParams.get('month')
 
-  const now = new Date()
-  const year = yearParam ? Number.parseInt(yearParam, 10) : now.getFullYear()
-  const month = monthParam
-    ? Number.parseInt(monthParam, 10)
-    : now.getMonth() + 1
+  const now = getNowInTimezone(organization.timezone)
+  const parsedYear = Number.parseInt(yearParam ?? '', 10)
+  const parsedMonth = Number.parseInt(monthParam ?? '', 10)
+  const year = Number.isFinite(parsedYear) ? parsedYear : now.year
+  const month =
+    Number.isFinite(parsedMonth) && parsedMonth >= 1 && parsedMonth <= 12
+      ? parsedMonth
+      : now.month
 
   const [monthEntries, clients] = await Promise.all([
     getMonthEntries(organization.id, user.id, year, month),
@@ -102,7 +106,7 @@ function computeMonthTotalMinutes(
 }
 
 export default function WorkHours({
-  loaderData: { year, month, monthDates, monthEntries, clients },
+  loaderData: { organization, year, month, monthDates, monthEntries, clients },
   params: { orgSlug },
 }: Route.ComponentProps) {
   const actionData = useActionData<typeof action>()
@@ -149,6 +153,7 @@ export default function WorkHours({
                   buildUrl={(y, m) =>
                     `/org/${orgSlug}/work-hours?year=${y}&month=${m}`
                   }
+                  timezone={organization.timezone}
                 />
                 <span className="text-muted-foreground text-sm">
                   合計:{' '}
