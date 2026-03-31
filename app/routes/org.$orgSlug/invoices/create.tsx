@@ -29,6 +29,7 @@ import { db } from '~/lib/db/kysely'
 import { getFreeeClientForOrganization } from '~/utils/freee.server'
 import {
   formatYearMonth,
+  getNowInTimezone,
   getPreviousMonth,
   getRecentMonths,
   parseYearMonthId,
@@ -54,9 +55,10 @@ export async function loader({ request, params }: Route.LoaderArgs) {
   const { organization } = await requireOrgMember(request, orgSlug)
 
   const url = new URL(request.url)
-  const prev = getPreviousMonth()
+  const now = getNowInTimezone(organization.timezone)
+  const prev = getPreviousMonth(now)
   const prevMonthId = formatYearMonth(prev.year, prev.month)
-  const months = getRecentMonths(12, new Date(prev.year, prev.month - 1, 1))
+  const months = getRecentMonths(12, now)
 
   const yearMonthParam = url.searchParams.get('yearMonth')
   const clientIdParam = url.searchParams.get('clientId')

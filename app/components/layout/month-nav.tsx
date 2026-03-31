@@ -41,14 +41,7 @@ export function MonthNav({ year, month, buildUrl, timezone }: MonthNavProps) {
   const nextMonth = month === 12 ? 1 : month + 1
   const nextYear = month === 12 ? year + 1 : year
 
-  const now = timezone
-    ? getNowInTimezone(timezone)
-    : (() => {
-        const d = new Date()
-        return { year: d.getFullYear(), month: d.getMonth() + 1 }
-      })()
-  const todayYear = now.year
-  const todayMonth = now.month
+  const { year: todayYear, month: todayMonth } = getNowInTimezone(timezone)
   const isCurrentMonth = year === todayYear && month === todayMonth
 
   const label = formatYearMonthLabel(year, month)

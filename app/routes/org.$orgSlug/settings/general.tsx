@@ -45,7 +45,9 @@ const formSchema = z.object({
     .string()
     .min(1, 'スラッグを入力してください')
     .regex(/^[a-z0-9-]+$/, '小文字英数字とハイフンのみ使用できます'),
-  timezone: z.string().min(1, 'タイムゾーンを選択してください'),
+  timezone: z.enum(TIMEZONE_OPTIONS, {
+    error: 'タイムゾーンを選択してください',
+  }),
 })
 
 export const handle = {
