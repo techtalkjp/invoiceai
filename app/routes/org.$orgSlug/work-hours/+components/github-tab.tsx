@@ -1,4 +1,5 @@
-import { GithubIcon, Loader2Icon, SettingsIcon } from 'lucide-react'
+import { IconBrandGithub } from '@tabler/icons-react'
+import { Loader2Icon, SettingsIcon } from 'lucide-react'
 import { useFetcher } from 'react-router'
 import { calculateWorkDuration } from '~/components/time/time-utils'
 import { useTimesheetStore } from '~/components/timesheet/store'
@@ -195,7 +196,7 @@ export function GitHubTab({
           </>
         ) : (
           <>
-            <GithubIcon className="size-4" />
+            <IconBrandGithub className="size-4" />
             候補を生成
           </>
         )}

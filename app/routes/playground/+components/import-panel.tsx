@@ -1,4 +1,5 @@
-import { GithubIcon, SparklesIcon } from 'lucide-react'
+import { IconBrandGithub } from '@tabler/icons-react'
+import { SparklesIcon } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { useFetcher } from 'react-router'
 import { toast } from 'sonner'
@@ -109,7 +110,7 @@ export function ImportPanel({
                 テキスト
               </TabsTrigger>
               <TabsTrigger value="github">
-                <GithubIcon className="size-4" />
+                <IconBrandGithub className="size-4" />
                 GitHub
               </TabsTrigger>
             </TabsList>
