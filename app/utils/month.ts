@@ -25,7 +25,7 @@ export function getNowInTimezone(timezone?: string | undefined) {
   return { year: d.getFullYear(), month: d.getMonth() + 1 }
 }
 
-type YearMonth = { year: number; month: number }
+export type YearMonth = { year: number; month: number }
 
 export function getPreviousMonth(from?: Date | YearMonth | undefined) {
   const { year, month } =

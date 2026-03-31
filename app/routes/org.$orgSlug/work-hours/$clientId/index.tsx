@@ -59,8 +59,13 @@ export async function loader({ request, params }: Route.LoaderArgs) {
   const monthParam = url.searchParams.get('month')
 
   const now = getNowInTimezone(organization.timezone)
-  const year = yearParam ? Number.parseInt(yearParam, 10) : now.year
-  const month = monthParam ? Number.parseInt(monthParam, 10) : now.month
+  const parsedYear = Number.parseInt(yearParam ?? '', 10)
+  const parsedMonth = Number.parseInt(monthParam ?? '', 10)
+  const year = Number.isFinite(parsedYear) ? parsedYear : now.year
+  const month =
+    Number.isFinite(parsedMonth) && parsedMonth >= 1 && parsedMonth <= 12
+      ? parsedMonth
+      : now.month
 
   const [clientEntry, mappings, source] = await Promise.all([
     getClientMonthEntries(organization.id, user.id, clientId, year, month),
