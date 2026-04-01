@@ -1,4 +1,5 @@
-import { GithubIcon, Loader2Icon } from 'lucide-react'
+import { IconBrandGithub } from '@tabler/icons-react'
+import { Loader2Icon } from 'lucide-react'
 import { useFetcher } from 'react-router'
 import { calculateWorkDuration } from '~/components/time/time-utils'
 import { Button } from '~/components/ui/button'
@@ -82,7 +83,7 @@ export function GitHubTab({
           {isLoading ? (
             <Loader2Icon className="size-4 animate-spin" />
           ) : (
-            <GithubIcon className="size-4" />
+            <IconBrandGithub className="size-4" />
           )}
           GitHubに接続
         </Button>

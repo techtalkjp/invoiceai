@@ -1,10 +1,10 @@
 import { getFormProps, useForm } from '@conform-to/react'
 import { parseWithZod } from '@conform-to/zod/v4'
 import { syncUserGitHubActivities } from '@shared/services/activity-sync'
+import { IconBrandGithub } from '@tabler/icons-react'
 import {
   CheckCircle2Icon,
   GitBranchIcon,
-  GithubIcon,
   Loader2Icon,
   PlusIcon,
   TrashIcon,
@@ -257,7 +257,7 @@ export default function IntegrationsSettings({
                 <Form method="POST">
                   <input type="hidden" name="intent" value="startOAuth" />
                   <Button type="submit" size="sm">
-                    <GithubIcon className="mr-1 h-4 w-4" />
+                    <IconBrandGithub className="mr-1 h-4 w-4" />
                     GitHub と連携
                   </Button>
                 </Form>

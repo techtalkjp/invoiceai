@@ -7,7 +7,6 @@
     "rootDirs": [".", "./.react-router/types"],
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "types": ["node", "vite/client", "vitest/globals"],
-    "baseUrl": ".",
     "paths": {
       "~/*": ["./app/*"],
       "@shared/*": ["./src/*"]
