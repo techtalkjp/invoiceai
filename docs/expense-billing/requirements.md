@@ -106,7 +106,7 @@
   - Billing Account: `012813-078E5D-19D7AB`
   - 対象プロジェクト: `dailove-search`
   - BigQuery: `techtalk.techtalk` データセット
-- [ ] GCP サービスアカウントの作成と JSON キー生成
+- [ ] GCP サービスアカウントの作成手順をドキュメント化（ユーザーが自分の GCP で作成し、アプリの設定画面から JSON をアップロードする運用）
 - [x] freee 請求書 API の税区分を確認済み（2026-04-04）
   - freee には `tax_type` フィールドなし。明細行の `tax_rate`（10/8/0）で制御
   - 既存実装は1明細行のみ。複数行対応が必要

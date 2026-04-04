@@ -21,9 +21,20 @@ Cloud Billing API v1 では実績コストを取得できない。**BigQuery Bil
 
 ### 認証
 
-- サービスアカウント（JSON キー）
-- 必要ロール: `bigquery.dataViewer`（対象データセット）+ `bigquery.jobUser`（クエリ実行プロジェクト）
-- サービスアカウント JSON は組織設定で登録し、暗号化して DB に保存
+各ユーザーが自分の GCP 環境でサービスアカウントを作成し、アプリの設定画面から JSON キーをアップロードする。
+
+**ユーザー向けセットアップ手順**（アプリ内のヘルプとして表示）:
+
+1. GCP コンソール → IAM と管理 → サービスアカウント
+2. 「サービスアカウントを作成」→ 名前は任意（例: `invoiceai-billing-reader`）
+3. ロール付与: `BigQuery データ閲覧者` + `BigQuery ジョブユーザー`
+4. 作成後、鍵を管理 → 新しい鍵を作成 → JSON
+5. ダウンロードした JSON ファイルをアプリの設定画面でアップロード
+
+**アプリ側の保存**:
+
+- アップロードされた JSON は `provider_credential` テーブルに暗号化して保存
+- 既存の `activity_source.credentials` と同じ暗号化方式（`ENCRYPTION_KEY`）を使用
 
 ### provider_config の構造
 
