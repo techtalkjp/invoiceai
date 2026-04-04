@@ -38,3 +38,6 @@ z/
 .entire
 .turbo
 .serena
+
+# GCP service account keys
+terraform/*-sa-key.json
