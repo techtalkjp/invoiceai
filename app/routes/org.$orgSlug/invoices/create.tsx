@@ -87,6 +87,7 @@ export async function loader({ request, params }: Route.LoaderArgs) {
       'monthlyFee',
       'hourlyRate',
       'unitLabel',
+      'roundingMethod',
     ])
     .where('organizationId', '=', organization.id)
     .where('isActive', '=', 1)
@@ -113,21 +114,14 @@ export async function loader({ request, params }: Route.LoaderArgs) {
   let expensePreview: ExpensePreviewResult | null = null
   if (defaultClientId && defaultYearMonth) {
     const { year, month } = parseYearMonthId(defaultYearMonth)
-
-    // クライアントの端数処理設定を取得
-    const clientForRounding = await db
-      .selectFrom('client')
-      .select('roundingMethod')
-      .where('id', '=', defaultClientId)
-      .where('organizationId', '=', organization.id)
-      .executeTakeFirst()
+    const selectedClient = clients.find((c) => c.id === defaultClientId)
 
     expensePreview = await getExpensePreview({
       organizationId: organization.id,
       clientId: defaultClientId,
       yearMonth: formatYearMonth(year, month),
       roundingMethod:
-        (clientForRounding?.roundingMethod as 'round' | 'floor' | 'ceil') ??
+        (selectedClient?.roundingMethod as 'round' | 'floor' | 'ceil') ??
         'round',
     })
   }
@@ -340,19 +334,12 @@ export async function action({ request, params }: Route.ActionArgs) {
         )
 
         // 経費行
-        const clientForRounding = await db
-          .selectFrom('client')
-          .select('roundingMethod')
-          .where('id', '=', client.id)
-          .executeTakeFirst()
-
         const expensePreview = await getExpensePreview({
           organizationId: organization.id,
           clientId: client.id,
           yearMonth,
           roundingMethod:
-            (clientForRounding?.roundingMethod as 'round' | 'floor' | 'ceil') ??
-            'round',
+            (client.roundingMethod as 'round' | 'floor' | 'ceil') ?? 'round',
         })
 
         for (const line of expensePreview.lines) {

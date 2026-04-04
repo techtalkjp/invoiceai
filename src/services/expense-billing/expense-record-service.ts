@@ -1,6 +1,7 @@
 import { nanoid } from 'nanoid'
 import { db } from '~/lib/db/kysely'
 import { nowISO } from '~/utils/date'
+import { parseYearMonthId } from '~/utils/month'
 import { fetchMeteredCost } from './metered-provider'
 
 // ---------------------------------------------------------------------------
@@ -90,7 +91,7 @@ export async function refreshExpenseRecords(args: {
           continue
         }
 
-        const [y, m] = yearMonth.split('-').map(Number)
+        const { year: y, month: m } = parseYearMonthId(yearMonth)
         if (!y || !m) {
           errors.push({ expenseItemId: item.id, error: '年月が不正です' })
           continue

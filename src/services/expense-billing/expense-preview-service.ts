@@ -1,5 +1,7 @@
 import Decimal from 'decimal.js'
 import { db } from '~/lib/db/kysely'
+import { dayjs } from '~/utils/dayjs'
+import { parseYearMonthId } from '~/utils/month'
 import { getExchangeRate } from './exchange-rate-service'
 import {
   findUnadjustedDifferences,
@@ -124,9 +126,10 @@ export async function getExpensePreview(args: {
       roundingMethod,
     )
 
+    const { year, month } = parseYearMonthId(yearMonth)
     const description = expandTemplate(group.invoiceLabel, {
-      year: yearMonth.split('-')[0] ?? '',
-      month: String(Number(yearMonth.split('-')[1])),
+      year: String(year),
+      month: String(month),
       amountForeign: totalForeign.toString(),
       currency: currencyLabel(currency),
       rate: rate ?? '',
@@ -164,15 +167,16 @@ export async function getExpensePreview(args: {
     const amountJpy = applyRounding(record.amountForeign, rate, roundingMethod)
     const taxRate = record.itemTaxRate ?? 10
 
+    const { year: sy, month: sm } = parseYearMonthId(yearMonth)
     const description = record.itemInvoiceLabel
       ? expandTemplate(record.itemInvoiceLabel, {
-          year: yearMonth.split('-')[0] ?? '',
-          month: String(Number(yearMonth.split('-')[1])),
+          year: String(sy),
+          month: String(sm),
           amountForeign: record.amountForeign,
           currency: currencyLabel(currency),
           rate: rate ?? '',
         })
-      : `${record.itemName} ${yearMonth.split('-')[0]}年${Number(yearMonth.split('-')[1])}月`
+      : `${record.itemName} ${sy}年${sm}月`
 
     lines.push({
       expenseKind: 'regular',
@@ -279,9 +283,12 @@ function currencyLabel(currency: string): string {
 /**
  * 対象月の翌月5日より前かどうか（従量課金の暫定値判定）
  */
-function isBeforeSettlement(yearMonth: string): boolean {
-  const [y, m] = yearMonth.split('-').map(Number)
-  if (!y || !m) return false
-  const nextMonth = m === 12 ? new Date(y + 1, 0, 5) : new Date(y, m, 5)
-  return new Date() < nextMonth
+export function isBeforeSettlement(yearMonth: string): boolean {
+  const { year, month } = parseYearMonthId(yearMonth)
+  if (!year || !month) return false
+  const settlementDate =
+    month === 12
+      ? dayjs(`${year + 1}-01-05`)
+      : dayjs(`${year}-${String(month + 1).padStart(2, '0')}-05`)
+  return dayjs().isBefore(settlementDate)
 }

@@ -100,7 +100,6 @@ export default function ExpenseSettings({
 
   return (
     <div className="space-y-6">
-      {/* グループ一覧 */}
       <div className="space-y-4">
         <h3 className="text-sm font-semibold">経費グループ</h3>
         {groups.map((group) => {
@@ -124,7 +123,6 @@ export default function ExpenseSettings({
                 </groupFetcher.Form>
               </div>
 
-              {/* グループ内アイテム */}
               <div className="ml-4 space-y-1">
                 {groupItems.map((item) => (
                   <div
@@ -153,7 +151,6 @@ export default function ExpenseSettings({
           )
         })}
 
-        {/* 単独アイテム */}
         {items
           .filter((i) => !i.groupId)
           .map((item) => (
@@ -182,7 +179,6 @@ export default function ExpenseSettings({
           ))}
       </div>
 
-      {/* グループ追加フォーム */}
       <div className="space-y-3 rounded-md border p-4">
         <h4 className="text-sm font-semibold">グループ追加</h4>
         <groupFetcher.Form method="post" className="space-y-3">
@@ -250,7 +246,6 @@ export default function ExpenseSettings({
         </groupFetcher.Form>
       </div>
 
-      {/* アイテム追加フォーム */}
       <div className="space-y-3 rounded-md border p-4">
         <h4 className="text-sm font-semibold">経費項目追加</h4>
         <itemFetcher.Form method="post" className="space-y-3">

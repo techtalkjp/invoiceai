@@ -1,9 +1,10 @@
-import dayjs from 'dayjs'
 import { nanoid } from 'nanoid'
 import { z } from 'zod'
 import { decrypt, encrypt } from '~/lib/activity-sources/encryption.server'
 import { db } from '~/lib/db/kysely'
 import { nowISO } from '~/utils/date'
+import { padMonth } from '~/utils/month'
+import { isBeforeSettlement } from './expense-preview-service'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -133,10 +134,10 @@ export async function fetchGoogleCloudMonthlyCost(args: {
   })
 
   // 月の開始・終了タイムスタンプ（UTC）
-  const startTime = `${year}-${String(month).padStart(2, '0')}-01T00:00:00Z`
+  const startTime = `${year}-${padMonth(month)}-01T00:00:00Z`
   const endMonth = month === 12 ? 1 : month + 1
   const endYear = month === 12 ? year + 1 : year
-  const endTime = `${endYear}-${String(endMonth).padStart(2, '0')}-01T00:00:00Z`
+  const endTime = `${endYear}-${padMonth(endMonth)}-01T00:00:00Z`
 
   const query = `
     SELECT
@@ -171,10 +172,8 @@ export async function fetchGoogleCloudMonthlyCost(args: {
   const fetchedAt = nowISO()
 
   // 暫定値判定: 対象月の翌月5日より前
-  const settlementDate = dayjs(
-    `${endYear}-${String(endMonth).padStart(2, '0')}-05`,
-  )
-  const isProvisional = dayjs().isBefore(settlementDate)
+  const yearMonth = `${year}-${padMonth(month)}`
+  const isProvisional = isBeforeSettlement(yearMonth)
 
   return { amount, currency, fetchedAt, isProvisional }
 }
