@@ -77,7 +77,7 @@ export function TimesheetGrid({
         </colgroup>
         <TableHeader>
           <TableRow>
-            <TableHead className="bg-background sticky left-0 z-10">
+            <TableHead className="bg-background sticky left-0 z-10 overflow-hidden">
               日付
             </TableHead>
             {monthEntries.map((entry, idx) => (
@@ -128,7 +128,7 @@ export function TimesheetGrid({
                   'md:hover:bg-muted/50',
                 )}
               >
-                <TableCell className="bg-background sticky left-0 z-10 font-medium">
+                <TableCell className="bg-background sticky left-0 z-10 overflow-hidden font-medium">
                   <div className="flex flex-col">
                     <span className={dateColorClass}>
                       {formatDateRow(date)}
@@ -168,7 +168,7 @@ export function TimesheetGrid({
 
           {/* クライアント合計行 */}
           <TableRow className="border-t-2">
-            <TableCell className="bg-background sticky left-0 z-10 font-bold">
+            <TableCell className="bg-background sticky left-0 z-10 overflow-hidden font-bold">
               合計
             </TableCell>
             {clientTotals.map((total, idx) => (
