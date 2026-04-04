@@ -13,7 +13,7 @@
 ## Commands (most used)
 
 - `pnpm dev`, `pnpm build`, `pnpm start`
-- `pnpm cli:invoice`, `pnpm cli:auth`, `pnpm cli:google`
+- `pnpm cli:auth`, `pnpm cli:google`
 - `pnpm test`, `pnpm lint`, `pnpm format`, `pnpm typecheck`
 - `pnpm db:push`, `pnpm db:types`
 
@@ -140,6 +140,15 @@ org.$orgSlug/
   `app/routes/index.tsx`, `app/routes/org.$orgSlug/clients/`,
   `app/components/password-input.tsx`
 - Form examples (future): `app/routes/playground/money-input/index.tsx`
+
+## Date / Time
+
+- **dayjs 統一**: 日付操作はすべて `dayjs`（`~/utils/dayjs`）を使う。`new Date()` は原則禁止（`holiday_jp` が要求する場合と `Date.now()` のみ例外）
+- **DB**: タイムスタンプは UTC ISO 文字列。書き込みには `nowISO()`（`~/utils/date`）を使う
+- **表示**: `Asia/Tokyo` で表示。`formatDate()` / `formatDateTime()` は自動で JST 変換済み
+- **勤務日**: 30 時制（6:00 起点）。`toJstWorkDate()` / `toJstTime()` / `toJstMinutes()` を使う
+- **カレンダー計算**: `daysInMonth(year, month)`, `dayOfWeek(dateStr)` — `~/utils/date`
+- **ヘルパー一覧**: `app/utils/date.ts`（表示・変換・DB用）、`app/utils/month.ts`（年月ナビ・範囲クエリ用）
 
 ## Security
 
