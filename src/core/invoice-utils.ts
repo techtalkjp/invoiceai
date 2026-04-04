@@ -1,3 +1,5 @@
+import dayjs from 'dayjs'
+
 // 請求書件名を生成
 export function generateSubject(
   client: { invoiceSubjectTemplate: string },
@@ -11,7 +13,9 @@ export function generateSubject(
 
 // 請求日を計算（月末）
 export function getBillingDate(year: number, month: number): string {
-  const lastDay = new Date(year, month, 0).getDate()
+  const lastDay = dayjs(
+    `${year}-${String(month).padStart(2, '0')}-01`,
+  ).daysInMonth()
   return `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`
 }
 
@@ -38,7 +42,9 @@ export function getPaymentDate(
         payMonth = 1
         payYear++
       }
-      const lastDay = new Date(payYear, payMonth, 0).getDate()
+      const lastDay = dayjs(
+        `${payYear}-${String(payMonth).padStart(2, '0')}-01`,
+      ).daysInMonth()
       return `${payYear}-${String(payMonth).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`
     }
     case 'next_next_month_1st': {
@@ -57,7 +63,9 @@ export function getPaymentDate(
         payMonth -= 12
         payYear++
       }
-      const lastDay = new Date(payYear, payMonth, 0).getDate()
+      const lastDay = dayjs(
+        `${payYear}-${String(payMonth).padStart(2, '0')}-01`,
+      ).daysInMonth()
       return `${payYear}-${String(payMonth).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`
     }
   }

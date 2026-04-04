@@ -1,3 +1,4 @@
+import { nowISO } from '~/utils/date'
 import { db } from './db/kysely'
 
 type Provider = 'freee' | 'google'
@@ -55,7 +56,7 @@ export async function saveProviderToken(
     .where('provider', '=', provider)
     .executeTakeFirst()
 
-  const now = new Date().toISOString()
+  const now = nowISO()
 
   if (existing) {
     await db

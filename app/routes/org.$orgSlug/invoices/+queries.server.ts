@@ -1,4 +1,5 @@
 import { db } from '~/lib/db/kysely'
+import { nowISO } from '~/utils/date'
 import {
   getFreeeClientForOrganization,
   listInvoices,
@@ -222,7 +223,7 @@ export async function saveInvoiceToDb(params: {
   status: string
 }): Promise<{ id: string }> {
   const yearMonth = formatYearMonth(params.year, params.month)
-  const now = new Date().toISOString()
+  const now = nowISO()
 
   // 既存の請求書を検索
   const existing = await db

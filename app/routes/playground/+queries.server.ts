@@ -1,6 +1,7 @@
 import { decrypt } from '~/lib/activity-sources/encryption.server'
 import { fetchGitHubActivities } from '~/lib/activity-sources/github.server'
 import { getSession } from '~/lib/auth-helpers.server'
+import { daysInMonth } from '~/utils/date'
 import { suggestWorkEntriesFromActivities } from '../org.$orgSlug/work-hours/+work-entry-suggest.server'
 import { checkAiUsage, recordAiUsage } from './+lib/ai-usage.server'
 import { type GitHubResult, getTokenFlash } from './+lib/github-oauth.server'
@@ -33,7 +34,7 @@ export async function loadGitHubWithSuggestions(
   const userId = session?.user.id
 
   const startDate = `${year}-${String(month).padStart(2, '0')}-01`
-  const lastDay = new Date(year, month, 0).getDate()
+  const lastDay = daysInMonth(year, month)
   const endDate = `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`
 
   try {

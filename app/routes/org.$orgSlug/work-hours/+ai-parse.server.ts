@@ -2,6 +2,7 @@ import { google } from '@ai-sdk/google'
 import holidayJp from '@holiday-jp/holiday_jp'
 import { Output, generateText } from 'ai'
 import { z } from 'zod'
+import { dayOfWeek, daysInMonth } from '~/utils/date'
 
 // テキストから抽出する稼働エントリのスキーマ
 const workEntrySchema = z.object({
@@ -32,9 +33,9 @@ const DAY_LABELS = ['日', '月', '火', '水', '木', '金', '土']
  * 指定年月のカレンダー情報（曜日・祝日）を生成
  */
 function buildCalendarContext(year: number, month: number): string {
-  const daysInMonth = new Date(year, month, 0).getDate()
+  const days = daysInMonth(year, month)
   const start = new Date(year, month - 1, 1)
-  const end = new Date(year, month - 1, daysInMonth)
+  const end = new Date(year, month - 1, days)
   const holidays = holidayJp.between(start, end)
   const holidayMap = new Map(
     holidays.map((h) => {
@@ -43,12 +44,14 @@ function buildCalendarContext(year: number, month: number): string {
     }),
   )
 
+  const pad = (n: number) => String(n).padStart(2, '0')
   const lines: string[] = []
-  for (let day = 1; day <= daysInMonth; day++) {
-    const date = new Date(year, month - 1, day)
-    const dow = DAY_LABELS[date.getDay()]
+  for (let day = 1; day <= days; day++) {
+    const dateStr = `${year}-${pad(month)}-${pad(day)}`
+    const dow = DAY_LABELS[dayOfWeek(dateStr)]
+    const weekday = dayOfWeek(dateStr)
     const holiday = holidayMap.get(day)
-    const isWeekend = date.getDay() === 0 || date.getDay() === 6
+    const isWeekend = weekday === 0 || weekday === 6
     let label = `${month}/${day}(${dow})`
     if (holiday) {
       label += ` 祝日:${holiday}`

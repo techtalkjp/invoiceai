@@ -11,6 +11,7 @@ import { decrypt } from '~/lib/activity-sources/encryption.server'
 import { fetchGitHubActivities } from '~/lib/activity-sources/github.server'
 import type { ActivityRecord } from '~/lib/activity-sources/types'
 import { requireOrgMember } from '~/lib/auth-helpers.server'
+import { daysInMonth } from '~/utils/date'
 import { getNowInTimezone } from '~/utils/month'
 import { parseWorkHoursText } from '../+ai-parse.server'
 import { toServerEntries } from '../+components/data-mapping'
@@ -88,7 +89,7 @@ export async function loader({ request, params }: Route.LoaderArgs) {
       const username = config?.username
       if (username) {
         const startDate = `${year}-${String(month).padStart(2, '0')}-01`
-        const lastDay = new Date(year, month, 0).getDate()
+        const lastDay = daysInMonth(year, month)
         const endDate = `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`
         const allActivities = await fetchGitHubActivities(
           pat,
@@ -195,7 +196,7 @@ export async function action({ request, params }: Route.ActionArgs) {
     }
 
     const startDate = `${year}-${String(month).padStart(2, '0')}-01`
-    const lastDay = new Date(year, month, 0).getDate()
+    const lastDay = daysInMonth(year, month)
     const endDate = `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`
 
     const allActivities = await fetchGitHubActivities(

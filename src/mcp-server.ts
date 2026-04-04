@@ -1,5 +1,6 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
+import dayjs from 'dayjs'
 import 'dotenv/config'
 import { z } from 'zod'
 import {
@@ -40,7 +41,6 @@ function toEntryInput(e: {
 }
 
 function parseMonthOrCurrent(input?: string): { year: number; month: number } {
-  const now = new Date()
   if (input) {
     const parts = input.split('-')
     const y = Number(parts[0])
@@ -49,7 +49,8 @@ function parseMonthOrCurrent(input?: string): { year: number; month: number } {
       return { year: y, month: m }
     }
   }
-  return { year: now.getFullYear(), month: now.getMonth() + 1 }
+  const now = dayjs()
+  return { year: now.year(), month: now.month() + 1 }
 }
 
 function jsonResponse(data: unknown) {

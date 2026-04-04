@@ -5,6 +5,7 @@ import {
   getProviderToken,
   saveProviderToken,
 } from '~/lib/provider-token.server'
+import { dayjs } from '~/utils/dayjs'
 
 export { getEnvValue, updateEnvFileAt } from '@shared/adapters/env'
 export {
@@ -35,10 +36,11 @@ export async function getFreeeAccessTokenForOrganization(
 
   // トークンが期限切れかチェック
   if (token.expiresAt) {
-    const expiresAt = new Date(token.expiresAt)
-    const now = new Date()
     // 5分前には更新
-    if (expiresAt.getTime() - now.getTime() < 5 * 60 * 1000) {
+    if (
+      dayjs.utc(token.expiresAt).diff(dayjs.utc(), 'millisecond') <
+      5 * 60 * 1000
+    ) {
       return refreshFreeeTokenForOrganization(
         organizationId,
         token.refreshToken,
@@ -85,7 +87,7 @@ async function refreshFreeeTokenForOrganization(
     accessToken: data.access_token,
     refreshToken: data.refresh_token ?? refreshToken,
     expiresAt: data.expires_in
-      ? new Date(Date.now() + data.expires_in * 1000).toISOString()
+      ? dayjs.utc().add(data.expires_in, 'second').toISOString()
       : null,
   })
 

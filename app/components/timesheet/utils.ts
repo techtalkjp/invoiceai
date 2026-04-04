@@ -1,4 +1,6 @@
 import holidayJp from '@holiday-jp/holiday_jp'
+import { dayOfWeek, daysInMonth } from '~/utils/date'
+import { dayjs } from '~/utils/dayjs'
 import type { MonthData } from './types'
 
 export const DAY_LABELS = ['日', '月', '火', '水', '木', '金', '土']
@@ -6,8 +8,8 @@ export const DAY_LABELS = ['日', '月', '火', '水', '木', '金', '土']
 // 月の日付一覧を取得
 export function getMonthDates(year: number, month: number): string[] {
   const dates: string[] = []
-  const daysInMonth = new Date(year, month, 0).getDate()
-  for (let day = 1; day <= daysInMonth; day++) {
+  const days = daysInMonth(year, month)
+  for (let day = 1; day <= days; day++) {
     const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
     dates.push(dateStr)
   }
@@ -16,33 +18,32 @@ export function getMonthDates(year: number, month: number): string[] {
 
 // 日付行の表示フォーマット
 export function formatDateRow(dateStr: string): string {
-  const date = new Date(dateStr)
-  const dayOfWeek = date.getDay()
-  const day = date.getDate()
-  return `${day}日 (${DAY_LABELS[dayOfWeek]})`
+  const dow = dayOfWeek(dateStr)
+  const day = dayjs(dateStr).date()
+  return `${day}日 (${DAY_LABELS[dow]})`
 }
 
 // 土曜日判定
 export function isSaturday(dateStr: string): boolean {
-  return new Date(dateStr).getDay() === 6
+  return dayOfWeek(dateStr) === 6
 }
 
 // 日曜日判定
 export function isSunday(dateStr: string): boolean {
-  return new Date(dateStr).getDay() === 0
+  return dayOfWeek(dateStr) === 0
 }
 
 // 祝日名を取得
 export function getHolidayName(dateStr: string): string | null {
-  const date = new Date(dateStr)
+  const date = dayjs(dateStr).toDate()
   const holiday = holidayJp.between(date, date)[0]
   return holiday?.name ?? null
 }
 
 // 平日判定
 export function isWeekday(dateStr: string): boolean {
-  const dayOfWeek = new Date(dateStr).getDay()
-  return dayOfWeek !== 0 && dayOfWeek !== 6 && !getHolidayName(dateStr)
+  const dow = dayOfWeek(dateStr)
+  return dow !== 0 && dow !== 6 && !getHolidayName(dateStr)
 }
 
 // キーボードナビゲーション用のヘルパー
@@ -100,10 +101,9 @@ export function generateSampleData(year: number, month: number): MonthData {
   const dates = getMonthDates(year, month)
 
   for (const date of dates) {
-    const d = new Date(date)
-    const dayOfWeek = d.getDay()
+    const dow = dayOfWeek(date)
     // 平日のみデータを入れる
-    if (dayOfWeek !== 0 && dayOfWeek !== 6) {
+    if (dow !== 0 && dow !== 6) {
       // ランダムに一部の日だけデータを入れる
       if (Math.random() > 0.3) {
         const startHour = 9 + Math.floor(Math.random() * 2)

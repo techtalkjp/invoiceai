@@ -1,6 +1,7 @@
 import { syncAllGitHubActivities } from '@shared/services/activity-sync'
 import { timingSafeEqual } from 'node:crypto'
 import { data } from 'react-router'
+import { dayjs } from '~/utils/dayjs'
 import type { Route } from './+types/activity-sync'
 
 /**
@@ -29,11 +30,9 @@ export async function action({ request }: Route.ActionArgs) {
   }
 
   // 過去7日間を同期
-  const end = new Date()
-  const start = new Date()
-  start.setDate(start.getDate() - 7)
-  const startDate = start.toISOString().slice(0, 10)
-  const endDate = end.toISOString().slice(0, 10)
+  const now = dayjs.utc()
+  const startDate = now.subtract(7, 'day').format('YYYY-MM-DD')
+  const endDate = now.format('YYYY-MM-DD')
 
   const results = await syncAllGitHubActivities(startDate, endDate)
 

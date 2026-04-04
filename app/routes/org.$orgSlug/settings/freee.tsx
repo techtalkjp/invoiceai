@@ -30,6 +30,8 @@ import {
   getProviderToken,
   saveProviderToken,
 } from '~/lib/provider-token.server'
+import { nowISO } from '~/utils/date'
+import { dayjs } from '~/utils/dayjs'
 import {
   getFreeeClientForOrganization,
   listCompanies,
@@ -125,7 +127,7 @@ export async function action({ request, params }: Route.ActionArgs) {
         accessToken: data.access_token,
         refreshToken: data.refresh_token,
         expiresAt: data.expires_in
-          ? new Date(Date.now() + data.expires_in * 1000).toISOString()
+          ? dayjs.utc().add(data.expires_in, 'second').toISOString()
           : null,
         scope: data.scope ?? null,
       })
@@ -164,7 +166,7 @@ export async function action({ request, params }: Route.ActionArgs) {
 
   if (intent === 'setCompany') {
     const { freeeCompanyId } = submission.value
-    const now = new Date().toISOString()
+    const now = nowISO()
 
     await db
       .updateTable('organization')
@@ -200,7 +202,7 @@ export async function action({ request, params }: Route.ActionArgs) {
 
   if (intent === 'setTemplate') {
     const { freeeTemplateId } = submission.value
-    const now = new Date().toISOString()
+    const now = nowISO()
 
     await db
       .updateTable('organization')

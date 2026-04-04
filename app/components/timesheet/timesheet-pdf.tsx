@@ -11,6 +11,8 @@ import {
   calculateWorkDuration,
   splitHoursMinutes,
 } from '~/components/time/time-utils'
+import { dayOfWeek } from '~/utils/date'
+import { dayjs } from '~/utils/dayjs'
 import type { TimesheetEntry } from './types'
 import { getHolidayName } from './utils'
 
@@ -81,12 +83,11 @@ export function buildTimesheetPdfData(rawData: {
 }): PdfTimesheetData[] {
   return rawData.staffTimesheets.map((staff) => {
     const entries: PdfTimesheetEntry[] = staff.entries.map((entry) => {
-      const dateObj = new Date(entry.date)
       const holidayName = getHolidayName(entry.date)
 
       return {
         date: entry.date,
-        dayOfWeek: dateObj.getDay(),
+        dayOfWeek: dayOfWeek(entry.date),
         isHoliday: !!holidayName,
         holidayName: holidayName ?? undefined,
         startTime: entry.startTime ?? undefined,
@@ -379,8 +380,8 @@ function TimesheetPdfPage({ data }: { data: PdfTimesheetData }) {
             ...(entry.isHoliday ? [styles.holiday] : []),
           ]
 
-          const d = new Date(entry.date)
-          const dateStr = `${d.getMonth() + 1}/${d.getDate()}`
+          const d = dayjs(entry.date)
+          const dateStr = `${d.month() + 1}/${d.date()}`
 
           return (
             <View key={entry.date} style={rowStyles}>
@@ -414,7 +415,7 @@ function TimesheetPdfPage({ data }: { data: PdfTimesheetData }) {
       </View>
 
       <Text style={styles.footer}>
-        Generated at {new Date().toISOString().split('T')[0]}
+        Generated at {dayjs().format('YYYY-MM-DD')}
       </Text>
     </Page>
   )
@@ -458,8 +459,7 @@ export async function generateTimesheetPdf(
     const entry = data[date]
     if (!entry?.startTime || !entry?.endTime) continue
 
-    const d = new Date(date)
-    const dayOfWeek = d.getDay()
+    const dow = dayOfWeek(date)
     const holidayName = getHolidayNameFn(date)
     const duration = calculateWorkDuration(
       entry.startTime,
@@ -470,7 +470,7 @@ export async function generateTimesheetPdf(
 
     entries.push({
       date,
-      dayOfWeek,
+      dayOfWeek: dow,
       isHoliday: !!holidayName,
       holidayName: holidayName ?? undefined,
       startTime: entry.startTime,

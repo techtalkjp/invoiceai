@@ -1,4 +1,5 @@
 import { cac } from 'cac'
+import dayjs from 'dayjs'
 import 'dotenv/config'
 import { getActivitiesByMonth } from '~/lib/activity-sources/activity-queries.server'
 import { runCli } from './cli/run'
@@ -25,18 +26,21 @@ function getDateRange(monthArg?: string): {
         `無効な月指定です: ${monthArg} (月は1〜12で指定してください)`,
       )
     }
-    const lastDay = new Date(year, month, 0).getDate()
+    const lastDay = dayjs(
+      `${year}-${String(month).padStart(2, '0')}-01`,
+    ).daysInMonth()
     return {
       startDate: `${year}-${String(month).padStart(2, '0')}-01`,
       endDate: `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`,
     }
   }
   // デフォルト: 過去7日間
-  const end = new Date()
-  const start = new Date()
-  start.setDate(start.getDate() - 7)
-  const fmt = (d: Date) => d.toISOString().slice(0, 10)
-  return { startDate: fmt(start), endDate: fmt(end) }
+  const end = dayjs()
+  const start = end.subtract(7, 'day')
+  return {
+    startDate: start.format('YYYY-MM-DD'),
+    endDate: end.format('YYYY-MM-DD'),
+  }
 }
 
 function main() {
@@ -96,10 +100,10 @@ function main() {
           return
         }
 
-        const now = new Date()
+        const now = dayjs()
         const monthArg =
           options.month ??
-          `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+          `${now.year()}-${String(now.month() + 1).padStart(2, '0')}`
         if (!/^\d{4}-\d{1,2}$/.test(monthArg)) {
           console.error(
             `無効な月指定です: ${monthArg} (YYYY-MM 形式で指定してください)`,

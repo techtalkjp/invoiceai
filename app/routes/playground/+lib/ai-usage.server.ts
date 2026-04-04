@@ -1,5 +1,6 @@
 import { nanoid } from 'nanoid'
 import { db } from '~/lib/db/kysely'
+import { nowISO } from '~/utils/date'
 
 /** 月あたりAI生成できる回数の上限 */
 const MONTHLY_LIMIT = 30
@@ -57,7 +58,7 @@ export async function recordAiUsage(
         totalOutputTokens: eb('totalOutputTokens', '+', outputTokens),
         // GitHub連携後に更新されたら username も記録
         ...(githubUsername ? { githubUsername } : {}),
-        updatedAt: new Date().toISOString(),
+        updatedAt: nowISO(),
       })),
     )
     .execute()

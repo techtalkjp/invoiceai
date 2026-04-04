@@ -1,3 +1,4 @@
+import { toJstWorkDate } from '~/utils/date'
 import type { ActivityRecord, ReviewState } from './types'
 
 const GITHUB_API = 'https://api.github.com'
@@ -140,12 +141,7 @@ async function githubGraphQL<T>(
  * タイムシートが30時制（6:00起点）なので、JST 0:00〜5:59 は前日扱い
  */
 export function isoToJstDate(iso: string): string {
-  const utc = new Date(iso)
-  // UTC → JST (+9h)
-  const jst = new Date(utc.getTime() + 9 * 60 * 60 * 1000)
-  // 30時制: 0:00-5:59 のアクティビティは前日の稼働として扱う (-6h)
-  const workDay = new Date(jst.getTime() - 6 * 60 * 60 * 1000)
-  return workDay.toISOString().slice(0, 10)
+  return toJstWorkDate(iso)
 }
 
 // GraphQL レスポンス型

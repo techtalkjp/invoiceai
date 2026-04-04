@@ -35,8 +35,8 @@ export function getNowInTimezone(timezone?: string | undefined) {
     const d = dayjs().tz(timezone)
     return { year: d.year(), month: d.month() + 1 }
   }
-  const d = new Date()
-  return { year: d.getFullYear(), month: d.getMonth() + 1 }
+  const d = dayjs()
+  return { year: d.year(), month: d.month() + 1 }
 }
 
 export type YearMonth = { year: number; month: number }
