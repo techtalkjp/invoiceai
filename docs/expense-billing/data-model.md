@@ -12,23 +12,22 @@
 
 ### expense_group（経費グループ）
 
-請求書上で1明細行にまとめる単位。通貨・税区分はグループが持ち、所属アイテムはすべて同一通貨。
-課税/非課税を混在させたい場合はグループを分ける。
+請求書上で1明細行にまとめる単位。通貨・税率はグループが持ち、所属アイテムはすべて同一通貨。
+税率が異なる経費を混在させたい場合はグループを分ける。
 
-| カラム          | 型                              | 説明                                                    |
-| --------------- | ------------------------------- | ------------------------------------------------------- |
-| id              | TEXT PK                         | nanoid                                                  |
-| organization_id | TEXT FK → organization          | 組織                                                    |
-| client_id       | TEXT FK → client                | 対象クライアント                                        |
-| name            | TEXT NOT NULL                   | 管理名（例: "サーバ通信費"）                            |
-| invoice_label   | TEXT NOT NULL                   | 請求書テンプレート                                      |
-| currency        | TEXT NOT NULL DEFAULT 'USD'     | 通貨コード（グループの真実のソース）                    |
-| tax_type        | TEXT NOT NULL DEFAULT 'taxable' | 税区分: `'taxable'`（課税） / `'non_taxable'`（非課税） |
-| tax_rate        | INTEGER NOT NULL DEFAULT 10     | 税率（%）。課税の場合のみ使用                           |
-| sort_order      | INTEGER NOT NULL DEFAULT 0      | 請求書内の表示順                                        |
-| is_active       | INTEGER NOT NULL DEFAULT 1      | 有効フラグ                                              |
-| created_at      | TEXT                            |                                                         |
-| updated_at      | TEXT                            |                                                         |
+| カラム          | 型                          | 説明                                                                         |
+| --------------- | --------------------------- | ---------------------------------------------------------------------------- |
+| id              | TEXT PK                     | nanoid                                                                       |
+| organization_id | TEXT FK → organization      | 組織                                                                         |
+| client_id       | TEXT FK → client            | 対象クライアント                                                             |
+| name            | TEXT NOT NULL               | 管理名（例: "サーバ通信費"）                                                 |
+| invoice_label   | TEXT NOT NULL               | 請求書テンプレート                                                           |
+| currency        | TEXT NOT NULL DEFAULT 'USD' | 通貨コード（グループの真実のソース）                                         |
+| tax_rate        | INTEGER NOT NULL DEFAULT 10 | 税率（%）。freee API の `tax_rate` にそのまま渡す。10=課税, 8=軽減, 0=非課税 |
+| sort_order      | INTEGER NOT NULL DEFAULT 0  | 請求書内の表示順                                                             |
+| is_active       | INTEGER NOT NULL DEFAULT 1  | 有効フラグ                                                                   |
+| created_at      | TEXT                        |                                                                              |
+| updated_at      | TEXT                        |                                                                              |
 
 `invoice_label` テンプレート変数:
 
@@ -43,8 +42,8 @@
 
 個別の経費項目。グループに属する場合と単独の場合がある。
 
-- **グループ所属**: 通貨・税区分はグループから継承。アイテムには税設定を持たない
-- **単独項目**（group_id = NULL）: 自身の currency / tax_type / tax_rate を使用
+- **グループ所属**: 通貨・税率はグループから継承。アイテムには税率を持たない
+- **単独項目**（group_id = NULL）: 自身の currency / tax_rate を使用
 
 | カラム          | 型                           | 説明                                                                           |
 | --------------- | ---------------------------- | ------------------------------------------------------------------------------ |
@@ -59,8 +58,7 @@
 | provider        | TEXT                         | metered のプロバイダ（例: `'google_cloud'`）                                   |
 | provider_config | TEXT                         | metered の設定 JSON                                                            |
 | invoice_label   | TEXT                         | 単独明細の請求書表示名テンプレート                                             |
-| tax_type        | TEXT                         | 単独項目の税区分（group_id = NULL の場合のみ使用）                             |
-| tax_rate        | INTEGER                      | 単独項目の税率（group_id = NULL の場合のみ使用）                               |
+| tax_rate        | INTEGER                      | 単独項目の税率（group_id = NULL の場合のみ使用。10/8/0）                       |
 | effective_from  | TEXT                         | 有効開始月（`'2026-04'`）。NULL = 制限なし                                     |
 | effective_to    | TEXT                         | 有効終了月（`'2026-12'`）。NULL = 制限なし                                     |
 | sort_order      | INTEGER NOT NULL DEFAULT 0   | グループ内の表示順                                                             |
@@ -156,12 +154,11 @@ invoice_line に追加するカラム:
 organization ──< client
                    ├──< expense_group ──< expense_item ──< expense_record
                    │        │                   │
-                   │        │ (tax_type,         └── provider_config (JSON)
-                   │        │  tax_rate,
+                   │        │ (tax_rate,          └── provider_config (JSON)
                    │        │  currency)
                    │        │
                    └──< expense_item (group_id = NULL, 単独)
-                              │ (tax_type, tax_rate, currency)
+                              │ (tax_rate, currency)
                               └──< expense_record
                                      └── adjusted_in_invoice_id → invoice
 
@@ -176,9 +173,9 @@ exchange_rate (独立、year_month + currency_pair で一意)
 
 1. グループ所属アイテムの `currency` はグループの `currency` と一致必須
 2. グループ所属アイテムの `organization_id` / `client_id` はグループのそれと一致必須
-3. グループ所属アイテムは `tax_type` / `tax_rate` を持たない（NULL）。税設定はグループから継承
-4. 単独アイテム（group_id = NULL）は `tax_type` / `tax_rate` 必須
-5. `tax_type = 'non_taxable'` の場合 `tax_rate = 0` とする
+3. グループ所属アイテムは `tax_rate` を持たない（NULL）。税率はグループから継承
+4. 単独アイテム（group_id = NULL）は `tax_rate` 必須
+5. `tax_rate` は `0`（非課税）/ `8`（軽減）/ `10`（標準）のいずれか。freee API にそのまま渡す
 6. `type = 'fixed'` の場合 `monthly_amount` 必須
 7. `type = 'metered'` の場合 `provider` + `provider_config` 必須
 8. `effective_from` ≤ `effective_to`（両方指定時）

@@ -12,13 +12,13 @@
 │  [+ グループ追加]  [+ 項目追加]               │
 │                                              │
 │  ▼ サーバ通信費  (USD / 3項目 / $45.00/月)   │
-│    │  課税 10%                               │
+│    │  税率 10%                               │
 │    ├── Vercel           fixed   $20.00       │
 │    ├── Supabase         fixed   $15.00       │
 │    └── Resend           fixed   $10.00       │
 │                                              │
 │  ▼ AI API利用料  (USD / 1項目 / 従量)        │
-│    │  課税 10%                               │
+│    │  税率 10%                               │
 │    └── Gemini API       metered  GCP         │
 │        └── dailove-search / Cloud AI API     │
 │                                              │
