@@ -4,6 +4,20 @@ export function padMonth(month: number) {
   return String(month).padStart(2, '0')
 }
 
+/**
+ * 指定年月の開始日・翌月初日を `YYYY-MM-DD` 形式で返す。
+ * DB の範囲クエリ (`>= startDate AND < endDate`) に使う。
+ */
+export function getMonthDateRange(
+  year: number,
+  month: number,
+): { startDate: string; endDate: string } {
+  const startDate = `${year}-${padMonth(month)}-01`
+  const endDate =
+    month === 12 ? `${year + 1}-01-01` : `${year}-${padMonth(month + 1)}-01`
+  return { startDate, endDate }
+}
+
 export function formatYearMonth(year: number, month: number) {
   return `${year}-${padMonth(month)}`
 }
@@ -21,8 +35,8 @@ export function getNowInTimezone(timezone?: string | undefined) {
     const d = dayjs().tz(timezone)
     return { year: d.year(), month: d.month() + 1 }
   }
-  const d = new Date()
-  return { year: d.getFullYear(), month: d.getMonth() + 1 }
+  const d = dayjs()
+  return { year: d.year(), month: d.month() + 1 }
 }
 
 export type YearMonth = { year: number; month: number }

@@ -1,9 +1,10 @@
 import { db } from '~/lib/db/kysely'
+import { nowISO } from '~/utils/date'
 import {
   getFreeeClientForOrganization,
   listInvoices,
 } from '~/utils/freee.server'
-import { formatYearMonth } from '~/utils/month'
+import { formatYearMonth, getMonthDateRange } from '~/utils/month'
 
 export type InvoiceListResult = {
   invoices: Awaited<ReturnType<typeof listInvoices>>['display']
@@ -56,11 +57,7 @@ export async function getClientWorkHoursFromDb(
   year: number,
   month: number,
 ): Promise<{ totalHours: number }> {
-  const startDate = `${year}-${String(month).padStart(2, '0')}-01`
-  const endDate =
-    month === 12
-      ? `${year + 1}-01-01`
-      : `${year}-${String(month + 1).padStart(2, '0')}-01`
+  const { startDate, endDate } = getMonthDateRange(year, month)
 
   const result = await db
     .selectFrom('workEntry')
@@ -83,11 +80,7 @@ export async function getClientWorkHoursByStaff(
   year: number,
   month: number,
 ): Promise<{ userId: string; userName: string; totalHours: number }[]> {
-  const startDate = `${year}-${String(month).padStart(2, '0')}-01`
-  const endDate =
-    month === 12
-      ? `${year + 1}-01-01`
-      : `${year}-${String(month + 1).padStart(2, '0')}-01`
+  const { startDate, endDate } = getMonthDateRange(year, month)
 
   const result = await db
     .selectFrom('workEntry')
@@ -127,11 +120,7 @@ export async function getWorkHoursByClientAndStaff(
 > {
   if (clientIds.length === 0) return {}
 
-  const startDate = `${year}-${String(month).padStart(2, '0')}-01`
-  const endDate =
-    month === 12
-      ? `${year + 1}-01-01`
-      : `${year}-${String(month + 1).padStart(2, '0')}-01`
+  const { startDate, endDate } = getMonthDateRange(year, month)
 
   const result = await db
     .selectFrom('workEntry')
@@ -181,16 +170,11 @@ export async function getPreviousMonthInvoice(
   year: number,
   month: number,
 ) {
-  // 前月を計算
+  // 前月の billing_date 範囲を計算
   const prevMonth = month === 1 ? 12 : month - 1
   const prevYear = month === 1 ? year - 1 : year
-
-  // 前月の billing_date 範囲を計算
-  const prevMonthStart = `${prevYear}-${String(prevMonth).padStart(2, '0')}-01`
-  const prevMonthEnd =
-    prevMonth === 12
-      ? `${prevYear + 1}-01-01`
-      : `${prevYear}-${String(prevMonth + 1).padStart(2, '0')}-01`
+  const { startDate: prevMonthStart, endDate: prevMonthEnd } =
+    getMonthDateRange(prevYear, prevMonth)
 
   try {
     const freee = await getFreeeClientForOrganization(organizationId)
@@ -239,7 +223,7 @@ export async function saveInvoiceToDb(params: {
   status: string
 }): Promise<{ id: string }> {
   const yearMonth = formatYearMonth(params.year, params.month)
-  const now = new Date().toISOString()
+  const now = nowISO()
 
   // 既存の請求書を検索
   const existing = await db
@@ -388,11 +372,7 @@ export async function getTimesheetDataForPdf(
     return { clientName: '不明', staffTimesheets: [] }
   }
 
-  const startDate = `${year}-${String(month).padStart(2, '0')}-01`
-  const endDate =
-    month === 12
-      ? `${year + 1}-01-01`
-      : `${year}-${String(month + 1).padStart(2, '0')}-01`
+  const { startDate, endDate } = getMonthDateRange(year, month)
 
   // 全エントリを取得（スタッフ情報付き）
   const entries = await db

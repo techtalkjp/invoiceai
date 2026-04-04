@@ -1,11 +1,12 @@
 import { parseWithZod } from '@conform-to/zod/v4'
 import { db } from '~/lib/db/kysely'
+import { nowISO } from '~/utils/date'
 import { bulkImportSchema, clientSchema, importSchema } from './+schema'
 
 export async function deleteClient(organizationId: string, clientId: string) {
   await db
     .updateTable('client')
-    .set({ isActive: 0, updatedAt: new Date().toISOString() })
+    .set({ isActive: 0, updatedAt: nowISO() })
     .where('id', '=', clientId)
     .where('organizationId', '=', organizationId)
     .execute()
@@ -14,7 +15,7 @@ export async function deleteClient(organizationId: string, clientId: string) {
 export async function restoreClient(organizationId: string, clientId: string) {
   await db
     .updateTable('client')
-    .set({ isActive: 1, updatedAt: new Date().toISOString() })
+    .set({ isActive: 1, updatedAt: nowISO() })
     .where('id', '=', clientId)
     .where('organizationId', '=', organizationId)
     .execute()
@@ -30,7 +31,7 @@ export async function importPartner(
   }
 
   const { partnerId, partnerName } = submission.value
-  const now = new Date().toISOString()
+  const now = nowISO()
 
   // 既存チェック
   const existing = await db
@@ -75,7 +76,7 @@ export async function importPartnersBulk(
     id: number
     name: string
   }>
-  const now = new Date().toISOString()
+  const now = nowISO()
 
   // 既存のパートナーIDを取得
   const existingPartnerIds = new Set(
@@ -125,7 +126,7 @@ export async function upsertClient(organizationId: string, formData: FormData) {
   }
 
   const data = submission.value
-  const now = new Date().toISOString()
+  const now = nowISO()
 
   if (data.id) {
     await db

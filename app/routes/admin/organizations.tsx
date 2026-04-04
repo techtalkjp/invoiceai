@@ -32,7 +32,7 @@ import {
   TableRow,
 } from '~/components/ui/table'
 import { db } from '~/lib/db/kysely'
-import { formatDate } from '~/utils/date'
+import { formatDate, nowISO } from '~/utils/date'
 import type { Route } from './+types/organizations'
 
 const createOrgSchema = z.object({
@@ -90,7 +90,7 @@ export async function action({ request }: Route.ActionArgs) {
 
   if (intent === 'create') {
     const { name, slug, freeeCompanyId } = submission.value
-    const now = new Date().toISOString()
+    const now = nowISO()
 
     await db
       .insertInto('organization')
@@ -109,7 +109,7 @@ export async function action({ request }: Route.ActionArgs) {
 
   if (intent === 'update') {
     const { organizationId, name, slug, freeeCompanyId } = submission.value
-    const now = new Date().toISOString()
+    const now = nowISO()
 
     await db
       .updateTable('organization')

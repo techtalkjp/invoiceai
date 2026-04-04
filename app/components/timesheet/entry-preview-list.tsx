@@ -6,6 +6,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from '~/components/ui/collapsible'
+import { dayjs } from '~/utils/dayjs'
 
 export function EntryPreviewList({
   entries,
@@ -31,7 +32,7 @@ export function EntryPreviewList({
       <CollapsibleContent>
         <div className="mt-1 max-h-48 space-y-0.5 overflow-x-hidden overflow-y-auto">
           {entries.map((e) => {
-            const d = new Date(e.workDate)
+            const d = dayjs(e.workDate)
             const work =
               e.startTime && e.endTime
                 ? calculateWorkDuration(e.startTime, e.endTime, e.breakMinutes)
@@ -42,7 +43,7 @@ export function EntryPreviewList({
                 className="text-muted-foreground flex min-w-0 items-baseline gap-2 text-xs"
               >
                 <span className="w-10 shrink-0 font-medium tabular-nums">
-                  {d.getMonth() + 1}/{d.getDate()}
+                  {d.month() + 1}/{d.date()}
                 </span>
                 <span className="w-20 shrink-0 tabular-nums">
                   {e.startTime}–{e.endTime}

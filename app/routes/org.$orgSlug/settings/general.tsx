@@ -20,6 +20,7 @@ import {
 } from '~/components/ui/select'
 import { requireOrgAdmin } from '~/lib/auth-helpers.server'
 import { db } from '~/lib/db/kysely'
+import { nowISO } from '~/utils/date'
 import type { Route } from './+types/general'
 
 const TIMEZONE_OPTIONS = [
@@ -91,7 +92,7 @@ export async function action({ request, params }: Route.ActionArgs) {
     }
   }
 
-  const now = new Date().toISOString()
+  const now = nowISO()
   await db
     .updateTable('organization')
     .set({ name, slug, timezone, updatedAt: now })

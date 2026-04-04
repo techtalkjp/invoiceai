@@ -1,5 +1,7 @@
 import { memo } from 'react'
 import { cn } from '~/lib/utils'
+import { dayOfWeek } from '~/utils/date'
+import { dayjs } from '~/utils/dayjs'
 import {
   TimesheetBreakCell,
   TimesheetDescriptionCell,
@@ -105,9 +107,9 @@ export const TimesheetRow = memo(function TimesheetRow({
       >
         <div className="flex flex-col px-2">
           <span className={cn('whitespace-nowrap', dateColorClass)}>
-            {new Date(date).getDate()}
+            {dayjs(date).date()}
             <span className="text-[10px]">
-              日 ({DAY_LABELS[new Date(date).getDay()]})
+              日 ({DAY_LABELS[dayOfWeek(date)]})
             </span>
           </span>
           {holidayName && (

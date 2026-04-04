@@ -11,7 +11,6 @@
     "cli:freee": "tsx src/list-invoices.ts",
     "cli:auth": "tsx src/auth.ts",
     "cli:google": "tsx src/google-auth.ts",
-    "cli:invoice": "tsx src/create-invoice.ts",
     "cli:activity": "tsx src/sync-activities.ts",
     "test": "vitest",
     "test:watch": "vitest --watch",

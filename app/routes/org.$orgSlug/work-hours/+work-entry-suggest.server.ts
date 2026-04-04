@@ -1,7 +1,7 @@
 import { google } from '@ai-sdk/google'
 import { generateText } from 'ai'
 import type { ActivityRecord } from '~/lib/activity-sources/types'
-import { dayjs } from '~/utils/dayjs'
+import { toJstMinutes } from '~/utils/date'
 
 export type SuggestedEntry = {
   workDate: string
@@ -18,18 +18,6 @@ export type SuggestResult = {
   totalInputTokens: number
   totalOutputTokens: number
   aiDaysUsed: number
-}
-
-/**
- * JSTでの時刻を分に変換（30時制: 0:00-5:59 は 24:00-29:59 として扱う）
- */
-function toJstMinutes(isoTimestamp: string): number {
-  const jst = dayjs(isoTimestamp).tz('Asia/Tokyo')
-  const hours = jst.hour()
-  const minutes = jst.minute()
-  // 6時前は前日の深夜扱い（24時超え）
-  if (hours < 6) return (hours + 24) * 60 + minutes
-  return hours * 60 + minutes
 }
 
 /**

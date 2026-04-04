@@ -1,3 +1,4 @@
+import { nowISO } from '~/utils/date'
 import { db } from './db/kysely'
 
 export type FeatureFlagKey = 'signup_enabled'
@@ -30,7 +31,7 @@ export async function getFeatureFlags() {
 export async function setFeatureFlag(key: FeatureFlagKey, enabled: boolean) {
   await db
     .updateTable('featureFlag')
-    .set({ defaultValue: enabled ? 1 : 0, updatedAt: new Date().toISOString() })
+    .set({ defaultValue: enabled ? 1 : 0, updatedAt: nowISO() })
     .where('key', '=', key)
     .execute()
 }

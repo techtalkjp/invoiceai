@@ -1,4 +1,5 @@
 import { db } from '~/lib/db/kysely'
+import { daysInMonth, nowISO } from '~/utils/date'
 import type { ActivityRecord, PrAction, ReviewState } from './types'
 
 /**
@@ -145,9 +146,10 @@ export function getActivitiesByMonth(
   year: number,
   month: number,
 ) {
-  const startDate = `${year}-${String(month).padStart(2, '0')}-01`
-  const lastDay = new Date(year, month, 0).getDate()
-  const endDate = `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`
+  const pad = (n: number) => String(n).padStart(2, '0')
+  const startDate = `${year}-${pad(month)}-01`
+  const lastDay = daysInMonth(year, month)
+  const endDate = `${year}-${pad(month)}-${pad(lastDay)}`
   return getActivities(organizationId, userId, startDate, endDate)
 }
 
@@ -178,7 +180,7 @@ export async function saveActivitySource(
   credentials: string,
   config: string | null,
 ) {
-  const now = new Date().toISOString()
+  const now = nowISO()
 
   await db
     .insertInto('activitySource')
@@ -248,7 +250,7 @@ export async function saveClientSourceMapping(
       clientId,
       sourceType,
       sourceIdentifier,
-      createdAt: new Date().toISOString(),
+      createdAt: nowISO(),
     })
     .onConflict((oc) =>
       oc.columns(['clientId', 'sourceType', 'sourceIdentifier']).doNothing(),

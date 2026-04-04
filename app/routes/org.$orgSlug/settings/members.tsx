@@ -37,7 +37,7 @@ import {
 } from '~/components/ui/table'
 import { requireOrgAdmin } from '~/lib/auth-helpers.server'
 import { db } from '~/lib/db/kysely'
-import { formatDate } from '~/utils/date'
+import { formatDate, nowISO } from '~/utils/date'
 import type { Route } from './+types/members'
 
 const addMemberSchema = z.object({
@@ -125,7 +125,7 @@ export async function action({ request, params }: Route.ActionArgs) {
 
   if (intent === 'addMember') {
     const { userId, role } = submission.value
-    const now = new Date().toISOString()
+    const now = nowISO()
 
     await db
       .insertInto('member')
@@ -162,7 +162,7 @@ export async function action({ request, params }: Route.ActionArgs) {
 
   if (intent === 'updateRole') {
     const { memberId, role } = submission.value
-    const now = new Date().toISOString()
+    const now = nowISO()
 
     // 自分自身のロール変更は不可
     if (memberId === currentMembership.id) {

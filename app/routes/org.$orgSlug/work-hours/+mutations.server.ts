@@ -1,4 +1,5 @@
 import { db } from '~/lib/db/kysely'
+import { daysInMonth, nowISO } from '~/utils/date'
 import { calculateHours } from './+schema'
 
 type EntryInput = {
@@ -18,7 +19,7 @@ export async function saveEntry(
   userId: string,
   entry: EntryInput,
 ) {
-  const now = new Date().toISOString()
+  const now = nowISO()
   const breakMinutes = entry.breakMinutes ?? 0
   const hours = calculateHours(entry.startTime, entry.endTime, breakMinutes)
 
@@ -125,7 +126,7 @@ export async function syncMonthEntries(
     const [y, m] = yearMonth.split('-').map(Number)
     if (y && m) {
       firstDate = `${y}-${String(m).padStart(2, '0')}-01`
-      const lastDay = new Date(y, m, 0).getDate()
+      const lastDay = daysInMonth(y, m)
       lastDate = `${y}-${String(m).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`
     }
   } else if (submittedDates.size > 0) {

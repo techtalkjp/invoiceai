@@ -14,6 +14,8 @@ import {
 } from '~/components/timesheet/utils'
 import { Skeleton } from '~/components/ui/skeleton'
 import { cn } from '~/lib/utils'
+import { dayOfWeek } from '~/utils/date'
+import { dayjs } from '~/utils/dayjs'
 import { buildPlaygroundUrl, resolveYearMonth } from '../+lib/url-utils'
 
 export function HydrateFallback() {
@@ -62,7 +64,7 @@ export function HydrateFallback() {
               </div>
               {/* Skeleton rows */}
               {monthDates.map((date) => {
-                const d = new Date(date)
+                const d = dayjs(date)
                 const saturday = isSaturday(date)
                 const sunday = isSunday(date)
                 const holidayName = getHolidayName(date)
@@ -89,9 +91,9 @@ export function HydrateFallback() {
                         <span
                           className={cn('whitespace-nowrap', dateColorClass)}
                         >
-                          {d.getDate()}
+                          {d.date()}
                           <span className="text-[10px]">
-                            日 ({DAY_LABELS[d.getDay()]})
+                            日 ({DAY_LABELS[dayOfWeek(date)]})
                           </span>
                         </span>
                         {holidayName && (
