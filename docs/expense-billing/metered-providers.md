@@ -45,6 +45,7 @@ Cloud Billing API v1 では実績コストを取得できない。**BigQuery Bil
 - **`usage_start_time` ベース（利用月基準）** を採用
 - GCP の `invoice.month` は請求書基準で、月跨ぎや遅延計上で利用月とズレることがあるため
 - クレジット（無料枠・割引等）を差し引いた実質コストを計算: `SUM(cost) + SUM(credits)`
+- 通貨は Billing Account の設定に依存。日本アカウントでは **JPY**（円建て）で返る。返却値の `currency` フィールドで判定する
 
 ### 確定タイミング
 
