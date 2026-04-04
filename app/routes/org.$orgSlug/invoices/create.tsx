@@ -6,6 +6,17 @@ import {
   type PaymentTerms,
 } from '@shared/core/invoice-utils'
 import {
+  getExpensePreview,
+  type ExpensePreviewLine,
+  type ExpensePreviewResult,
+} from '@shared/services/expense-billing/expense-preview-service'
+import {
+  buildExpenseLineSnapshot,
+  buildWorkLineSnapshot,
+  markExpenseRecordsAdjusted,
+  saveInvoiceLines,
+} from '@shared/services/expense-billing/invoice-line-snapshot'
+import {
   createClientInvoice,
   updateClientInvoice,
 } from '@shared/services/invoice-service'
@@ -98,6 +109,29 @@ export async function loader({ request, params }: Route.LoaderArgs) {
     )
   }
 
+  // 経費プレビューを取得
+  let expensePreview: ExpensePreviewResult | null = null
+  if (defaultClientId && defaultYearMonth) {
+    const { year, month } = parseYearMonthId(defaultYearMonth)
+
+    // クライアントの端数処理設定を取得
+    const clientForRounding = await db
+      .selectFrom('client')
+      .select('roundingMethod')
+      .where('id', '=', defaultClientId)
+      .where('organizationId', '=', organization.id)
+      .executeTakeFirst()
+
+    expensePreview = await getExpensePreview({
+      organizationId: organization.id,
+      clientId: defaultClientId,
+      yearMonth: formatYearMonth(year, month),
+      roundingMethod:
+        (clientForRounding?.roundingMethod as 'round' | 'floor' | 'ceil') ??
+        'round',
+    })
+  }
+
   return {
     organization,
     clients,
@@ -106,6 +140,7 @@ export async function loader({ request, params }: Route.LoaderArgs) {
     defaultClientId,
     prevMonthId,
     existingInvoice,
+    expensePreview,
   }
 }
 
@@ -250,13 +285,14 @@ export async function action({ request, params }: Route.ActionArgs) {
     // DB に保存
     if (result.invoice) {
       const { year, month } = input.yearMonth
+      const yearMonth = formatYearMonth(year, month)
       const subject =
         client.invoiceSubjectTemplate
           ?.replace('{year}', String(year))
           .replace('{month}', String(month)) ??
         `${client.name} ${year}年${month}月`
 
-      await saveInvoiceToDb({
+      const invoiceRecord = await saveInvoiceToDb({
         organizationId: organization.id,
         clientId: client.id,
         year,
@@ -279,6 +315,60 @@ export async function action({ request, params }: Route.ActionArgs) {
         totalAmount: result.invoice.totalAmount,
         status: result.invoice.sendingStatus,
       })
+
+      // invoice_line に凍結保存（稼働行 + 経費行）
+      if (invoiceRecord) {
+        const invoiceId = invoiceRecord.id
+        const snapshotLines = []
+
+        // 稼働行
+        snapshotLines.push(
+          buildWorkLineSnapshot({
+            invoiceId,
+            description: `${subject}分`,
+            quantity: client.billingType === 'time' ? result.totalHours : 1,
+            unit:
+              client.billingType === 'time'
+                ? '時間'
+                : (client.unitLabel ?? '式'),
+            unitPrice:
+              client.billingType === 'time'
+                ? (client.hourlyRate ?? 0)
+                : (client.monthlyFee ?? 0),
+            taxRate: 10,
+          }),
+        )
+
+        // 経費行
+        const clientForRounding = await db
+          .selectFrom('client')
+          .select('roundingMethod')
+          .where('id', '=', client.id)
+          .executeTakeFirst()
+
+        const expensePreview = await getExpensePreview({
+          organizationId: organization.id,
+          clientId: client.id,
+          yearMonth,
+          roundingMethod:
+            (clientForRounding?.roundingMethod as 'round' | 'floor' | 'ceil') ??
+            'round',
+        })
+
+        for (const line of expensePreview.lines) {
+          snapshotLines.push(buildExpenseLineSnapshot({ invoiceId, line }))
+        }
+
+        await saveInvoiceLines(snapshotLines)
+
+        // 差額調整の expense_record をマーク
+        const adjustmentLines = expensePreview.lines.filter(
+          (l) => l.expenseKind === 'adjustment',
+        )
+        if (adjustmentLines.length > 0) {
+          await markExpenseRecordsAdjusted(invoiceId, adjustmentLines)
+        }
+      }
     }
 
     return {
@@ -309,6 +399,7 @@ export default function InvoiceCreate({
     defaultClientId,
     prevMonthId,
     existingInvoice,
+    expensePreview,
   },
   params: { orgSlug },
 }: Route.ComponentProps) {
@@ -471,6 +562,78 @@ export default function InvoiceCreate({
           </div>
         </Form>
       </ContentPanel>
+      {/* 経費プレビュー */}
+      {expensePreview && expensePreview.lines.length > 0 && (
+        <ContentPanel className="space-y-3 p-6">
+          <h3 className="text-sm font-semibold">経費明細プレビュー</h3>
+          {Object.entries(expensePreview.exchangeRates).length > 0 && (
+            <div className="text-muted-foreground text-xs">
+              {Object.entries(expensePreview.exchangeRates).map(
+                ([pair, info]: [
+                  string,
+                  { rate: string; rateDate: string; source: string },
+                ]) => (
+                  <span key={pair}>
+                    {pair}: {info.rate} 円（
+                    {info.source === 'manual'
+                      ? '手動設定'
+                      : `日銀TTM ${info.rateDate}`}
+                    ）
+                  </span>
+                ),
+              )}
+            </div>
+          )}
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b text-left">
+                <th className="py-1">摘要</th>
+                <th className="py-1 text-right">外貨</th>
+                <th className="py-1 text-right">金額（円）</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(expensePreview.lines as ExpensePreviewLine[]).map(
+                (line: ExpensePreviewLine, i: number) => (
+                  <tr key={i} className="border-b">
+                    <td className="py-1">
+                      {line.description}
+                      {line.isProvisional && (
+                        <span className="text-muted-foreground ml-1 text-xs">
+                          （暫定値）
+                        </span>
+                      )}
+                      {line.expenseKind === 'adjustment' && (
+                        <Badge variant="outline" className="ml-1 text-xs">
+                          差額調整
+                        </Badge>
+                      )}
+                    </td>
+                    <td className="py-1 text-right tabular-nums">
+                      {line.currency !== 'JPY'
+                        ? `${line.currency} ${line.amountForeign}`
+                        : ''}
+                    </td>
+                    <td className="py-1 text-right tabular-nums">
+                      ¥{line.amountJpy.toLocaleString()}
+                    </td>
+                  </tr>
+                ),
+              )}
+            </tbody>
+          </table>
+          {expensePreview.errors.length > 0 && (
+            <div className="text-destructive text-xs">
+              {(expensePreview.errors as Array<{ error: string }>).map(
+                (e: { error: string }, i: number) => (
+                  <div key={i}>{e.error}</div>
+                ),
+              )}
+            </div>
+          )}
+        </ContentPanel>
+      )}
+
       {actionData && 'ok' in actionData && actionData.ok && (
         <ContentPanel className="space-y-1 p-6">
           <div className="text-lg font-semibold">

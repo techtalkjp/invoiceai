@@ -1,32 +1,9 @@
-import { redirect, useActionData } from 'react-router'
+import { redirect, useActionData, useRouteLoaderData } from 'react-router'
 import { useSmartNavigation } from '~/hooks/use-smart-navigation'
 import { requireOrgAdmin } from '~/lib/auth-helpers.server'
-import { ClientForm } from './+components/client-form'
-import { upsertClient } from './+mutations.server'
-import { getClient } from './+queries.server'
-import type { Route } from './+types/$clientId'
-
-export const handle = {
-  breadcrumb: (data: { orgSlug: string; client: { name: string } }) => [
-    { label: 'クライアント', to: `/org/${data.orgSlug}/clients` },
-    { label: data.client.name },
-  ],
-}
-
-export async function loader({ request, params }: Route.LoaderArgs) {
-  const { orgSlug, clientId } = params
-  const { organization } = await requireOrgAdmin(request, orgSlug)
-
-  const client = await getClient(organization.id, clientId)
-  if (!client) {
-    throw new Response('クライアントが見つかりません', { status: 404 })
-  }
-
-  // 同期可能かどうか（freee連携済みかどうか）
-  const canSync = !!organization.freeeCompanyId && !!client.freeePartnerId
-
-  return { orgSlug, client, organization, canSync }
-}
+import { ClientForm } from '../+components/client-form'
+import { upsertClient } from '../+mutations.server'
+import type { Route } from './+types/_index'
 
 export async function action({ request, params }: Route.ActionArgs) {
   const { orgSlug } = params
@@ -42,12 +19,38 @@ export async function action({ request, params }: Route.ActionArgs) {
   return result
 }
 
-export default function EditClient({
-  loaderData: { orgSlug, client, canSync },
+export default function ClientBasicSettings({
+  params: { orgSlug },
 }: Route.ComponentProps) {
   const actionData = useActionData<typeof action>()
-  const baseUrl = `/org/${orgSlug}/clients`
-  const { backUrl } = useSmartNavigation({ baseUrl })
+  const { backUrl } = useSmartNavigation({
+    baseUrl: `/org/${orgSlug}/clients`,
+  })
+  const layoutData = useRouteLoaderData(
+    'routes/org.$orgSlug/clients/$clientId/_layout',
+  ) as
+    | {
+        client: {
+          id: string
+          name: string
+          billingType: string
+          hourlyRate: number | null
+          monthlyFee: number | null
+          unitLabel: string | null
+          hasWorkDescription: number | null
+          freeePartnerId: number | null
+          freeePartnerName: string | null
+          invoiceSubjectTemplate: string | null
+          invoiceNote: string | null
+          paymentTerms: string
+        }
+        canSync: boolean
+      }
+    | undefined
+
+  if (!layoutData) return null
+
+  const { client, canSync } = layoutData
 
   return (
     <ClientForm
