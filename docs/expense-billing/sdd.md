@@ -59,34 +59,17 @@ app/
             expense-record-list.tsx         # 新規
       invoices/
         +queries.server.ts                   # 変更: 経費プレビュー取得と invoice_line 保存を追加
-        +schema.ts                           # 変更: rate manual override などの intent 用 schema 追加
-        create.tsx                           # 変更: 経費プレビュー、再取得、manual rate、差額調整 UI
+        +schema.ts                           # 変更: intent union schema を追加
+        create.tsx                           # 変更: useFetcher ベースの経費プレビュー、再取得、manual rate、差額調整 UI
 
 src/
   services/
     expense-billing/
-      types.ts                               # 新規: domain types
-      constants.ts                           # 新規
-      utils/
-        decimal.ts                           # 新規: Decimal ラッパ
-        label-template.ts                    # 新規: invoice_label 展開
-        rounding.ts                          # 新規: round/floor/ceil
-        year-month.ts                        # 新規: YYYY-MM 判定
-      exchange-rate/
-        boj-client.ts                        # 新規: 日銀 API client
-        exchange-rate-service.ts             # 新規: cache + manual override + fetch
-      metered/
-        provider-registry.ts                 # 新規: plugin registry
-        types.ts                             # 新規
-        google-cloud-billing-provider.ts     # 新規
-        google-cloud-billing-query.ts        # 新規
-      records/
-        expense-record-service.ts            # 新規: fixed/metered の月次 record upsert
-        expense-record-diff-service.ts       # 新規: 差額検出
-      billing/
-        expense-definition-service.ts        # 新規: active items/groups 解決
-        expense-preview-service.ts           # 新規: 請求書作成画面用 preview 組立
-        invoice-expense-line-builder.ts      # 新規: freee line + invoice_line snapshot
+      exchange-rate-service.ts               # 新規: 日銀 API + cache + manual override
+      metered-provider.ts                    # 新規: provider registry + GCP 実装
+      expense-record-service.ts              # 新規: fixed/metered の月次 record materialize + 差額検出
+      expense-preview-service.ts             # 新規: 請求書作成画面用 preview 組立
+      invoice-line-snapshot.ts               # 新規: invoice_line 凍結保存 + freee line 変換
 
 db/
   schema.sql                                 # 変更
@@ -110,7 +93,14 @@ app/lib/db/
 - クライアント詳細は現在 `app/routes/org.$orgSlug/clients/$clientId.tsx` の単一画面だが、経費タブ追加に合わせて `app/routes/org.$orgSlug/clients/$clientId/` フォルダへ分解する
 - 既存の `/org/:orgSlug/clients/:clientId` パスは `_index.tsx` に移すことで維持する
 - 請求書作成は既存 `create.tsx` を維持し、そこで経費 preview を loader で読み、`action` の `intent` 分岐で再取得・手動レート保存・請求書作成を処理する
-- freee 送信の業務ロジックは `src/services/invoice-service.ts` を拡張し、既存の稼働明細 1 行に加えて経費明細配列を受け取れる形にする
+- freee 送信の業務ロジックは `src/services/invoice-service.ts` を拡張し、route 側が組み立てた「稼働行 + 経費行」の全 `lines` を受け取って freee に送信し、送信済み `lines` を返す形にする
+
+サービス分割の方針:
+
+- `types.ts`, `constants.ts`, `utils/` 配下の小分け helper は各サービスファイルへ内包する
+- `provider-registry.ts` は `metered-provider.ts` に統合する
+- `expense-definition-service.ts` は `expense-preview-service.ts` に統合する
+- `invoice-expense-line-builder.ts` は `invoice-line-snapshot.ts` に統合する
 
 ---
 
@@ -128,8 +118,7 @@ CREATE TABLE IF NOT EXISTS "expense_group" (
   "name" TEXT NOT NULL,
   "invoice_label" TEXT NOT NULL,
   "currency" TEXT NOT NULL DEFAULT 'USD',
-  "tax_type" TEXT NOT NULL DEFAULT 'taxable' CHECK ("tax_type" IN ('taxable', 'non_taxable')),
-  "tax_rate" INTEGER NOT NULL DEFAULT 10,
+  "tax_rate" INTEGER NOT NULL DEFAULT 10 CHECK ("tax_rate" IN (0, 8, 10)),
   "sort_order" INTEGER NOT NULL DEFAULT 0,
   "is_active" INTEGER NOT NULL DEFAULT 1,
   "created_at" TEXT NOT NULL DEFAULT (datetime('now')),
@@ -157,8 +146,7 @@ CREATE TABLE IF NOT EXISTS "expense_item" (
   "provider" TEXT,
   "provider_config" TEXT,
   "invoice_label" TEXT,
-  "tax_type" TEXT CHECK ("tax_type" IN ('taxable', 'non_taxable')),
-  "tax_rate" INTEGER,
+  "tax_rate" INTEGER CHECK ("tax_rate" IN (0, 8, 10)),
   "effective_from" TEXT,
   "effective_to" TEXT,
   "sort_order" INTEGER NOT NULL DEFAULT 0,
@@ -328,13 +316,13 @@ CHECK (
 
 ### 4.1 ドメイン型
 
-`src/services/expense-billing/types.ts`
+`src/services/expense-billing/expense-preview-service.ts`
 
 ```ts
 export type RoundingMethod = 'round' | 'floor' | 'ceil'
-export type TaxType = 'taxable' | 'non_taxable'
 export type ExpenseItemType = 'fixed' | 'metered'
 export type MeteredProvider = 'google_cloud'
+export type SupportedCurrency = 'JPY' | 'USD'
 
 export type MoneyDecimal = string
 export type YearMonth = `${number}-${number}`
@@ -347,12 +335,12 @@ export type ExpensePreviewLine = {
   expenseYearMonth: string
   description: string
   amountForeign: string
-  currency: 'USD'
-  exchangeRate: string
+  currency: SupportedCurrency
+  exchangeRate: string | null
   amountJpy: number
   taxRate: number
-  taxType: TaxType
   isProvisional: boolean
+  reducedTaxRate: boolean
 }
 ```
 
@@ -420,7 +408,7 @@ export type ExpensePreviewLine = {
 
 ### 4.3 為替レート取得サービス
 
-`src/services/expense-billing/exchange-rate/exchange-rate-service.ts`
+`src/services/expense-billing/exchange-rate-service.ts`
 
 責務:
 
@@ -435,7 +423,7 @@ export type ExpensePreviewLine = {
 getExchangeRate(yearMonth: string, currencyPair: 'USD/JPY'): Promise<{
   rate: string
   rateDate: string
-  source: 'boj' | 'manual'
+  source: 'boj' | 'manual' | 'system'
   isManual: boolean
 }>
 
@@ -445,30 +433,31 @@ clearManualExchangeRate(yearMonth: string, currencyPair: 'USD/JPY'): Promise<voi
 
 処理フロー:
 
-1. `exchange_rate` を検索
-2. `isManual = 1` なら即返す
-3. キャッシュがあれば返す
-4. `boj-client.ts` で月次データ取得
-5. 月末から逆順で `null` 以外の値を採用
-6. `exchange_rate` に upsert
+1. 呼び出し元の line/record の `currency` を見て `JPY` なら為替取得をスキップし、`rate = '1'`, `rateDate = yearMonth + '-01'`, `source = 'system'`, `isManual = false` として扱う
+2. `currency !== 'JPY'` の場合のみ `exchange_rate` を検索
+3. `isManual = 1` なら即返す
+4. キャッシュがあれば返す
+5. 日銀 API で月次データ取得
+6. 月末から逆順で `null` 以外の値を採用
+7. `exchange_rate` に upsert
 
-`boj-client.ts` 実装方針:
+日銀 API 実装方針:
 
 - `fetch` を使う
 - API レスポンスは JSON で受ける
 - request 単位は `startDate=YYYYMM`, `endDate=YYYYMM`
-- 通貨ペアは現時点 `USD/JPY` 固定で `FXERD05`
+- 通貨ペアは当面 `USD/JPY` 固定で `FXERD05`
 
 ### 4.4 従量課金取得サービス
 
 #### 共通 interface
 
-`src/services/expense-billing/metered/types.ts`
+`src/services/expense-billing/metered-provider.ts`
 
 ```ts
 export type MeteredUsageResult = {
   amount: string
-  currency: 'USD'
+  currency: 'JPY' | 'USD'
   fetchedAt: string
   isProvisional: boolean
 }
@@ -484,16 +473,15 @@ export interface MeteredProviderAdapter<TConfig> {
 }
 ```
 
-#### Registry
+`metered-provider.ts` に以下を統合する。
 
-`provider-registry.ts`
+- `google_cloud` の provider registry
+- Google Cloud Billing provider 実装
+- provider ごとの config schema
 
-- `google_cloud` を registry 登録
-- 今後 Vercel / AWS / Stripe を追加可能にする
+今後 Vercel / AWS / Stripe を追加する場合も同ファイル内の registry を拡張する。
 
 #### Google Cloud Billing provider
-
-`google-cloud-billing-provider.ts`
 
 責務:
 
@@ -543,9 +531,10 @@ WHERE project.id = @projectId
 
 責務:
 
-- active な fixed/metered item から当月 `expense_record` を upsert
+- active な fixed/metered item から当月 `expense_record` を必ず materialize して upsert
 - fixed は `monthlyAmount` をそのまま採用
 - metered は provider registry で取得
+- 前回請求との差額検出に必要な情報も返す
 
 公開 API:
 
@@ -562,11 +551,19 @@ upsert ルール:
 - key は `expense_item_id + year_month`
 - fixed:
   - `amountForeign = monthlyAmount`
+  - `currency = expense_item.currency`
   - `fetchedAt = null`
 - metered:
   - `amountForeign = providerResult.amount`
+  - `currency = providerResult.currency`
   - `fetchedAt = providerResult.fetchedAt`
 - `createdAt` / `updatedAt` は `nowISO()`
+
+補足:
+
+- fixed item も `refreshExpenseRecords` 実行時に必ず `expense_record` を作成する
+- 「仮想record」は採用しない
+- 差額検出ロジックも本サービスに内包し、preview 側は materialize 済み record と差額候補を受け取るだけにする
 
 ### 4.6 プレビュー/差額計算サービス
 
@@ -575,18 +572,27 @@ upsert ルール:
 責務:
 
 - 対象月の active item/group を解決
-- `expense_record` 未作成の fixed item は仮想 record として扱うか、loader 前に `refreshExpenseRecords` を呼んで materialize する
-- 為替レートを取得
+- `refreshExpenseRecords` 実行結果を読み、preview 用 line を組み立てる
+- 必要な場合のみ為替レートを取得
 - 円換算、template 展開、差額 line 生成
 
 推奨フロー:
 
 1. `refreshExpenseRecords` を対象月で実行
-2. `getExchangeRate` を取得
-3. current month の regular lines を生成
-4. previous month 以前の `expense_record` で未調整差額を検出
-5. adjustment lines を生成
-6. freee 用 line 配列と DB snapshot 用 line 配列を返す
+2. current month の regular lines を生成
+3. previous month 以前の `expense_record` で未調整差額を検出
+4. adjustment lines を生成
+5. route がその preview から稼働行 + 経費行の全 `lines` を組み立てる
+
+`ExpensePreviewLine` 組み立てルール:
+
+- `currency === 'JPY'` の場合:
+  - `exchangeRate = '1'`
+  - `amountJpy = amountForeign` をそのまま円額として使う
+  - 為替レート表示は UI に出さない
+- `currency !== 'JPY'` の場合:
+  - `getExchangeRate` を取得
+  - `amountJpy = roundingMethod` に従って換算する
 
 差額判定:
 
@@ -595,22 +601,41 @@ upsert ルール:
 - 再調整:
   - `expense_record.amount_foreign - expense_record.last_adjusted_amount`
 - 差額の円換算は `expense_year_month` の `exchange_rate` を使う
+- ただし `currency === 'JPY'` の差額 line は `exchangeRate = '1'` とする
 
 ### 4.7 端数処理
 
-`rounding.ts`
+### 4.7 invoice_line snapshot サービス
+
+`invoice-line-snapshot.ts`
+
+責務:
+
+- `ExpensePreviewLine` と稼働 line を freee 送信用 `AdditionalInvoiceLine` に変換する
+- `taxRate` と `reducedTaxRate` を freee 契約へ正規化する
+- freee 送信後に返された `lines` を `invoice_line` 保存用 payload に変換する
+
+補足:
+
+- 旧 `invoice-expense-line-builder.ts` の責務は本ファイルへ統合する
+- route は本サービスを使って「送信用 lines」と「凍結保存用 lines」の変換をそろえる
+
+### 4.8 端数処理
+
+`expense-preview-service.ts` 内 helper
 
 ```ts
 applyRounding(
   amountForeign: string,
-  exchangeRate: string,
+  exchangeRate: string | null,
   method: 'round' | 'floor' | 'ceil',
 ): number
 ```
 
 処理:
 
-- `Decimal(amountForeign).mul(exchangeRate)`
+- `currency === 'JPY'` なら `Decimal(amountForeign)`
+- それ以外は `Decimal(amountForeign).mul(exchangeRate)`
 - `toDecimalPlaces(0, roundingMode)`
 - `toNumber()`
 
@@ -676,7 +701,7 @@ loader:
 - `requireOrgAdmin`
 - `yearMonth` query param を解釈
 - `getExpenseRecordsByMonth`
-- `getExchangeRate`
+- 非 JPY レコードがある場合のみ `getExchangeRate`
 
 action intents:
 
@@ -695,7 +720,7 @@ loader:
 - preview には以下を含める
   - work summary
   - expense lines
-  - exchange rate
+  - exchange rate（JPY line では非表示）
   - manual override 状態
   - provisional フラグ
   - adjustment lines
@@ -718,6 +743,13 @@ action intents:
   - freee update
   - DB save
 
+`create.tsx` の実装方針:
+
+- 既存画面の `useFetcher({ key })` パターンに合わせる
+- `+schema.ts` は `intent` discriminated union にする
+- パターンは既存 `work-hours/+schema.ts` と同じく、`refresh-expenses` / `save-manual-rate` / `clear-manual-rate` / `create-invoice` / `update-invoice` を 1 schema にまとめる
+- route action は schema parse 後に `intent` で分岐する
+
 ### 5.3 フォーム設計
 
 新規ルートは `~/lib/form` を使う。
@@ -734,6 +766,7 @@ action intents:
 注意:
 
 - `coerceFormValue()` を schema 定義時に使う
+- `tax_rate` は 10 / 8 / 0 の enum validation のみに統一する
 - `provider_config` は UI 入力値から object 化したあと `JSON.stringify` して DB 保存
 - DB 読み出し時は `db` が `ParseJSONResultsPlugin` を使わない TEXT 列なので、`providerConfig` は route/server 層で `JSON.parse()` する
 
@@ -762,7 +795,7 @@ type ClientDetailTabsProps = {
 責務:
 
 - グループ 1 件の表示
-- 合計額、税区分、所属 item 一覧を表示
+- 合計額、税率、所属 item 一覧を表示
 - 編集/削除トリガを出す
 
 props:
@@ -797,7 +830,6 @@ type ExpenseGroupFormProps = {
 - name
 - invoiceLabel
 - currency
-- taxType
 - taxRate
 - sortOrder
 - isActive
@@ -829,7 +861,6 @@ type ExpenseItemFormProps = {
 - provider
 - provider specific config
 - invoiceLabel
-- taxType
 - taxRate
 - effectiveFrom
 - effectiveTo
@@ -905,7 +936,7 @@ type ExpenseRecordListProps = {
 
 表示内容:
 
-- 為替レート
+- 為替レート（JPY line では非表示）
 - manual override 状態
 - 経費明細 table
 - provisional alert
@@ -917,11 +948,11 @@ type ExpenseRecordListProps = {
 
 ### 7.1 現状
 
-`src/services/invoice-service.ts` は稼働明細 1 行のみを `lines` に積む構造。
+`src/services/invoice-service.ts` は稼働明細を内部で組み立てて `lines` に積む構造で、呼び出し側に送信済み行を返していない。
 
 ### 7.2 変更方針
 
-`createClientInvoice` / `updateClientInvoice` に追加行を渡せるようにする。
+`createClientInvoice` / `updateClientInvoice` は、route 側が組み立てた「稼働行 + 経費行」の全 `lines` を受け取って freee に送信する。
 
 新しい入力:
 
@@ -932,44 +963,37 @@ export type AdditionalInvoiceLine = {
   unit: string
   unitPrice: string
   taxRate: number
+  reducedTaxRate: boolean
 }
 ```
 
 署名変更案:
 
 ```ts
-createClientInvoice(
-  client,
-  year,
-  month,
-  deps,
-  options?: {
-    additionalLines?: AdditionalInvoiceLine[]
-  },
-)
+createClientInvoice(client, year, month, lines, deps)
 ```
 
-`buildInvoiceParams` の `lines`:
+返却値:
 
 ```ts
-lines: [
-  buildInvoiceLine(client, year, month, totalHours),
-  ...additionalLines.map(...)
-]
+type CreateClientInvoiceResult = {
+  invoice: FreeeInvoice
+  lines: AdditionalInvoiceLine[]
+}
 ```
 
 ### 7.3 税区分の扱い
 
-現時点の設計:
+税指定は `tax_rate` のみに統一する。
 
-- `taxable` -> `tax_rate: taxRate`
-- `non_taxable` -> `tax_rate: 0`
-
-ただし RDD のアクションアイテム通り、freee 請求書 API で「非課税」の厳密表現は別確認が必要。実装では mapping を `invoice-expense-line-builder.ts` に閉じ込め、freee API 仕様確認後にそこで差し替える。
+- `tax_rate` は 10 / 8 / 0 のいずれか
+- freee 送信時は `tax_rate` をそのまま渡す
+- `tax_rate = 8` の場合は `reduced_tax_rate: true` も併せて渡す
+- `tax_rate = 10` または `0` の場合は `reduced_tax_rate: false`
 
 ### 7.4 DB 凍結
 
-freee 送信成功後、freee 側の line id を待たずにアプリ側 snapshot を `invoice_line` に保存する。
+freee 送信成功後、`invoice-service` が返した送信済み `lines` を `invoice_line` に凍結保存する。freee 側の line id は待たない。
 
 保存対象:
 
@@ -985,7 +1009,7 @@ freee 送信成功後、freee 側の line id を待たずにアプリ側 snapsho
 - exchangeRate
 - currency
 
-これにより請求書再表示時は `expense_record` 再計算を参照せず、`invoice_line` を唯一の凍結値として扱える。
+これにより請求書再表示時は `expense_record` 再計算を参照せず、`invoice_line` を唯一の凍結値として扱える。稼働行も経費行も同じ `lines` 契約で route から `invoice-service` に渡し、返却された同一配列を snapshot 化する。
 
 ### 7.5 adjustment 反映
 
@@ -1020,6 +1044,11 @@ freee 送信成功後、freee 側の line id を待たずにアプリ側 snapsho
   - label は item.invoiceLabel を展開
   - 税設定は item から採用
 
+freee line 変換時:
+
+- `taxRate = 8` なら `reducedTaxRate = true`
+- それ以外は `reducedTaxRate = false`
+
 ### 8.3 label template 展開
 
 置換変数:
@@ -1032,8 +1061,9 @@ freee 送信成功後、freee 側の line id を待たずにアプリ側 snapsho
 
 通貨表示:
 
-- 当面は `USD` のみなので UI 表示文言は `ドル`
-- template 展開は `currency = 'ドル'` を返す helper を設ける
+- `USD` は `ドル`
+- `JPY` は `円`
+- template 展開は `currency` ごとの表示名を返す helper を設ける
 
 ### 8.4 provisional 判定
 
@@ -1067,9 +1097,8 @@ metered line に対して:
 ### Step 2: 基盤 utility / credential
 
 1. `provider-credential.server.ts`
-2. `src/services/expense-billing/utils/decimal.ts`
-3. `rounding.ts`
-4. `label-template.ts`
+2. `src/services/expense-billing/exchange-rate-service.ts` の内部 helper
+3. `src/services/expense-billing/expense-preview-service.ts` の内部 helper
 
 理由:
 
@@ -1077,9 +1106,8 @@ metered line に対して:
 
 ### Step 3: 為替レートサービス
 
-1. `boj-client.ts`
-2. `exchange-rate-service.ts`
-3. unit test を追加
+1. `exchange-rate-service.ts`
+2. unit test を追加
 
 理由:
 
@@ -1087,7 +1115,7 @@ metered line に対して:
 
 ### Step 4: metered provider 基盤
 
-1. provider registry
+1. `metered-provider.ts`
 2. Google Cloud Billing provider
 3. provider_config schema
 4. credential 保存機能
@@ -1100,7 +1128,7 @@ metered line に対して:
 
 1. `expense_group`, `expense_item` CRUD
 2. `expense-record-service.ts`
-3. `expense-record-diff-service.ts`
+3. fixed item materialize と差額検出
 
 理由:
 
@@ -1108,9 +1136,10 @@ metered line に対して:
 
 ### Step 6: クライアント詳細 UI
 
-1. `clients/$clientId` を folder route へリファクタ
-2. `expenses.tsx`
-3. `expense-records.tsx`
+1. `clients/$clientId.tsx` を `clients/$clientId/_layout.tsx` に移動し、loader / breadcrumb をレイアウトへ寄せる
+2. 既存フォーム部分を `clients/$clientId/_index.tsx` に分離する
+3. `clients/$clientId/expenses.tsx` を新規作成する
+4. `clients/$clientId/expense-records.tsx` を追加する
 
 理由:
 
@@ -1120,8 +1149,9 @@ metered line に対して:
 
 1. `expense-preview-service.ts`
 2. `invoices/create.tsx` loader 拡張
-3. manual rate / refresh action
-4. UI table / notice
+3. `+schema.ts` の intent union 化
+4. `useFetcher({ key })` ベースの manual rate / refresh action
+5. UI table / notice
 
 理由:
 
@@ -1130,8 +1160,9 @@ metered line に対して:
 ### Step 8: freee 送信統合
 
 1. `src/services/invoice-service.ts` 拡張
-2. `invoice_line` snapshot 保存
-3. `expense_record` adjustment 更新
+2. route 側で稼働行 + 経費行を組み立てて渡す
+3. `invoice-service` 返却値の `lines` を `invoice_line` snapshot 保存
+4. `expense_record` adjustment 更新
 
 理由:
 
@@ -1142,8 +1173,7 @@ metered line に対して:
 最低限追加するテスト:
 
 - `exchange-rate-service.test.ts`
-- `google-cloud-billing-provider.test.ts`
-- `rounding.test.ts`
+- `metered-provider.test.ts`
 - `expense-preview-service.test.ts`
 - `invoice-service.test.ts` の追加ケース
 
@@ -1151,6 +1181,7 @@ metered line に対して:
 
 - fixed + metered 混在
 - manual rate 保護
+- JPY で為替取得をスキップすること
 - 翌月 5 日前の provisional
 - 差額 adjustment の初回 / 再調整
 - grouped / standalone item 両方
@@ -1159,9 +1190,9 @@ metered line に対して:
 
 ## 10. 未解決事項と実装メモ
 
-### 10.1 freee 非課税 line の表現
+### 10.1 freee 税率送信
 
-RDD にも残っている確認事項。初版は `tax_rate = 0` 前提で実装し、adapter 層に閉じ込める。
+`tax_rate` は 10 / 8 / 0 のみを扱う。`8` の場合だけ `reduced_tax_rate: true` を追加送信する。
 
 ### 10.2 invoice_line の migration
 
