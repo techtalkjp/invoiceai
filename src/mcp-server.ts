@@ -40,11 +40,16 @@ function toEntryInput(e: {
 }
 
 function parseMonthOrCurrent(input?: string): { year: number; month: number } {
-  const monthStr =
-    input ??
-    `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`
-  const [y, m] = monthStr.split('-').map(Number)
-  return { year: y ?? 0, month: m ?? 0 }
+  const now = new Date()
+  if (input) {
+    const parts = input.split('-')
+    const y = Number(parts[0])
+    const m = Number(parts[1])
+    if (Number.isFinite(y) && m >= 1 && m <= 12) {
+      return { year: y, month: m }
+    }
+  }
+  return { year: now.getFullYear(), month: now.getMonth() + 1 }
 }
 
 function jsonResponse(data: unknown) {
