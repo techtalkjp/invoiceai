@@ -30,7 +30,7 @@ export function parsePatternA(data: string[][]): WorkHoursResult {
   const entries: WorkEntry[] = []
   for (let i = 4; i < data.length; i++) {
     const row = data[i]
-    if (!row || !row[0]) continue
+    if (!row?.[0]) continue
 
     const date = row[0] // A列: 日付
     const hours = parseFloat(row[5] ?? '0') || 0 // F列: 稼働
@@ -70,7 +70,7 @@ export function parsePatternB(data: string[][]): WorkHoursResult {
   const entries: WorkEntry[] = []
   for (let i = 4; i < data.length; i++) {
     const row = data[i]
-    if (!row || !row[0]) continue
+    if (!row?.[0]) continue
     if (row[4] === '合計') break // 合計行で終了
 
     const date = row[0] // A列: 日付
