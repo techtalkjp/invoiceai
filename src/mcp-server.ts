@@ -39,14 +39,18 @@ function toEntryInput(e: {
   return entry
 }
 
-function parseMonth(monthStr: string): { year: number; month: number } {
+function parseMonthOrCurrent(input?: string): { year: number; month: number } {
+  const monthStr =
+    input ??
+    `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`
   const [y, m] = monthStr.split('-').map(Number)
   return { year: y ?? 0, month: m ?? 0 }
 }
 
-function currentMonth(): string {
-  const now = new Date()
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+function jsonResponse(data: unknown) {
+  return {
+    content: [{ type: 'text' as const, text: JSON.stringify(data, null, 2) }],
+  }
 }
 
 export async function startMcpServer() {
@@ -76,20 +80,13 @@ export async function startMcpServer() {
         .describe('終了日 (YYYY-MM-DD形式)。monthより優先'),
     },
     async ({ organizationId, userId, month, startDate, endDate }) => {
-      const m = parseMonth(month ?? currentMonth())
+      const m = parseMonthOrCurrent(month)
       const activities =
         startDate && endDate
           ? await getActivities(organizationId, userId, startDate, endDate)
           : await getActivitiesByMonth(organizationId, userId, m.year, m.month)
 
-      return {
-        content: [
-          {
-            type: 'text' as const,
-            text: JSON.stringify(activities, null, 2),
-          },
-        ],
-      }
+      return jsonResponse(activities)
     },
   )
 
@@ -110,14 +107,7 @@ export async function startMcpServer() {
         .orderBy('name', 'asc')
         .execute()
 
-      return {
-        content: [
-          {
-            type: 'text' as const,
-            text: JSON.stringify(clients, null, 2),
-          },
-        ],
-      }
+      return jsonResponse(clients)
     },
   )
 
@@ -134,7 +124,7 @@ export async function startMcpServer() {
         .describe('対象月 (YYYY-MM形式)。省略時は今月'),
     },
     async ({ organizationId, userId, month }) => {
-      const m = parseMonth(month ?? currentMonth())
+      const m = parseMonthOrCurrent(month)
       const entries = await getMonthEntries(
         organizationId,
         userId,
@@ -142,14 +132,7 @@ export async function startMcpServer() {
         m.month,
       )
 
-      return {
-        content: [
-          {
-            type: 'text' as const,
-            text: JSON.stringify(entries, null, 2),
-          },
-        ],
-      }
+      return jsonResponse(entries)
     },
   )
 
@@ -196,17 +179,7 @@ export async function startMcpServer() {
       })
       const result = await saveEntries(organizationId, userId, [entry])
 
-      return {
-        content: [
-          {
-            type: 'text' as const,
-            text: JSON.stringify({
-              success: true,
-              ...result,
-            }),
-          },
-        ],
-      }
+      return jsonResponse({ success: true, ...result })
     },
   )
 
@@ -237,17 +210,7 @@ export async function startMcpServer() {
         entries.map(toEntryInput),
       )
 
-      return {
-        content: [
-          {
-            type: 'text' as const,
-            text: JSON.stringify({
-              success: true,
-              ...result,
-            }),
-          },
-        ],
-      }
+      return jsonResponse({ success: true, ...result })
     },
   )
 
@@ -264,7 +227,7 @@ export async function startMcpServer() {
         .describe('対象月 (YYYY-MM形式)。省略時は今月'),
     },
     async ({ organizationId, userId, month }) => {
-      const m = parseMonth(month ?? currentMonth())
+      const m = parseMonthOrCurrent(month)
       const summary = await getMonthlySummary(
         organizationId,
         userId,
@@ -272,14 +235,7 @@ export async function startMcpServer() {
         m.month,
       )
 
-      return {
-        content: [
-          {
-            type: 'text' as const,
-            text: JSON.stringify(summary, null, 2),
-          },
-        ],
-      }
+      return jsonResponse(summary)
     },
   )
 

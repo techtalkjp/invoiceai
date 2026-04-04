@@ -1,4 +1,5 @@
 import { db } from '~/lib/db/kysely'
+import { getMonthDateRange } from '~/utils/month'
 import type { MonthEntry, WorkEntryData } from './+schema'
 
 /**
@@ -11,10 +12,10 @@ export async function getMonthEntries(
   month: number,
 ): Promise<MonthEntry[]> {
   // 月の開始・終了日を計算
-  const monthStart = `${year}-${String(month).padStart(2, '0')}-01`
-  const nextMonth = month === 12 ? 1 : month + 1
-  const nextYear = month === 12 ? year + 1 : year
-  const monthEnd = `${nextYear}-${String(nextMonth).padStart(2, '0')}-01`
+  const { startDate: monthStart, endDate: monthEnd } = getMonthDateRange(
+    year,
+    month,
+  )
 
   // 稼働データを取得
   const entries = await db
@@ -115,10 +116,10 @@ export async function getClientMonthEntries(
   }
 
   // 月の開始・終了日を計算
-  const monthStart = `${year}-${String(month).padStart(2, '0')}-01`
-  const nextMonth = month === 12 ? 1 : month + 1
-  const nextYear = month === 12 ? year + 1 : year
-  const monthEnd = `${nextYear}-${String(nextMonth).padStart(2, '0')}-01`
+  const { startDate: monthStart, endDate: monthEnd } = getMonthDateRange(
+    year,
+    month,
+  )
 
   // 稼働データを取得
   const entries = await db
@@ -175,11 +176,7 @@ export async function getMonthlySummary(
   year: number,
   month: number,
 ) {
-  const startDate = `${year}-${String(month).padStart(2, '0')}-01`
-  const endDate =
-    month === 12
-      ? `${year + 1}-01-01`
-      : `${year}-${String(month + 1).padStart(2, '0')}-01`
+  const { startDate, endDate } = getMonthDateRange(year, month)
 
   const entries = await db
     .selectFrom('workEntry')

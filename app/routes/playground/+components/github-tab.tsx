@@ -2,9 +2,9 @@ import { IconBrandGithub } from '@tabler/icons-react'
 import { Loader2Icon } from 'lucide-react'
 import { useFetcher } from 'react-router'
 import { calculateWorkDuration } from '~/components/time/time-utils'
+import { EntryPreviewList } from '~/components/timesheet/entry-preview-list'
 import { Button } from '~/components/ui/button'
 import type { GitHubResult } from '../+lib/github-oauth.server'
-import { EntryPreviewList } from './entry-preview-list'
 
 interface GitHubTabProps {
   year: number
