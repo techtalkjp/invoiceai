@@ -3,6 +3,7 @@ import { PageHeader } from '~/components/layout/page-header'
 import { getMonthDates } from '~/components/timesheet'
 import {
   deleteClientSourceMapping,
+  getActivitiesByMonth,
   getActivitySource,
   getClientSourceMappings,
   saveClientSourceMapping,
@@ -78,37 +79,25 @@ export async function loader({ request, params }: Route.LoaderArgs) {
     throw new Response('クライアントが見つかりません', { status: 404 })
   }
 
-  // マッピング済みリポジトリのアクティビティを GitHub API から取得
+  // マッピング済みリポジトリのアクティビティを DB から取得（sync 済みデータ）
   const activitiesByDate: Record<string, ActivityRecord[]> = {}
   const mappedRepos = new Set(mappings.map((m) => m.sourceIdentifier))
-  if (mappedRepos.size > 0 && source?.credentials) {
-    try {
-      const pat = decrypt(source.credentials)
-      // ParseJSONResultsPlugin により config は既にパース済みオブジェクト
-      const config = source.config as { username?: string } | null
-      const username = config?.username
-      if (username) {
-        const startDate = `${year}-${String(month).padStart(2, '0')}-01`
-        const lastDay = daysInMonth(year, month)
-        const endDate = `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`
-        const allActivities = await fetchGitHubActivities(
-          pat,
-          username,
-          startDate,
-          endDate,
-        )
-        for (const a of allActivities) {
-          if (!a.repo || !mappedRepos.has(a.repo)) continue
-          let arr = activitiesByDate[a.eventDate]
-          if (!arr) {
-            arr = []
-            activitiesByDate[a.eventDate] = arr
-          }
-          arr.push(a)
-        }
+  if (mappedRepos.size > 0) {
+    const allActivities = await getActivitiesByMonth(
+      organization.id,
+      user.id,
+      year,
+      month,
+    )
+    for (const a of allActivities) {
+      if (!a.repo || !mappedRepos.has(a.repo)) continue
+      const record = a as unknown as ActivityRecord
+      let arr = activitiesByDate[a.eventDate]
+      if (!arr) {
+        arr = []
+        activitiesByDate[a.eventDate] = arr
       }
-    } catch {
-      // PAT 復号失敗時はアクティビティなしで続行
+      arr.push(record)
     }
   }
 
