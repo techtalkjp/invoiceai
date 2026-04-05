@@ -370,6 +370,7 @@ CREATE INDEX IF NOT EXISTS "expense_item_client_active_idx"
 
 CREATE TABLE IF NOT EXISTS "exchange_rate" (
   "id" TEXT PRIMARY KEY NOT NULL,
+  "organization_id" TEXT NOT NULL REFERENCES "organization"("id") ON DELETE CASCADE,
   "year_month" TEXT NOT NULL,
   "currency_pair" TEXT NOT NULL,
   "rate" TEXT NOT NULL,
@@ -381,8 +382,8 @@ CREATE TABLE IF NOT EXISTS "exchange_rate" (
   "updated_at" TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
-CREATE UNIQUE INDEX IF NOT EXISTS "exchange_rate_year_month_pair_idx"
-  ON "exchange_rate"("year_month", "currency_pair");
+CREATE UNIQUE INDEX IF NOT EXISTS "exchange_rate_org_year_month_pair_idx"
+  ON "exchange_rate"("organization_id", "year_month", "currency_pair");
 
 CREATE TABLE IF NOT EXISTS "expense_record" (
   "id" TEXT PRIMARY KEY NOT NULL,

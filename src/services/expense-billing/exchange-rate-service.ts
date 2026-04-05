@@ -36,6 +36,7 @@ type BojApiResponse = {
  * 手動設定 > キャッシュ > 日銀API の優先順位。
  */
 export async function getExchangeRate(
+  organizationId: string,
   yearMonth: string,
   currency: string,
 ): Promise<ExchangeRateResult> {
@@ -55,6 +56,7 @@ export async function getExchangeRate(
   const cached = await db
     .selectFrom('exchangeRate')
     .selectAll()
+    .where('organizationId', '=', organizationId)
     .where('yearMonth', '=', yearMonth)
     .where('currencyPair', '=', currencyPair)
     .executeTakeFirst()
@@ -76,6 +78,7 @@ export async function getExchangeRate(
     .insertInto('exchangeRate')
     .values({
       id: nanoid(),
+      organizationId,
       yearMonth,
       currencyPair,
       rate: String(fetched.rate),
@@ -86,10 +89,11 @@ export async function getExchangeRate(
       updatedAt: nowISO(),
     })
     .onConflict((oc) =>
-      oc.columns(['yearMonth', 'currencyPair']).doUpdateSet({
+      oc.columns(['organizationId', 'yearMonth', 'currencyPair']).doUpdateSet({
         rate: String(fetched.rate),
         rateDate: fetched.rateDate,
         source: 'boj',
+        isManual: 0,
         updatedAt: nowISO(),
       }),
     )
@@ -108,6 +112,7 @@ export async function getExchangeRate(
  * 手動レートは API 再取得で上書きされない。
  */
 export async function saveManualExchangeRate(input: {
+  organizationId: string
   yearMonth: string
   currencyPair: string
   rate: string
@@ -118,6 +123,7 @@ export async function saveManualExchangeRate(input: {
     .insertInto('exchangeRate')
     .values({
       id: nanoid(),
+      organizationId: input.organizationId,
       yearMonth: input.yearMonth,
       currencyPair: input.currencyPair,
       rate: input.rate,
@@ -129,7 +135,7 @@ export async function saveManualExchangeRate(input: {
       updatedAt: now,
     })
     .onConflict((oc) =>
-      oc.columns(['yearMonth', 'currencyPair']).doUpdateSet({
+      oc.columns(['organizationId', 'yearMonth', 'currencyPair']).doUpdateSet({
         rate: input.rate,
         source: 'manual',
         isManual: 1,
@@ -144,11 +150,13 @@ export async function saveManualExchangeRate(input: {
  * 手動レートを解除し、API 取得値に戻す。
  */
 export async function clearManualExchangeRate(
+  organizationId: string,
   yearMonth: string,
   currencyPair: string,
 ): Promise<void> {
   await db
     .deleteFrom('exchangeRate')
+    .where('organizationId', '=', organizationId)
     .where('yearMonth', '=', yearMonth)
     .where('currencyPair', '=', currencyPair)
     .where('isManual', '=', 1)

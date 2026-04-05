@@ -41,3 +41,5 @@ z/
 
 # GCP service account keys
 terraform/*-sa-key.json
+*-sa-key.json
+*service-account*.json

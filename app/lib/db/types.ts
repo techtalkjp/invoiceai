@@ -84,6 +84,7 @@ export interface ExchangeRate {
   currencyPair: string;
   id: string;
   isManual: Generated<number>;
+  organizationId: string;
   overrideReason: string | null;
   rate: string;
   rateDate: string;

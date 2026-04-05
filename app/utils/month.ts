@@ -92,6 +92,7 @@ export function parseYearMonthId(id: string) {
 
 /**
  * 対象月の翌月5日より前かどうか（従量課金の暫定値判定）
+ * JST で比較する（Vercel 等 UTC 環境でもズレないように）
  */
 export function isBeforeSettlement(yearMonth: string): boolean {
   const { year, month } = parseYearMonthId(yearMonth)
@@ -100,5 +101,5 @@ export function isBeforeSettlement(yearMonth: string): boolean {
     month === 12
       ? dayjs(`${year + 1}-01-05`)
       : dayjs(`${year}-${String(month + 1).padStart(2, '0')}-05`)
-  return dayjs().isBefore(settlementDate)
+  return dayjs().tz('Asia/Tokyo').isBefore(settlementDate)
 }

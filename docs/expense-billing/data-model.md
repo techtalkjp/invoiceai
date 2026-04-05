@@ -2,7 +2,7 @@
 
 ## 設計方針
 
-- 金額は **INTEGER（cent / 銭単位）** または **TEXT（decimal文字列）** で保持。`REAL` は浮動小数点誤差があるため使わない
+- 金額は **INTEGER（円単位）** または **TEXT（decimal文字列）** で保持。`REAL` は浮動小数点誤差があるため使わない
   - 金額: TEXT（例: `"45.00"`）— API からの値をそのまま保持、精度を失わない
   - 為替レート: TEXT（例: `"149.53"`）— 日銀の公表値をそのまま保持
   - 円換算額: INTEGER（円単位）— 端数処理後の確定値
@@ -75,6 +75,7 @@
 | カラム          | 型                          | 説明                                                  |
 | --------------- | --------------------------- | ----------------------------------------------------- |
 | id              | TEXT PK                     | nanoid                                                |
+| organization_id | TEXT FK → organization      | 組織                                                  |
 | year_month      | TEXT NOT NULL               | `'2026-03'`                                           |
 | currency_pair   | TEXT NOT NULL               | `'USD/JPY'`                                           |
 | rate            | TEXT NOT NULL               | レート decimal 文字列（例: `"149.53"`）               |
@@ -85,7 +86,7 @@
 | created_at      | TEXT                        |                                                       |
 | updated_at      | TEXT                        |                                                       |
 
-UNIQUE(year_month, currency_pair)
+UNIQUE(organization_id, year_month, currency_pair)
 
 手動上書き時: `is_manual = 1`, `source = 'manual'`, `override_reason` に理由を記録。
 API 再取得時: `is_manual = 0` のレコードのみ上書き。手動レコードは保護される。
@@ -170,7 +171,7 @@ invoice ──< invoice_line
               ├── expense_group_id (グループ経費)  ─┐ 排他
               └── expense_item_id  (単独経費)    ─┘
 
-exchange_rate (独立、year_month + currency_pair で一意)
+exchange_rate (organization_id + year_month + currency_pair で一意)
 ```
 
 ## バリデーションルール

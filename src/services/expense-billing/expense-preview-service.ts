@@ -98,7 +98,9 @@ export async function getExpensePreview(args: {
   const exchangeRates: ExpensePreviewResult['exchangeRates'] = {}
   const foreignCurrencies = [...currencies].filter((c) => c !== 'JPY')
   const rates = await Promise.all(
-    foreignCurrencies.map((currency) => getExchangeRate(yearMonth, currency)),
+    foreignCurrencies.map((currency) =>
+      getExchangeRate(organizationId, yearMonth, currency),
+    ),
   )
   for (let i = 0; i < foreignCurrencies.length; i++) {
     // biome-ignore lint/style/noNonNullAssertion: indices are guaranteed to be in bounds
@@ -215,7 +217,11 @@ export async function getExpensePreview(args: {
     const currency = diff.currency
     let rate: string | null = null
     if (currency !== 'JPY') {
-      const origRate = await getExchangeRate(diff.yearMonth, currency)
+      const origRate = await getExchangeRate(
+        organizationId,
+        diff.yearMonth,
+        currency,
+      )
       rate = origRate.rate
     }
 

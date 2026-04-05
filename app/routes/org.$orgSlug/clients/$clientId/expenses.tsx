@@ -41,6 +41,15 @@ import {
 } from './+schema'
 import type { Route } from './+types/expenses'
 
+function safeParseJson(str: string | null): Record<string, string> | undefined {
+  if (!str) return undefined
+  try {
+    return JSON.parse(str) as Record<string, string>
+  } catch {
+    return undefined
+  }
+}
+
 export async function loader({ request, params }: Route.LoaderArgs) {
   const { orgSlug, clientId } = params
   const { organization } = await requireOrgAdmin(request, orgSlug)
@@ -558,14 +567,7 @@ function EditItemDialog({
               </Label>
               <input type="hidden" name="provider" value="google_cloud" />
               <ProviderConfigFields
-                defaultConfig={
-                  item.providerConfig
-                    ? (JSON.parse(item.providerConfig) as Record<
-                        string,
-                        string
-                      >)
-                    : undefined
-                }
+                defaultConfig={safeParseJson(item.providerConfig)}
               />
             </div>
           )}
