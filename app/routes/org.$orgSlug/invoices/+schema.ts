@@ -21,7 +21,7 @@ export const invoiceCreateSchema = z.object({
   clientId: z.string({ error: 'クライアントを選択してください' }).min(1),
   yearMonth: yearMonthSchema,
   // 編集モード時は freee の請求書 ID を渡す
-  freeeInvoiceId: z.coerce.number().optional(),
+  freeeInvoiceId: z.number().optional(),
 })
 
 export type InvoiceCreateInput = z.infer<typeof invoiceCreateSchema>

@@ -439,6 +439,7 @@ function AddExpenseDialog({
     if (!v) {
       setStep(1)
       setMeteredName('')
+      setCredentialJson('')
     }
     onOpenChange(v)
   }
