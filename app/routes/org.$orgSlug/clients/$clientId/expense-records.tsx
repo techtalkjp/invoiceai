@@ -1,12 +1,13 @@
 import { ChevronDownIcon, ChevronRightIcon } from 'lucide-react'
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
+import { ContentPanel } from '~/components/layout/content-panel'
 import { Badge } from '~/components/ui/badge'
 import { requireOrgAdmin } from '~/lib/auth-helpers.server'
 import { getNowInTimezone, getRecentMonths } from '~/utils/month'
 import {
-  getExchangeRateForMonth,
+  getExchangeRatesForMonths,
   getExpenseGroups,
-  getExpenseRecordsByMonth,
+  getExpenseRecordsByMonths,
 } from './+queries.server'
 import type { Route } from './+types/expense-records'
 
@@ -16,29 +17,48 @@ export async function loader({ request, params }: Route.LoaderArgs) {
 
   const now = getNowInTimezone('Asia/Tokyo')
   const months = getRecentMonths(6, now)
-  const groups = await getExpenseGroups(organization.id, clientId)
+  const yearMonthIds = months.map((m) => m.id)
 
-  const monthlyData = await Promise.all(
-    months.map(async (m) => {
-      const records = await getExpenseRecordsByMonth(
-        organization.id,
-        clientId,
-        m.id,
-      )
-      if (records.length === 0) return null
+  const [groups, allRecords, allRates] = await Promise.all([
+    getExpenseGroups(organization.id, clientId),
+    getExpenseRecordsByMonths(organization.id, clientId, yearMonthIds),
+    getExchangeRatesForMonths(organization.id, yearMonthIds),
+  ])
 
-      const exchangeRate = await getExchangeRateForMonth(
-        organization.id,
-        m.id,
-        'USD/JPY',
-      )
+  // Group records by yearMonth
+  const recordsByMonth = new Map<string, typeof allRecords>()
+  for (const record of allRecords) {
+    const arr = recordsByMonth.get(record.yearMonth)
+    if (arr) {
+      arr.push(record)
+    } else {
+      recordsByMonth.set(record.yearMonth, [record])
+    }
+  }
+
+  // Index exchange rates by yearMonth+currencyPair
+  const rateMap = new Map<string, { rate: string; source: string }>()
+  for (const rate of allRates) {
+    rateMap.set(`${rate.yearMonth}:${rate.currencyPair}`, {
+      rate: rate.rate,
+      source: rate.source,
+    })
+  }
+
+  const monthlyData = months
+    .map((m) => {
+      const records = recordsByMonth.get(m.id)
+      if (!records || records.length === 0) return null
+
+      const hasNonJpy = records.some((r) => r.currency !== 'JPY')
+      const exchangeRate = hasNonJpy
+        ? (rateMap.get(`${m.id}:USD/JPY`) ?? null)
+        : null
 
       return {
         yearMonth: m.id,
         label: m.label,
-        exchangeRate: exchangeRate
-          ? { rate: exchangeRate.rate, source: exchangeRate.source }
-          : null,
+        exchangeRate,
         records: records.map((r) => ({
           id: r.id,
           itemName: r.itemName,
@@ -48,14 +68,10 @@ export async function loader({ request, params }: Route.LoaderArgs) {
           isBilled: r.billedLineId != null,
         })),
       }
-    }),
-  )
+    })
+    .filter((d): d is NonNullable<typeof d> => d !== null)
 
-  const filteredData = monthlyData.filter(
-    (d): d is NonNullable<typeof d> => d !== null,
-  )
-
-  return { months: filteredData, groups }
+  return { months: monthlyData, groups }
 }
 
 function formatAmount(
@@ -66,8 +82,9 @@ function formatAmount(
   if (currency === 'JPY') {
     return `\u00a5${Number(amount).toLocaleString()}`
   }
+  const symbol = currency === 'USD' ? '$' : currency
   const jpyAmount = rate ? Math.round(Number(amount) * Number(rate)) : null
-  const foreignStr = `$${Number(amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}`
+  const foreignStr = `${symbol}${Number(amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}`
   if (jpyAmount != null) {
     return `${foreignStr}  \u2192  \u00a5${jpyAmount.toLocaleString()}`
   }
@@ -83,11 +100,37 @@ function groupTotal(
   return formatAmount(String(total), currency, currency !== 'JPY' ? rate : null)
 }
 
+type MonthData = NonNullable<
+  Awaited<ReturnType<typeof loader>>['months'][number]
+>
+
+function groupRecordsByGroupId(records: MonthData['records']) {
+  const grouped = new Map<string | null, typeof records>()
+  for (const record of records) {
+    const key = record.groupId
+    const arr = grouped.get(key)
+    if (arr) {
+      arr.push(record)
+    } else {
+      grouped.set(key, [record])
+    }
+  }
+  return grouped
+}
+
 export default function ExpenseRecords({
   loaderData: { months, groups },
 }: Route.ComponentProps) {
   const [expandedMonths, setExpandedMonths] = useState<Set<string>>(
     () => new Set(months.slice(0, 2).map((m) => m.yearMonth)),
+  )
+
+  const groupedByMonth = useMemo(
+    () =>
+      new Map(
+        months.map((m) => [m.yearMonth, groupRecordsByGroupId(m.records)]),
+      ),
+    [months],
   )
 
   function toggleMonth(ym: string) {
@@ -111,136 +154,129 @@ export default function ExpenseRecords({
   }
 
   return (
-    <div className="space-y-6">
-      {months.map((month) => {
-        const isExpanded = expandedMonths.has(month.yearMonth)
+    <div className="grid gap-4">
+      <ContentPanel>
+        <div className="space-y-6">
+          {months.map((month) => {
+            const isExpanded = expandedMonths.has(month.yearMonth)
+            const groupedRecords = groupedByMonth.get(month.yearMonth)
+            if (!groupedRecords) return null
+            const rate = month.exchangeRate?.rate ?? null
+            const hasUsd = month.records.some((r) => r.currency !== 'JPY')
 
-        // Group records by groupId
-        const groupedRecords = new Map<
-          string | null,
-          Array<(typeof month.records)[number]>
-        >()
-        for (const record of month.records) {
-          const key = record.groupId
-          const arr = groupedRecords.get(key)
-          if (arr) {
-            arr.push(record)
-          } else {
-            groupedRecords.set(key, [record])
-          }
-        }
+            return (
+              <div key={month.yearMonth} className="rounded-md border">
+                <button
+                  type="button"
+                  className="flex w-full items-center gap-2 px-4 py-3 text-left"
+                  onClick={() => toggleMonth(month.yearMonth)}
+                >
+                  {isExpanded ? (
+                    <ChevronDownIcon className="size-4 shrink-0" />
+                  ) : (
+                    <ChevronRightIcon className="size-4 shrink-0" />
+                  )}
+                  <span className="font-medium">{month.label}</span>
+                  {hasUsd && rate && (
+                    <span className="text-muted-foreground text-xs">
+                      USD/JPY: {rate}
+                    </span>
+                  )}
+                </button>
 
-        const rate = month.exchangeRate?.rate ?? null
-        const hasUsd = month.records.some((r) => r.currency !== 'JPY')
+                {isExpanded && (
+                  <div className="space-y-3 border-t px-4 py-3">
+                    {[...groupedRecords.entries()].map(
+                      ([groupId, groupRecords]) => {
+                        const group = groupId
+                          ? groups.find((g) => g.id === groupId)
+                          : null
+                        const currency = groupRecords[0]?.currency ?? 'JPY'
 
-        return (
-          <div key={month.yearMonth} className="rounded-md border">
-            <button
-              type="button"
-              className="flex w-full items-center gap-2 px-4 py-3 text-left"
-              onClick={() => toggleMonth(month.yearMonth)}
-            >
-              {isExpanded ? (
-                <ChevronDownIcon className="size-4 shrink-0" />
-              ) : (
-                <ChevronRightIcon className="size-4 shrink-0" />
-              )}
-              <span className="font-medium">{month.label}</span>
-              {hasUsd && rate && (
-                <span className="text-muted-foreground text-xs">
-                  USD/JPY: {rate}
-                </span>
-              )}
-            </button>
-
-            {isExpanded && (
-              <div className="space-y-3 border-t px-4 py-3">
-                {[...groupedRecords.entries()].map(
-                  ([groupId, groupRecords]) => {
-                    const group = groupId
-                      ? groups.find((g) => g.id === groupId)
-                      : null
-                    const currency = groupRecords[0]?.currency ?? 'JPY'
-
-                    if (group) {
-                      return (
-                        <div key={groupId} className="space-y-1">
-                          <div className="text-sm font-medium">
-                            {group.name}{' '}
-                            <span className="text-muted-foreground">
-                              ({currency})
-                            </span>
-                          </div>
-                          <div className="ml-4 space-y-0.5">
-                            {groupRecords.map((record) => (
-                              <div
-                                key={record.id}
-                                className="flex items-center justify-between text-sm"
-                              >
-                                <span className="flex items-center gap-2">
-                                  {record.itemName}
-                                  {record.isBilled && (
-                                    <Badge
-                                      variant="secondary"
-                                      className="text-[10px]"
-                                    >
-                                      請求済
-                                    </Badge>
-                                  )}
-                                </span>
-                                <span className="font-mono text-xs">
-                                  {formatAmount(
-                                    record.amountForeign,
-                                    record.currency,
-                                    record.currency !== 'JPY' ? rate : null,
-                                  )}
+                        if (group) {
+                          return (
+                            <div key={groupId} className="space-y-1">
+                              <div className="text-sm font-medium">
+                                {group.name}{' '}
+                                <span className="text-muted-foreground">
+                                  ({currency})
                                 </span>
                               </div>
-                            ))}
-                            <div className="text-muted-foreground flex justify-between border-t pt-1 text-xs">
-                              <span>合計</span>
-                              <span className="font-mono">
-                                {groupTotal(groupRecords, rate)}
-                              </span>
+                              <div className="ml-4 space-y-0.5">
+                                {groupRecords.map((record) => (
+                                  <div
+                                    key={record.id}
+                                    className="flex items-center justify-between text-sm"
+                                  >
+                                    <span className="flex items-center gap-2">
+                                      {record.itemName}
+                                      {record.isBilled && (
+                                        <Badge
+                                          variant="secondary"
+                                          className="text-[10px]"
+                                        >
+                                          請求済
+                                        </Badge>
+                                      )}
+                                    </span>
+                                    <span className="font-mono text-xs">
+                                      {formatAmount(
+                                        record.amountForeign,
+                                        record.currency,
+                                        record.currency !== 'JPY' ? rate : null,
+                                      )}
+                                    </span>
+                                  </div>
+                                ))}
+                                <div className="text-muted-foreground flex justify-between border-t pt-1 text-xs">
+                                  <span>合計</span>
+                                  <span className="font-mono">
+                                    {groupTotal(groupRecords, rate)}
+                                  </span>
+                                </div>
+                              </div>
                             </div>
-                          </div>
-                        </div>
-                      )
-                    }
+                          )
+                        }
 
-                    // Ungrouped items
-                    return groupRecords.map((record) => (
-                      <div
-                        key={record.id}
-                        className="flex items-center justify-between text-sm"
-                      >
-                        <span className="flex items-center gap-2">
-                          {record.itemName}{' '}
-                          <span className="text-muted-foreground">
-                            ({record.currency})
-                          </span>
-                          {record.isBilled && (
-                            <Badge variant="secondary" className="text-[10px]">
-                              請求済
-                            </Badge>
-                          )}
-                        </span>
-                        <span className="font-mono text-xs">
-                          {formatAmount(
-                            record.amountForeign,
-                            record.currency,
-                            record.currency !== 'JPY' ? rate : null,
-                          )}
-                        </span>
-                      </div>
-                    ))
-                  },
+                        // Ungrouped items
+                        return groupRecords.map((record) => (
+                          <div
+                            key={record.id}
+                            className="flex items-center justify-between text-sm"
+                          >
+                            <span className="flex items-center gap-2">
+                              {record.itemName}{' '}
+                              <span className="text-muted-foreground">
+                                ({record.currency})
+                              </span>
+                              {record.isBilled && (
+                                <Badge
+                                  variant="secondary"
+                                  className="text-[10px]"
+                                >
+                                  請求済
+                                </Badge>
+                              )}
+                            </span>
+                            <span className="font-mono text-xs">
+                              {formatAmount(
+                                record.amountForeign,
+                                record.currency,
+                                record.currency !== 'JPY' ? rate : null,
+                              )}
+                            </span>
+                          </div>
+                        ))
+                      },
+                    )}
+                  </div>
                 )}
               </div>
-            )}
-          </div>
-        )
-      })}
+            )
+          })}
+        </div>
+      </ContentPanel>
     </div>
   )
 }
