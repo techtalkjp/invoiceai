@@ -1,5 +1,5 @@
 import { ImportIcon } from 'lucide-react'
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { ControlBar } from '~/components/layout/control-bar'
 import { MonthNav } from '~/components/layout/month-nav'
 import {
@@ -60,15 +60,16 @@ export function WorkHoursTimesheet({
     flush,
   } = useWorkHoursAutoSave(clientId, year, month)
 
-  // サーバーデータを store にセット
-  useState(() => {
+  // サーバーデータを store にセット（月変更時にも再実行）
+  // sync: loader から取得したデータを Zustand ストアに反映
+  useEffect(() => {
     const store = useTimesheetStore.getState()
     const data = toMonthData(clientEntry.entries)
     store.setMonthData(data)
     store.setMonthDates(monthDates)
     store.setActivitiesByDate(activitiesByDate ?? {})
     initializeLastSaved(JSON.stringify(data))
-  })
+  }, [clientEntry, monthDates, activitiesByDate, initializeLastSaved])
 
   // 全クリア
   const handleClearAll = useCallback(() => {
