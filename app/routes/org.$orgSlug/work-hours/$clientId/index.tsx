@@ -145,24 +145,29 @@ export async function action({ request, params }: Route.ActionArgs) {
   if (intent === 'syncActivities') {
     const syncYear = Number(formData.get('year'))
     const syncMonth = Number(formData.get('month'))
-    const source = await getActivitySource(organization.id, user.id, 'github')
-    if (source?.credentials && syncYear && syncMonth) {
-      const pat = decrypt(source.credentials)
-      const config = source.config as { username?: string } | null
-      const username = config?.username
-      if (username) {
-        const startDate = `${syncYear}-${padMonth(syncMonth)}-01`
-        const lastDay = daysInMonth(syncYear, syncMonth)
-        const endDate = `${syncYear}-${padMonth(syncMonth)}-${String(lastDay).padStart(2, '0')}`
-        const activities = await fetchGitHubActivities(
-          pat,
-          username,
-          startDate,
-          endDate,
-        )
-        await insertActivities(organization.id, user.id, activities)
-      }
+    if (!syncYear || !syncMonth) {
+      return { synced: false, error: '年月が不正です' }
     }
+    const source = await getActivitySource(organization.id, user.id, 'github')
+    if (!source?.credentials) {
+      return { synced: false, error: 'GitHub認証情報が設定されていません' }
+    }
+    const pat = decrypt(source.credentials)
+    const config = source.config as { username?: string } | null
+    const username = config?.username
+    if (!username) {
+      return { synced: false, error: 'GitHubユーザー名が設定されていません' }
+    }
+    const startDate = `${syncYear}-${padMonth(syncMonth)}-01`
+    const lastDay = daysInMonth(syncYear, syncMonth)
+    const endDate = `${syncYear}-${padMonth(syncMonth)}-${String(lastDay).padStart(2, '0')}`
+    const activities = await fetchGitHubActivities(
+      pat,
+      username,
+      startDate,
+      endDate,
+    )
+    await insertActivities(organization.id, user.id, activities)
     return { synced: true }
   }
 
