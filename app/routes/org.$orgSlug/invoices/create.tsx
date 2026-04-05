@@ -468,12 +468,11 @@ export default function InvoiceCreate({
         >
           <div className="grid gap-2">
             <Label htmlFor={fields.clientId.id}>クライアント</Label>
-            <Select
-              key={fields.clientId.key}
-              name={fields.clientId.name}
-              defaultValue={defaultClientId}
-            >
-              <SelectTrigger id={fields.clientId.id} className="w-full">
+            <Select {...fields.clientId.selectProps}>
+              <SelectTrigger
+                {...fields.clientId.selectTriggerProps}
+                className="w-full"
+              >
                 <SelectValue placeholder="選択してください" />
               </SelectTrigger>
               <SelectContent>
@@ -502,12 +501,11 @@ export default function InvoiceCreate({
           </div>
           <div className="grid gap-2">
             <Label htmlFor={fields.yearMonth.id}>対象月</Label>
-            <Select
-              key={fields.yearMonth.key}
-              name={fields.yearMonth.name}
-              defaultValue={defaultYearMonth}
-            >
-              <SelectTrigger id={fields.yearMonth.id} className="w-full">
+            <Select {...fields.yearMonth.selectProps}>
+              <SelectTrigger
+                {...fields.yearMonth.selectTriggerProps}
+                className="w-full"
+              >
                 <SelectValue placeholder="対象月を選択" />
               </SelectTrigger>
               <SelectContent>
@@ -532,8 +530,9 @@ export default function InvoiceCreate({
           {isEditMode && existingInvoice?.freeeInvoiceId && (
             <input
               type="hidden"
-              name="freeeInvoiceId"
+              name={fields.freeeInvoiceId.name}
               value={existingInvoice.freeeInvoiceId}
+              form={fields.freeeInvoiceId.formId}
             />
           )}
           <div className="md:col-span-2">
