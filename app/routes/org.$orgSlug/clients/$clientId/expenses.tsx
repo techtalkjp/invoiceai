@@ -1,5 +1,9 @@
 import { parseSubmission, report } from '@conform-to/react/future'
 import { coerceFormValue, formatResult } from '@conform-to/zod/v4/future'
+import {
+  hasProviderCredential,
+  saveProviderCredential,
+} from '@shared/services/expense-billing/metered-provider'
 import { PencilIcon, PlusIcon, TrashIcon } from 'lucide-react'
 import { nanoid } from 'nanoid'
 import { useEffect, useRef, useState } from 'react'
@@ -40,12 +44,13 @@ export async function loader({ request, params }: Route.LoaderArgs) {
   const { orgSlug, clientId } = params
   const { organization } = await requireOrgAdmin(request, orgSlug)
 
-  const [groups, items] = await Promise.all([
+  const [groups, items, hasGcpCredential] = await Promise.all([
     getExpenseGroups(organization.id, clientId),
     getExpenseItems(organization.id, clientId),
+    hasProviderCredential(organization.id, 'google_cloud_billing'),
   ])
 
-  return { groups, items, organizationId: organization.id }
+  return { groups, items, organizationId: organization.id, hasGcpCredential }
 }
 
 export async function action({ request, params }: Route.ActionArgs) {
@@ -106,6 +111,26 @@ export async function action({ request, params }: Route.ActionArgs) {
     case 'upsertItem': {
       const groupId =
         data.groupId && data.groupId !== '__none__' ? data.groupId : null
+
+      // metered の場合、formData から provider config を組み立て
+      let providerConfig: string | undefined
+      if (data.type === 'metered') {
+        const bqProject = formData.get('__bqProject')
+        const bqDataset = formData.get('__bqDataset')
+        const bqTable = formData.get('__bqTable')
+        const gcpProjectId = formData.get('__gcpProjectId')
+        const serviceFilter = formData.get('__serviceFilter')
+        if (bqProject && bqDataset && bqTable && gcpProjectId) {
+          providerConfig = JSON.stringify({
+            bigqueryProject: String(bqProject),
+            bigqueryDataset: String(bqDataset),
+            bigqueryTable: String(bqTable),
+            projectId: String(gcpProjectId),
+            ...(serviceFilter ? { serviceFilter: String(serviceFilter) } : {}),
+          })
+        }
+      }
+
       await upsertExpenseItem(organization.id, clientId, {
         id: data.itemId || undefined,
         groupId,
@@ -113,6 +138,8 @@ export async function action({ request, params }: Route.ActionArgs) {
         type: data.type,
         currency: data.currency,
         monthlyAmount: data.monthlyAmount,
+        provider: data.type === 'metered' ? 'google_cloud' : undefined,
+        providerConfig,
         taxRate: data.taxRate,
         sortOrder: data.sortOrder,
       })
@@ -120,6 +147,23 @@ export async function action({ request, params }: Route.ActionArgs) {
     }
     case 'deleteItem': {
       await deleteExpenseItem(organization.id, clientId, data.itemId)
+      return { lastResult: report(submission, { error }), success: true }
+    }
+    case 'saveCredential': {
+      await saveProviderCredential(
+        organization.id,
+        data.provider,
+        data.credentialsJson,
+      )
+      return { lastResult: report(submission, { error }), success: true }
+    }
+    case 'deleteCredential': {
+      const { db } = await import('~/lib/db/kysely')
+      await db
+        .deleteFrom('providerCredential')
+        .where('organizationId', '=', organization.id)
+        .where('provider', '=', data.provider)
+        .execute()
       return { lastResult: report(submission, { error }), success: true }
     }
   }
@@ -309,6 +353,120 @@ function EditGroupDialog({
   )
 }
 
+function ProviderConfigFields({
+  defaultConfig,
+}: {
+  defaultConfig?: Record<string, string> | undefined
+}) {
+  return (
+    <div className="space-y-2">
+      <div className="grid grid-cols-2 gap-2">
+        <div>
+          <Label className="text-xs">BigQuery プロジェクト</Label>
+          <Input
+            name="__bqProject"
+            defaultValue={defaultConfig?.bigqueryProject ?? ''}
+            placeholder="techtalk-380714"
+            className="h-7 text-xs"
+          />
+        </div>
+        <div>
+          <Label className="text-xs">データセット</Label>
+          <Input
+            name="__bqDataset"
+            defaultValue={defaultConfig?.bigqueryDataset ?? ''}
+            placeholder="techtalk"
+            className="h-7 text-xs"
+          />
+        </div>
+      </div>
+      <div>
+        <Label className="text-xs">テーブル名</Label>
+        <Input
+          name="__bqTable"
+          defaultValue={defaultConfig?.bigqueryTable ?? ''}
+          placeholder="gcp_billing_export_v1_..."
+          className="h-7 text-xs"
+        />
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        <div>
+          <Label className="text-xs">GCP プロジェクトID</Label>
+          <Input
+            name="__gcpProjectId"
+            defaultValue={defaultConfig?.projectId ?? ''}
+            placeholder="dailove-search"
+            className="h-7 text-xs"
+          />
+        </div>
+        <div>
+          <Label className="text-xs">サービスフィルタ（任意）</Label>
+          <Input
+            name="__serviceFilter"
+            defaultValue={defaultConfig?.serviceFilter ?? ''}
+            placeholder="Cloud AI API"
+            className="h-7 text-xs"
+          />
+        </div>
+      </div>
+      <input type="hidden" name="providerConfig" value="" />
+      <p className="text-muted-foreground text-[10px]">
+        ※ BigQuery Billing Export のテーブル情報を入力してください
+      </p>
+    </div>
+  )
+}
+
+function GcpCredentialUpload() {
+  const fetcher = useFetcher({ key: 'gcp-credential' })
+  const [jsonContent, setJsonContent] = useState('')
+
+  return (
+    <fetcher.Form method="post" className="space-y-2">
+      <input type="hidden" name="intent" value="saveCredential" />
+      <input type="hidden" name="provider" value="google_cloud_billing" />
+      <div>
+        <Label htmlFor="sa-json" className="text-xs">
+          サービスアカウント JSON キー
+        </Label>
+        <textarea
+          id="sa-json"
+          name="credentialsJson"
+          value={jsonContent}
+          onChange={(e) => setJsonContent(e.target.value)}
+          className="border-input bg-background h-32 w-full rounded-md border px-3 py-2 font-mono text-xs"
+          placeholder="JSON キーをペーストするか、ファイルをドロップ"
+        />
+      </div>
+      <div className="flex gap-2">
+        <Button type="submit" size="sm" disabled={!jsonContent.trim()}>
+          保存
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => {
+            const input = document.createElement('input')
+            input.type = 'file'
+            input.accept = '.json'
+            input.onchange = async (e) => {
+              const file = (e.target as HTMLInputElement).files?.[0]
+              if (file) {
+                const text = await file.text()
+                setJsonContent(text)
+              }
+            }
+            input.click()
+          }}
+        >
+          ファイルから読み込み
+        </Button>
+      </div>
+    </fetcher.Form>
+  )
+}
+
 function EditItemDialog({
   item,
   groups,
@@ -322,6 +480,8 @@ function EditItemDialog({
     type: string
     currency: string
     monthlyAmount: string | null
+    provider: string | null
+    providerConfig: string | null
     taxRate: number | null
     sortOrder: number
   }
@@ -395,6 +555,24 @@ function EditItemDialog({
               />
             </div>
           </div>
+          {item.type === 'metered' && (
+            <div className="bg-muted/50 space-y-2 rounded-md p-3">
+              <Label className="text-xs font-semibold">
+                従量課金プロバイダ設定
+              </Label>
+              <input type="hidden" name="provider" value="google_cloud" />
+              <ProviderConfigFields
+                defaultConfig={
+                  item.providerConfig
+                    ? (JSON.parse(item.providerConfig) as Record<
+                        string,
+                        string
+                      >)
+                    : undefined
+                }
+              />
+            </div>
+          )}
           <div className="grid grid-cols-2 gap-3">
             <div>
               <Label>税率（単独の場合）</Label>
@@ -428,7 +606,7 @@ function EditItemDialog({
 }
 
 export default function ExpenseSettings({
-  loaderData: { groups, items },
+  loaderData: { groups, items, hasGcpCredential },
   actionData,
 }: Route.ComponentProps) {
   const [editingGroupId, setEditingGroupId] = useState<string | null>(null)
@@ -780,6 +958,33 @@ export default function ExpenseSettings({
             項目追加
           </Button>
         </Form>
+      </div>
+
+      <div className="space-y-3 rounded-md border p-4">
+        <h4 className="text-sm font-semibold">GCP Billing 連携</h4>
+        {hasGcpCredential ? (
+          <div className="space-y-2">
+            <p className="text-sm text-green-600">サービスアカウント設定済み</p>
+            <Form method="post">
+              <input type="hidden" name="intent" value="deleteCredential" />
+              <input
+                type="hidden"
+                name="provider"
+                value="google_cloud_billing"
+              />
+              <Button variant="outline" size="sm" type="submit">
+                <TrashIcon className="size-3" />
+                認証情報を削除
+              </Button>
+            </Form>
+          </div>
+        ) : (
+          <GcpCredentialUpload />
+        )}
+        <p className="text-muted-foreground text-xs">
+          従量課金（metered）アイテムで GCP Billing
+          を利用するにはサービスアカウントの JSON キーが必要です。
+        </p>
       </div>
     </div>
   )

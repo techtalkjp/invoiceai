@@ -43,6 +43,8 @@ export const upsertItemSchema = z.object({
   type: z.enum(['fixed', 'metered']),
   currency: z.enum(['USD', 'JPY']),
   monthlyAmount: z.string().optional(),
+  provider: z.string().optional(),
+  providerConfig: z.string().optional(),
   taxRate: taxRateSchema.optional(),
   sortOrder: z.number().int().default(0),
 })
@@ -52,10 +54,23 @@ export const deleteItemSchema = z.object({
   itemId: z.string().min(1),
 })
 
+export const saveCredentialSchema = z.object({
+  intent: z.literal('saveCredential'),
+  provider: z.literal('google_cloud_billing'),
+  credentialsJson: z.string().min(1, 'JSON キーを入力してください'),
+})
+
+export const deleteCredentialSchema = z.object({
+  intent: z.literal('deleteCredential'),
+  provider: z.literal('google_cloud_billing'),
+})
+
 export const expenseFormSchema = z.discriminatedUnion('intent', [
   createGroupWithItemsSchema,
   upsertGroupSchema,
   deleteGroupSchema,
   upsertItemSchema,
   deleteItemSchema,
+  saveCredentialSchema,
+  deleteCredentialSchema,
 ])
