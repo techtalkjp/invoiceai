@@ -385,6 +385,7 @@ export default function ClientWorkHours({
       />
 
       <WorkHoursTimesheet
+        key={`${clientId}-${year}-${month}`}
         clientId={clientId}
         clientEntry={clientEntry}
         year={year}
