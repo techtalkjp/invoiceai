@@ -117,6 +117,7 @@ CREATE TABLE IF NOT EXISTS "client" (
   "invoice_subject_template" TEXT,
   "invoice_note" TEXT,
   "payment_terms" TEXT NOT NULL DEFAULT 'next_month_end' CHECK ("payment_terms" IN ('next_month_end', 'next_next_month_1st', 'next_next_month_end')),
+  "rounding_method" TEXT NOT NULL DEFAULT 'round' CHECK ("rounding_method" IN ('round', 'floor', 'ceil')),
   "is_active" INTEGER NOT NULL DEFAULT 1,
   "created_at" TEXT NOT NULL DEFAULT (datetime('now')),
   "updated_at" TEXT NOT NULL DEFAULT (datetime('now'))
@@ -161,7 +162,16 @@ CREATE TABLE IF NOT EXISTS "invoice_line" (
   "quantity" REAL,
   "unit" TEXT,
   "unit_price" INTEGER,
-  "tax_rate" INTEGER
+  "tax_rate" INTEGER,
+  "expense_group_id" TEXT REFERENCES "expense_group"("id") ON DELETE SET NULL,
+  "expense_item_id" TEXT REFERENCES "expense_item"("id") ON DELETE SET NULL,
+  "expense_record_id" TEXT REFERENCES "expense_record"("id") ON DELETE SET NULL,
+  "expense_year_month" TEXT,
+  "expense_kind" TEXT CHECK ("expense_kind" IN ('regular', 'adjustment')),
+  "amount_foreign" TEXT,
+  "exchange_rate" TEXT,
+  "currency" TEXT,
+  CHECK ("expense_group_id" IS NULL OR "expense_item_id" IS NULL)
 );
 
 CREATE TABLE IF NOT EXISTS "work_entry" (
@@ -226,6 +236,8 @@ CREATE UNIQUE INDEX IF NOT EXISTS "invoice_org_client_month_idx"
   ON "invoice"("organization_id", "client_id", "year_month");
 CREATE INDEX IF NOT EXISTS "invoice_client_idx" ON "invoice"("client_id");
 CREATE INDEX IF NOT EXISTS "invoice_line_invoice_idx" ON "invoice_line"("invoice_id");
+CREATE INDEX IF NOT EXISTS "invoice_line_expense_group_idx" ON "invoice_line"("expense_group_id");
+CREATE INDEX IF NOT EXISTS "invoice_line_expense_item_idx" ON "invoice_line"("expense_item_id");
 CREATE INDEX IF NOT EXISTS "work_entry_client_idx" ON "work_entry"("client_id");
 CREATE INDEX IF NOT EXISTS "work_entry_user_idx" ON "work_entry"("user_id");
 CREATE INDEX IF NOT EXISTS "work_entry_invoice_idx" ON "work_entry"("invoice_id");
@@ -306,3 +318,100 @@ CREATE TABLE IF NOT EXISTS "playground_ai_usage" (
 
 CREATE UNIQUE INDEX IF NOT EXISTS "playground_ai_usage_user_month_idx"
   ON "playground_ai_usage"("user_id", "year_month");
+
+-- Expense billing tables
+
+CREATE TABLE IF NOT EXISTS "expense_group" (
+  "id" TEXT PRIMARY KEY NOT NULL,
+  "organization_id" TEXT NOT NULL REFERENCES "organization"("id") ON DELETE CASCADE,
+  "client_id" TEXT NOT NULL REFERENCES "client"("id") ON DELETE CASCADE,
+  "name" TEXT NOT NULL,
+  "invoice_label" TEXT NOT NULL,
+  "currency" TEXT NOT NULL DEFAULT 'USD',
+  "tax_rate" INTEGER NOT NULL DEFAULT 10 CHECK ("tax_rate" IN (0, 8, 10)),
+  "sort_order" INTEGER NOT NULL DEFAULT 0,
+  "is_active" INTEGER NOT NULL DEFAULT 1,
+  "created_at" TEXT NOT NULL DEFAULT (datetime('now')),
+  "updated_at" TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS "expense_group_client_idx"
+  ON "expense_group"("client_id");
+CREATE INDEX IF NOT EXISTS "expense_group_org_client_active_idx"
+  ON "expense_group"("organization_id", "client_id", "is_active");
+
+CREATE TABLE IF NOT EXISTS "expense_item" (
+  "id" TEXT PRIMARY KEY NOT NULL,
+  "organization_id" TEXT NOT NULL REFERENCES "organization"("id") ON DELETE CASCADE,
+  "group_id" TEXT REFERENCES "expense_group"("id") ON DELETE SET NULL,
+  "client_id" TEXT NOT NULL REFERENCES "client"("id") ON DELETE CASCADE,
+  "name" TEXT NOT NULL,
+  "type" TEXT NOT NULL CHECK ("type" IN ('fixed', 'metered')),
+  "currency" TEXT NOT NULL DEFAULT 'USD',
+  "monthly_amount" TEXT,
+  "provider" TEXT,
+  "provider_config" TEXT,
+  "invoice_label" TEXT,
+  "tax_rate" INTEGER CHECK ("tax_rate" IN (0, 8, 10)),
+  "effective_from" TEXT,
+  "effective_to" TEXT,
+  "sort_order" INTEGER NOT NULL DEFAULT 0,
+  "is_active" INTEGER NOT NULL DEFAULT 1,
+  "created_at" TEXT NOT NULL DEFAULT (datetime('now')),
+  "updated_at" TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS "expense_item_client_idx"
+  ON "expense_item"("client_id");
+CREATE INDEX IF NOT EXISTS "expense_item_group_idx"
+  ON "expense_item"("group_id");
+CREATE INDEX IF NOT EXISTS "expense_item_client_active_idx"
+  ON "expense_item"("client_id", "is_active");
+
+CREATE TABLE IF NOT EXISTS "exchange_rate" (
+  "id" TEXT PRIMARY KEY NOT NULL,
+  "organization_id" TEXT NOT NULL REFERENCES "organization"("id") ON DELETE CASCADE,
+  "year_month" TEXT NOT NULL,
+  "currency_pair" TEXT NOT NULL,
+  "rate" TEXT NOT NULL,
+  "rate_date" TEXT NOT NULL,
+  "source" TEXT NOT NULL DEFAULT 'boj',
+  "is_manual" INTEGER NOT NULL DEFAULT 0,
+  "override_reason" TEXT,
+  "created_at" TEXT NOT NULL DEFAULT (datetime('now')),
+  "updated_at" TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS "exchange_rate_org_year_month_pair_idx"
+  ON "exchange_rate"("organization_id", "year_month", "currency_pair");
+
+CREATE TABLE IF NOT EXISTS "expense_record" (
+  "id" TEXT PRIMARY KEY NOT NULL,
+  "expense_item_id" TEXT NOT NULL REFERENCES "expense_item"("id") ON DELETE CASCADE,
+  "year_month" TEXT NOT NULL,
+  "amount_foreign" TEXT NOT NULL,
+  "currency" TEXT NOT NULL,
+  "adjusted_in_invoice_id" TEXT REFERENCES "invoice"("id") ON DELETE SET NULL,
+  "last_adjusted_amount" TEXT,
+  "fetched_at" TEXT,
+  "created_at" TEXT NOT NULL DEFAULT (datetime('now')),
+  "updated_at" TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS "expense_record_item_month_idx"
+  ON "expense_record"("expense_item_id", "year_month");
+CREATE INDEX IF NOT EXISTS "expense_record_invoice_idx"
+  ON "expense_record"("adjusted_in_invoice_id");
+
+CREATE TABLE IF NOT EXISTS "provider_credential" (
+  "id" TEXT PRIMARY KEY NOT NULL,
+  "organization_id" TEXT NOT NULL REFERENCES "organization"("id") ON DELETE CASCADE,
+  "provider" TEXT NOT NULL CHECK ("provider" IN ('google_cloud_billing', 'anthropic', 'openai', 'aws')),
+  "encrypted_credentials" TEXT NOT NULL,
+  "config" TEXT,
+  "created_at" TEXT NOT NULL DEFAULT (datetime('now')),
+  "updated_at" TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS "provider_credential_org_provider_idx"
+  ON "provider_credential"("organization_id", "provider");

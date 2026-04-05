@@ -66,6 +66,7 @@ export interface Client {
   name: string;
   organizationId: string;
   paymentTerms: Generated<string>;
+  roundingMethod: Generated<string>;
   unitLabel: Generated<string | null>;
   updatedAt: Generated<string>;
 }
@@ -76,6 +77,68 @@ export interface ClientSourceMapping {
   id: string;
   sourceIdentifier: string;
   sourceType: string;
+}
+
+export interface ExchangeRate {
+  createdAt: Generated<string>;
+  currencyPair: string;
+  id: string;
+  isManual: Generated<number>;
+  organizationId: string;
+  overrideReason: string | null;
+  rate: string;
+  rateDate: string;
+  source: Generated<string>;
+  updatedAt: Generated<string>;
+  yearMonth: string;
+}
+
+export interface ExpenseGroup {
+  clientId: string;
+  createdAt: Generated<string>;
+  currency: Generated<string>;
+  id: string;
+  invoiceLabel: string;
+  isActive: Generated<number>;
+  name: string;
+  organizationId: string;
+  sortOrder: Generated<number>;
+  taxRate: Generated<number>;
+  updatedAt: Generated<string>;
+}
+
+export interface ExpenseItem {
+  clientId: string;
+  createdAt: Generated<string>;
+  currency: Generated<string>;
+  effectiveFrom: string | null;
+  effectiveTo: string | null;
+  groupId: string | null;
+  id: string;
+  invoiceLabel: string | null;
+  isActive: Generated<number>;
+  monthlyAmount: string | null;
+  name: string;
+  organizationId: string;
+  provider: string | null;
+  providerConfig: string | null;
+  sortOrder: Generated<number>;
+  taxRate: number | null;
+  type: string;
+  updatedAt: Generated<string>;
+}
+
+export interface ExpenseRecord {
+  adjustedInInvoiceId: string | null;
+  amountForeign: string;
+  createdAt: Generated<string>;
+  currency: string;
+  expenseItemId: string;
+  fetchedAt: string | null;
+  id: string;
+  lastAdjustedAmount: string | null;
+  updatedAt: Generated<string>;
+  yearMonth: string;
 }
 
 export interface FeatureFlag {
@@ -124,7 +187,15 @@ export interface Invoice {
 }
 
 export interface InvoiceLine {
+  amountForeign: string | null;
+  currency: string | null;
   description: string | null;
+  exchangeRate: string | null;
+  expenseGroupId: string | null;
+  expenseItemId: string | null;
+  expenseKind: string | null;
+  expenseRecordId: string | null;
+  expenseYearMonth: string | null;
   id: string;
   invoiceId: string;
   quantity: number | null;
@@ -185,6 +256,16 @@ export interface PlaygroundAiUsage {
   updatedAt: Generated<string>;
   userId: string;
   yearMonth: string;
+}
+
+export interface ProviderCredential {
+  config: string | null;
+  createdAt: Generated<string>;
+  encryptedCredentials: string;
+  id: string;
+  organizationId: string;
+  provider: string;
+  updatedAt: Generated<string>;
 }
 
 export interface ProviderToken {
@@ -271,6 +352,10 @@ export interface DB {
   activitySource: ActivitySource;
   client: Client;
   clientSourceMapping: ClientSourceMapping;
+  exchangeRate: ExchangeRate;
+  expenseGroup: ExpenseGroup;
+  expenseItem: ExpenseItem;
+  expenseRecord: ExpenseRecord;
   featureFlag: FeatureFlag;
   invitation: Invitation;
   invoice: Invoice;
@@ -280,6 +365,7 @@ export interface DB {
   monthlyStatus: MonthlyStatus;
   organization: Organization;
   playgroundAiUsage: PlaygroundAiUsage;
+  providerCredential: ProviderCredential;
   providerToken: ProviderToken;
   session: Session;
   team: Team;

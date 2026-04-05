@@ -92,6 +92,13 @@ org.$orgSlug/
 - テーブルやリストは `<ContentPanel>` で囲む
 - 共通コンポーネント: `~/components/page-header`, `~/components/control-bar`, `~/components/month-nav`, `~/components/content-panel`
 
+## Design
+
+UI/UX の設計原則と実装規約は `docs/design/` を参照:
+
+- [UX 設計原則](docs/design/ux-principles.md) — OOUI、プログレッシブ・ディスクロージャー、視覚的階層、空状態、導線
+- [UI 実装規約](docs/design/ui-conventions.md) — 数値表示、フォーム、ダイアログ、オブジェクト表示、色、アクセシビリティ
+
 ## useEffect Policy
 
 `useEffect` は外部世界との同期専用。それ以外では使用禁止。

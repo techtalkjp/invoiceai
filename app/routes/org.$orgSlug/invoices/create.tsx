@@ -1,10 +1,20 @@
-import { getFormProps, useForm } from '@conform-to/react'
-import { parseWithZod } from '@conform-to/zod/v4'
+import { parseSubmission, report } from '@conform-to/react/future'
+import { coerceFormValue, formatResult } from '@conform-to/zod/v4/future'
 import {
   getBillingDate,
   getPaymentDate,
   type PaymentTerms,
 } from '@shared/core/invoice-utils'
+import {
+  getExpensePreview,
+  type ExpensePreviewResult,
+} from '@shared/services/expense-billing/expense-preview-service'
+import {
+  buildExpenseLineSnapshot,
+  buildWorkLineSnapshot,
+  markExpenseRecordsAdjusted,
+  saveInvoiceLines,
+} from '@shared/services/expense-billing/invoice-line-snapshot'
 import {
   createClientInvoice,
   updateClientInvoice,
@@ -26,6 +36,7 @@ import {
 } from '~/components/ui/select'
 import { requireOrgMember } from '~/lib/auth-helpers.server'
 import { db } from '~/lib/db/kysely'
+import { useForm } from '~/lib/form'
 import { getFreeeClientForOrganization } from '~/utils/freee.server'
 import {
   formatYearMonth,
@@ -76,6 +87,7 @@ export async function loader({ request, params }: Route.LoaderArgs) {
       'monthlyFee',
       'hourlyRate',
       'unitLabel',
+      'roundingMethod',
     ])
     .where('organizationId', '=', organization.id)
     .where('isActive', '=', 1)
@@ -98,6 +110,22 @@ export async function loader({ request, params }: Route.LoaderArgs) {
     )
   }
 
+  // 経費プレビューを取得
+  let expensePreview: ExpensePreviewResult | null = null
+  if (defaultClientId && defaultYearMonth) {
+    const { year, month } = parseYearMonthId(defaultYearMonth)
+    const selectedClient = clients.find((c) => c.id === defaultClientId)
+
+    expensePreview = await getExpensePreview({
+      organizationId: organization.id,
+      clientId: defaultClientId,
+      yearMonth: formatYearMonth(year, month),
+      roundingMethod:
+        (selectedClient?.roundingMethod as 'round' | 'floor' | 'ceil') ??
+        'round',
+    })
+  }
+
   return {
     organization,
     clients,
@@ -106,6 +134,7 @@ export async function loader({ request, params }: Route.LoaderArgs) {
     defaultClientId,
     prevMonthId,
     existingInvoice,
+    expensePreview,
   }
 }
 
@@ -113,14 +142,15 @@ export async function action({ request, params }: Route.ActionArgs) {
   const { orgSlug } = params
   const { organization } = await requireOrgMember(request, orgSlug)
 
-  const submission = parseWithZod(await request.formData(), {
-    schema: invoiceCreateSchema,
-  })
-  if (submission.status !== 'success') {
-    return { lastResult: submission.reply() }
-  }
+  const formData = await request.formData()
+  const submission = parseSubmission(formData)
+  const result = coerceFormValue(invoiceCreateSchema).safeParse(
+    submission.payload,
+  )
+  const error = formatResult(result)
+  if (!result.success) return { lastResult: report(submission, { error }) }
 
-  const input = submission.value
+  const input = result.data
 
   // クライアントを取得
   const client = await db
@@ -132,16 +162,16 @@ export async function action({ request, params }: Route.ActionArgs) {
 
   if (!client) {
     return {
-      lastResult: submission.reply({
-        formErrors: [`クライアント "${input.clientId}" が見つかりません`],
+      lastResult: report(submission, {
+        error: { formErrors: ['クライアントが見つかりません'] },
       }),
     }
   }
 
   if (!organization.freeeCompanyId) {
     return {
-      lastResult: submission.reply({
-        formErrors: ['freee 会社IDが設定されていません'],
+      lastResult: report(submission, {
+        error: { formErrors: ['freee 会社IDが設定されていません'] },
       }),
     }
   }
@@ -151,22 +181,24 @@ export async function action({ request, params }: Route.ActionArgs) {
   // billing type に応じたバリデーション
   if (client.billingType === 'time' && !client.hourlyRate) {
     return {
-      lastResult: submission.reply({
-        formErrors: ['クライアントの時間単価が設定されていません'],
+      lastResult: report(submission, {
+        error: { formErrors: ['クライアントの時間単価が設定されていません'] },
       }),
     }
   }
   if (client.billingType === 'fixed' && !client.monthlyFee) {
     return {
-      lastResult: submission.reply({
-        formErrors: ['クライアントの月額が設定されていません'],
+      lastResult: report(submission, {
+        error: { formErrors: ['クライアントの月額が設定されていません'] },
       }),
     }
   }
   if (!client.freeePartnerId) {
     return {
-      lastResult: submission.reply({
-        formErrors: ['クライアントの freee 取引先IDが設定されていません'],
+      lastResult: report(submission, {
+        error: {
+          formErrors: ['クライアントの freee 取引先IDが設定されていません'],
+        },
       }),
     }
   }
@@ -250,13 +282,14 @@ export async function action({ request, params }: Route.ActionArgs) {
     // DB に保存
     if (result.invoice) {
       const { year, month } = input.yearMonth
+      const yearMonth = formatYearMonth(year, month)
       const subject =
         client.invoiceSubjectTemplate
           ?.replace('{year}', String(year))
           .replace('{month}', String(month)) ??
         `${client.name} ${year}年${month}月`
 
-      await saveInvoiceToDb({
+      const invoiceRecord = await saveInvoiceToDb({
         organizationId: organization.id,
         clientId: client.id,
         year,
@@ -279,6 +312,53 @@ export async function action({ request, params }: Route.ActionArgs) {
         totalAmount: result.invoice.totalAmount,
         status: result.invoice.sendingStatus,
       })
+
+      // invoice_line に凍結保存（稼働行 + 経費行）
+      if (invoiceRecord) {
+        const invoiceId = invoiceRecord.id
+        const snapshotLines = []
+
+        // 稼働行
+        snapshotLines.push(
+          buildWorkLineSnapshot({
+            invoiceId,
+            description: `${subject}分`,
+            quantity: client.billingType === 'time' ? result.totalHours : 1,
+            unit:
+              client.billingType === 'time'
+                ? '時間'
+                : (client.unitLabel ?? '式'),
+            unitPrice:
+              client.billingType === 'time'
+                ? (client.hourlyRate ?? 0)
+                : (client.monthlyFee ?? 0),
+            taxRate: 10,
+          }),
+        )
+
+        // 経費行
+        const expensePreview = await getExpensePreview({
+          organizationId: organization.id,
+          clientId: client.id,
+          yearMonth,
+          roundingMethod:
+            (client.roundingMethod as 'round' | 'floor' | 'ceil') ?? 'round',
+        })
+
+        for (const line of expensePreview.lines) {
+          snapshotLines.push(buildExpenseLineSnapshot({ invoiceId, line }))
+        }
+
+        await saveInvoiceLines(snapshotLines)
+
+        // 差額調整の expense_record をマーク
+        const adjustmentLines = expensePreview.lines.filter(
+          (l) => l.expenseKind === 'adjustment',
+        )
+        if (adjustmentLines.length > 0) {
+          await markExpenseRecordsAdjusted(invoiceId, adjustmentLines)
+        }
+      }
     }
 
     return {
@@ -294,8 +374,8 @@ export async function action({ request, params }: Route.ActionArgs) {
     const message =
       error instanceof Error ? error.message : '請求書の処理に失敗しました'
     return {
-      lastResult: submission.reply({
-        formErrors: [message],
+      lastResult: report(submission, {
+        error: { formErrors: [message] },
       }),
     }
   }
@@ -309,6 +389,7 @@ export default function InvoiceCreate({
     defaultClientId,
     prevMonthId,
     existingInvoice,
+    expensePreview,
   },
   params: { orgSlug },
 }: Route.ComponentProps) {
@@ -316,7 +397,7 @@ export default function InvoiceCreate({
   const navigation = useNavigation()
   const isSubmitting = navigation.state === 'submitting'
   const isEditMode = existingInvoice != null
-  const [form, fields] = useForm({
+  const { form, fields } = useForm(invoiceCreateSchema, {
     lastResult:
       actionData && 'lastResult' in actionData
         ? actionData.lastResult
@@ -326,14 +407,11 @@ export default function InvoiceCreate({
       yearMonth: defaultYearMonth,
       freeeInvoiceId: existingInvoice?.freeeInvoiceId?.toString(),
     },
-    onValidate: ({ formData }) =>
-      parseWithZod(formData, { schema: invoiceCreateSchema }),
-    shouldRevalidate: 'onBlur',
   })
 
-  const selectedMonth = fields.yearMonth.value ?? defaultYearMonth
+  const selectedMonth = fields.yearMonth.defaultValue ?? defaultYearMonth
   const isPrevMonth = selectedMonth === prevMonthId
-  const selectedClientId = fields.clientId.value ?? defaultClientId
+  const selectedClientId = fields.clientId.defaultValue ?? defaultClientId
   const selectedClient = clients.find((c) => c.id === selectedClientId)
 
   if (clients.length === 0) {
@@ -385,17 +463,16 @@ export default function InvoiceCreate({
       <ContentPanel className="p-6">
         <Form
           method="post"
-          {...getFormProps(form)}
+          {...form.props}
           className="grid gap-4 md:grid-cols-2"
         >
           <div className="grid gap-2">
             <Label htmlFor={fields.clientId.id}>クライアント</Label>
-            <Select
-              key={fields.clientId.key}
-              name={fields.clientId.name}
-              defaultValue={defaultClientId}
-            >
-              <SelectTrigger id={fields.clientId.id} className="w-full">
+            <Select {...fields.clientId.selectProps}>
+              <SelectTrigger
+                {...fields.clientId.selectTriggerProps}
+                className="w-full"
+              >
                 <SelectValue placeholder="選択してください" />
               </SelectTrigger>
               <SelectContent>
@@ -415,7 +492,7 @@ export default function InvoiceCreate({
               {fields.clientId.errors}
             </div>
             {selectedClient && (
-              <div className="text-muted-foreground text-sm">
+              <div className="text-muted-foreground text-sm tabular-nums">
                 {selectedClient.billingType === 'time'
                   ? `時間単価: ¥${selectedClient.hourlyRate?.toLocaleString() ?? '未設定'}/h`
                   : `月額: ¥${selectedClient.monthlyFee?.toLocaleString() ?? '未設定'}`}
@@ -424,12 +501,11 @@ export default function InvoiceCreate({
           </div>
           <div className="grid gap-2">
             <Label htmlFor={fields.yearMonth.id}>対象月</Label>
-            <Select
-              key={fields.yearMonth.key}
-              name={fields.yearMonth.name}
-              defaultValue={defaultYearMonth}
-            >
-              <SelectTrigger id={fields.yearMonth.id} className="w-full">
+            <Select {...fields.yearMonth.selectProps}>
+              <SelectTrigger
+                {...fields.yearMonth.selectTriggerProps}
+                className="w-full"
+              >
                 <SelectValue placeholder="対象月を選択" />
               </SelectTrigger>
               <SelectContent>
@@ -454,8 +530,9 @@ export default function InvoiceCreate({
           {isEditMode && existingInvoice?.freeeInvoiceId && (
             <input
               type="hidden"
-              name="freeeInvoiceId"
+              name={fields.freeeInvoiceId.name}
               value={existingInvoice.freeeInvoiceId}
+              form={fields.freeeInvoiceId.formId}
             />
           )}
           <div className="md:col-span-2">
@@ -471,6 +548,74 @@ export default function InvoiceCreate({
           </div>
         </Form>
       </ContentPanel>
+      {/* 経費プレビュー */}
+      {expensePreview && expensePreview.lines.length > 0 && (
+        <ContentPanel className="space-y-3 p-6">
+          <h3 className="text-sm font-semibold">経費明細プレビュー</h3>
+          {Object.entries(expensePreview.exchangeRates).length > 0 && (
+            <div className="text-muted-foreground text-xs">
+              {Object.entries(expensePreview.exchangeRates).map(
+                ([pair, info]: [
+                  string,
+                  { rate: string; rateDate: string; source: string },
+                ]) => (
+                  <span key={pair}>
+                    {pair}: {info.rate} 円（
+                    {info.source === 'manual'
+                      ? '手動設定'
+                      : `日銀TTM ${info.rateDate}`}
+                    ）
+                  </span>
+                ),
+              )}
+            </div>
+          )}
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b text-left">
+                <th className="py-1">摘要</th>
+                <th className="py-1 text-right">外貨</th>
+                <th className="py-1 text-right">金額（円）</th>
+              </tr>
+            </thead>
+            <tbody>
+              {expensePreview.lines.map((line, i) => (
+                <tr key={i} className="border-b">
+                  <td className="py-1">
+                    {line.description}
+                    {line.isProvisional && (
+                      <span className="text-muted-foreground ml-1 text-xs">
+                        （暫定値）
+                      </span>
+                    )}
+                    {line.expenseKind === 'adjustment' && (
+                      <Badge variant="outline" className="ml-1 text-xs">
+                        差額調整
+                      </Badge>
+                    )}
+                  </td>
+                  <td className="py-1 text-right tabular-nums">
+                    {line.currency !== 'JPY'
+                      ? `${line.currency} ${line.amountForeign}`
+                      : ''}
+                  </td>
+                  <td className="py-1 text-right tabular-nums">
+                    ¥{line.amountJpy.toLocaleString()}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {expensePreview.errors.length > 0 && (
+            <div className="text-destructive text-xs">
+              {expensePreview.errors.map((e, i) => (
+                <div key={i}>{e.error}</div>
+              ))}
+            </div>
+          )}
+        </ContentPanel>
+      )}
+
       {actionData && 'ok' in actionData && actionData.ok && (
         <ContentPanel className="space-y-1 p-6">
           <div className="text-lg font-semibold">
@@ -479,7 +624,7 @@ export default function InvoiceCreate({
           {actionData.billingType === 'time' && (
             <p className="text-sm">稼働時間: {actionData.totalHours} 時間</p>
           )}
-          <p className="text-sm">
+          <p className="text-sm tabular-nums">
             金額: ¥{actionData.amount.toLocaleString()}（税抜）
           </p>
           {actionData.invoice && (
