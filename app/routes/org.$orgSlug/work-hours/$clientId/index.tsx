@@ -87,7 +87,6 @@ export async function loader({ request, params }: Route.LoaderArgs) {
 
   // マッピング済みリポジトリのアクティビティを DB から取得
   const activitiesByDate: Record<string, ActivityRecord[]> = {}
-  let lastSyncedAt: string | null = null
   const mappedRepos = new Set(mappings.map((m) => m.sourceIdentifier))
   if (mappedRepos.size > 0) {
     const dbActivities = await getActivitiesByMonth(
@@ -106,20 +105,18 @@ export async function loader({ request, params }: Route.LoaderArgs) {
       }
       arr.push(record)
     }
-
-    // 最終同期日時を取得（最新アクティビティの createdAt）
-    if (dbActivities.length > 0) {
-      const latest = await db
-        .selectFrom('activity')
-        .select('createdAt')
-        .where('organizationId', '=', organization.id)
-        .where('userId', '=', user.id)
-        .orderBy('createdAt', 'desc')
-        .limit(1)
-        .executeTakeFirst()
-      lastSyncedAt = latest?.createdAt ?? null
-    }
   }
+
+  // 最終同期日時（当月に関係なく、ユーザー全体の最新）
+  const latest = await db
+    .selectFrom('activity')
+    .select('createdAt')
+    .where('organizationId', '=', organization.id)
+    .where('userId', '=', user.id)
+    .orderBy('createdAt', 'desc')
+    .limit(1)
+    .executeTakeFirst()
+  const lastSyncedAt = latest?.createdAt ?? null
 
   return {
     organization,
