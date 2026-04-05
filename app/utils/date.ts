@@ -32,14 +32,14 @@ export function dayOfWeek(dateStr: string): number {
 
 /** UTC ISO タイムスタンプ → JST の「勤務日」YYYY-MM-DD */
 export function toJstWorkDate(iso: string): string {
-  const jst = dayjs(iso).tz(DISPLAY_TZ)
+  const jst = dayjs.utc(iso).tz(DISPLAY_TZ)
   const workDay = jst.hour() < 6 ? jst.subtract(1, 'day') : jst
   return workDay.format('YYYY-MM-DD')
 }
 
 /** UTC ISO タイムスタンプ → JST 時刻文字列（30 時制 HH:MM） */
 export function toJstTime(iso: string): string {
-  const jst = dayjs(iso).tz(DISPLAY_TZ)
+  const jst = dayjs.utc(iso).tz(DISPLAY_TZ)
   const hours = jst.hour()
   const minutes = jst.minute()
   const displayHours = hours < 6 ? hours + 24 : hours
@@ -48,7 +48,7 @@ export function toJstTime(iso: string): string {
 
 /** UTC ISO タイムスタンプ → JST 分（30 時制） */
 export function toJstMinutes(iso: string): number {
-  const jst = dayjs(iso).tz(DISPLAY_TZ)
+  const jst = dayjs.utc(iso).tz(DISPLAY_TZ)
   const hours = jst.hour()
   const minutes = jst.minute()
   if (hours < 6) return (hours + 24) * 60 + minutes

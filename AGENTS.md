@@ -152,7 +152,8 @@ UI/UX の設計原則と実装規約は `docs/design/` を参照:
 
 - **dayjs 統一**: 日付操作はすべて `dayjs`（`~/utils/dayjs`）を使う。`new Date()` は原則禁止（`holiday_jp` が要求する場合と `Date.now()` のみ例外）
 - **DB**: タイムスタンプは UTC ISO 文字列。書き込みには `nowISO()`（`~/utils/date`）を使う
-- **表示**: `Asia/Tokyo` で表示。`formatDate()` / `formatDateTime()` は自動で JST 変換済み
+- **UTC 解析**: DB の UTC タイムスタンプを dayjs で扱う際は必ず `dayjs.utc(date)` で解析する。`dayjs(date)` だとサーバー(UTC)とクライアント(JST)で解釈が異なりハイドレーション不整合になる
+- **表示**: `Asia/Tokyo` で表示。`formatDate()` / `formatDateTime()` は `dayjs.utc(date).tz()` で自動 JST 変換済み
 - **勤務日**: 30 時制（6:00 起点）。`toJstWorkDate()` / `toJstTime()` / `toJstMinutes()` を使う
 - **カレンダー計算**: `daysInMonth(year, month)`, `dayOfWeek(dateStr)` — `~/utils/date`
 - **ヘルパー一覧**: `app/utils/date.ts`（表示・変換・DB用）、`app/utils/month.ts`（年月ナビ・範囲クエリ用）
