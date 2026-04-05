@@ -23,6 +23,7 @@ export function useWorkHoursAutoSave(
   const fetcher = useStableFetcher({ key: fetcherKey })
   const lastSavedRef = useRef<string>('')
   const dirtyRef = useRef(false)
+  const initializingRef = useRef(true)
   const fallbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // 実際の保存処理
@@ -49,6 +50,7 @@ export function useWorkHoursAutoSave(
   // store 変更 → dirty + fallback タイマーリセット
   useEffect(() => {
     const unsubscribe = useTimesheetStore.subscribe((state) => {
+      if (initializingRef.current) return
       const serialized = JSON.stringify(state.monthData)
       if (serialized === lastSavedRef.current) return
 
@@ -92,6 +94,7 @@ export function useWorkHoursAutoSave(
   const initializeLastSaved = useCallback((data: string) => {
     lastSavedRef.current = data
     dirtyRef.current = false
+    initializingRef.current = false
   }, [])
 
   return { initializeLastSaved, fetcherKey, flush }
