@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef } from 'react'
-import { useTimesheetStore } from '~/components/timesheet/store'
+import type { TimesheetStoreApi } from '~/components/timesheet/store'
 import { useStableFetcher } from '~/hooks/use-stable-fetcher'
 
 /**
@@ -15,6 +15,7 @@ import { useStableFetcher } from '~/hooks/use-stable-fetcher'
 export const AUTO_SAVE_FETCHER_KEY_PREFIX = 'auto-save-'
 
 export function useWorkHoursAutoSave(
+  store: TimesheetStoreApi,
   clientId: string,
   year: number,
   month: number,
@@ -24,13 +25,16 @@ export function useWorkHoursAutoSave(
   const lastSavedRef = useRef<string>('')
   const dirtyRef = useRef(false)
   const initializingRef = useRef(true)
+  const mountedRef = useRef(true)
+  const rafRef = useRef<number>(0)
   const fallbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // 実際の保存処理
   const flush = useCallback(() => {
+    if (!mountedRef.current) return
     if (!dirtyRef.current) return
 
-    const serialized = JSON.stringify(useTimesheetStore.getState().monthData)
+    const serialized = JSON.stringify(store.getState().monthData)
     if (serialized === lastSavedRef.current) {
       dirtyRef.current = false
       return
@@ -45,14 +49,13 @@ export function useWorkHoursAutoSave(
     formData.append('yearMonth', `${year}-${String(month).padStart(2, '0')}`)
     formData.append('monthData', serialized)
     fetcher.submit(formData, { method: 'POST' })
-  }, [clientId, year, month, fetcher.submit])
+  }, [store, clientId, year, month, fetcher.submit])
 
   // store 変更 → dirty + fallback タイマーリセット
   useEffect(() => {
-    const unsubscribe = useTimesheetStore.subscribe((state) => {
+    const unsubscribe = store.subscribe((state, prevState) => {
+      if (state.monthData === prevState.monthData) return
       if (initializingRef.current) return
-      const serialized = JSON.stringify(state.monthData)
-      if (serialized === lastSavedRef.current) return
 
       dirtyRef.current = true
 
@@ -65,17 +68,20 @@ export function useWorkHoursAutoSave(
       unsubscribe()
       if (fallbackTimerRef.current) clearTimeout(fallbackTimerRef.current)
     }
-  }, [flush])
+  }, [store, flush])
 
   // focusout で保存トリガー（セル間移動時）
   useEffect(() => {
     const handleFocusOut = () => {
       // 次の tick で保存（新しいフォーカス先が確定してから）
-      requestAnimationFrame(flush)
+      rafRef.current = requestAnimationFrame(flush)
     }
 
     document.addEventListener('focusout', handleFocusOut)
-    return () => document.removeEventListener('focusout', handleFocusOut)
+    return () => {
+      document.removeEventListener('focusout', handleFocusOut)
+      cancelAnimationFrame(rafRef.current)
+    }
   }, [flush])
 
   // beforeunload: 未保存データがあれば警告 + 保存試行
@@ -89,6 +95,13 @@ export function useWorkHoursAutoSave(
     window.addEventListener('beforeunload', handleBeforeUnload)
     return () => window.removeEventListener('beforeunload', handleBeforeUnload)
   }, [flush])
+
+  // アンマウント時にスコープ無効化
+  useEffect(() => {
+    return () => {
+      mountedRef.current = false
+    }
+  }, [])
 
   // 初期データを lastSavedRef に設定（マウント直後の無駄な保存を防ぐ）
   const initializeLastSaved = useCallback((data: string) => {

@@ -1,6 +1,6 @@
 import { FilterIcon } from 'lucide-react'
 import { Button } from '~/components/ui/button'
-import { useTimesheetStore } from './store'
+import { useTimesheetSelector, useTimesheetStoreApi } from './store'
 
 /**
  * 「稼働日だけ表示」フィルタトグルボタン。
@@ -8,13 +8,14 @@ import { useTimesheetStore } from './store'
  * 親コンポーネントの再レンダリングを引き起こさない。
  */
 export function FilterToggleButton() {
-  const showOnlyFilled = useTimesheetStore((s) => s.showOnlyFilled)
+  const store = useTimesheetStoreApi()
+  const showOnlyFilled = useTimesheetSelector((s) => s.showOnlyFilled)
 
   return (
     <Button
       variant={showOnlyFilled ? 'secondary' : 'ghost'}
       size="sm"
-      onClick={() => useTimesheetStore.getState().setShowOnlyFilled((v) => !v)}
+      onClick={() => store.getState().setShowOnlyFilled((v) => !v)}
       title="稼働日だけ表示"
       className="text-muted-foreground"
     >

@@ -3,12 +3,14 @@ export type { Clipboard, MonthData, TimesheetEntry } from './types'
 
 // Store
 export {
+  TimesheetProvider,
   useActivitiesForDate,
   useEntryField,
   useIsSelected,
-  useTimesheetStore,
+  useTimesheetSelector,
+  useTimesheetStoreApi,
 } from './store'
-export type { TimesheetState } from './store'
+export type { TimesheetState, TimesheetStoreApi } from './store'
 
 // Utils
 export {

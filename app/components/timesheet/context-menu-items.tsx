@@ -4,20 +4,21 @@ import {
   ContextMenuItem,
   ContextMenuSeparator,
 } from '~/components/ui/context-menu'
-import { useTimesheetStore } from './store'
+import { useTimesheetSelector, useTimesheetStoreApi } from './store'
 
 /**
  * タイムシートの右クリックメニュー内容。
  * store から直接 subscribe するので、親コンポーネントへの props 依存がない。
  */
 export function TimesheetContextMenuItems() {
-  const hasSelection = useTimesheetStore((s) => s.selectedDates.length > 0)
-  const hasClipboard = useTimesheetStore(
+  const store = useTimesheetStoreApi()
+  const hasSelection = useTimesheetSelector((s) => s.selectedDates.length > 0)
+  const hasClipboard = useTimesheetSelector(
     (s) => s.clipboard !== null && s.clipboard.length > 0,
   )
 
   const { copySelection, pasteToSelected, clearSelectedEntries } =
-    useTimesheetStore.getState()
+    store.getState()
 
   return (
     <ContextMenuContent>

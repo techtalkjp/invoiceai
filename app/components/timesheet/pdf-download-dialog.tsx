@@ -12,7 +12,7 @@ import {
 } from '~/components/ui/dialog'
 import { Input } from '~/components/ui/input'
 import { Label } from '~/components/ui/label'
-import { useTimesheetStore } from './store'
+import { useTimesheetStoreApi } from './store'
 import type { TimesheetPdfInfo } from './timesheet-pdf'
 import { downloadBlob, generateTimesheetPdf } from './timesheet-pdf'
 import { getHolidayName } from './utils'
@@ -30,6 +30,7 @@ export function TimesheetPdfDownloadDialog({
   monthDates,
   defaultInfo,
 }: TimesheetPdfDownloadDialogProps) {
+  const store = useTimesheetStoreApi()
   const [open, setOpen] = useState(false)
   const [pdfInfo, setPdfInfo] = useState<TimesheetPdfInfo>({
     organizationName: defaultInfo?.organizationName ?? '',
@@ -38,7 +39,7 @@ export function TimesheetPdfDownloadDialog({
   })
 
   const handleDownload = async () => {
-    const { monthData } = useTimesheetStore.getState()
+    const { monthData } = store.getState()
     const blob = await generateTimesheetPdf(
       year,
       month,

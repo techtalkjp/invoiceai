@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { timesheetEntrySchema } from '~/components/timesheet/schema'
-import { useTimesheetStore } from '~/components/timesheet/store'
+import type { TimesheetStoreApi } from '~/components/timesheet/store'
 import type { MonthData } from '~/components/timesheet/types'
 import type { ActivityRecord } from '~/lib/activity-sources/types'
 
@@ -14,13 +14,13 @@ const ACTIVITY_STORAGE_KEY = 'invoiceai-playground-activities'
  * useFetcher/clientAction を使わず直接 localStorage を操作することで、
  * React Router の revalidation や fetcher state 変更による再レンダリングを完全に回避する。
  */
-export function useAutoSave(monthKey: string) {
+export function useAutoSave(store: TimesheetStoreApi, monthKey: string) {
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const lastEntriesRef = useRef<string>('')
   const lastActivitiesRef = useRef<string>('')
 
   useEffect(() => {
-    const unsubscribe = useTimesheetStore.subscribe((state) => {
+    const unsubscribe = store.subscribe((state) => {
       const entries = JSON.stringify(state.monthData)
       const activities = JSON.stringify(state.activitiesByDate)
 
@@ -50,7 +50,7 @@ export function useAutoSave(monthKey: string) {
         clearTimeout(timeoutRef.current)
       }
     }
-  }, [monthKey])
+  }, [store, monthKey])
 }
 
 function saveMonthToStorage(monthKey: string, data: MonthData) {

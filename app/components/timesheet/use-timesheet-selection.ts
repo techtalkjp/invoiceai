@@ -1,5 +1,5 @@
 import { useCallback, useEffect } from 'react'
-import { useTimesheetStore } from './store'
+import { useTimesheetStoreApi } from './store'
 
 /**
  * タイムシートの選択操作を管理するフック。
@@ -9,6 +9,8 @@ import { useTimesheetStore } from './store'
  * - mouseUp ハンドラ（テーブル内用）
  */
 export function useTimesheetSelection() {
+  const store = useTimesheetStoreApi()
+
   // グローバルな mouseup/mousemove/touch イベント + 自動スクロール
   useEffect(() => {
     let scrollAnimationId: number | null = null
@@ -21,7 +23,7 @@ export function useTimesheetSelection() {
     }
 
     const handleGlobalMouseUp = () => {
-      useTimesheetStore.getState().setIsDragging(false)
+      store.getState().setIsDragging(false)
       cancelScroll()
     }
 
@@ -56,7 +58,7 @@ export function useTimesheetSelection() {
       if (closestRow) {
         const date = closestRow.dataset.date
         if (date) {
-          useTimesheetStore.getState().extendSelection(date)
+          store.getState().extendSelection(date)
         }
       }
     }
@@ -78,7 +80,7 @@ export function useTimesheetSelection() {
           scrolled = true
         }
 
-        if (scrolled && useTimesheetStore.getState().isDragging) {
+        if (scrolled && store.getState().isDragging) {
           updateSelectionFromY(y)
           scrollAnimationId = requestAnimationFrame(autoScroll)
         }
@@ -90,7 +92,7 @@ export function useTimesheetSelection() {
     }
 
     const handleGlobalMouseMove = (e: MouseEvent) => {
-      const { isDragging, dragStartDate } = useTimesheetStore.getState()
+      const { isDragging, dragStartDate } = store.getState()
       if (!isDragging || !dragStartDate) return
 
       startAutoScroll(e.clientY)
@@ -98,12 +100,12 @@ export function useTimesheetSelection() {
     }
 
     const handleGlobalTouchEnd = () => {
-      useTimesheetStore.getState().setIsDragging(false)
+      store.getState().setIsDragging(false)
       cancelScroll()
     }
 
     const handleGlobalTouchMove = (e: TouchEvent) => {
-      const { isDragging, dragStartDate } = useTimesheetStore.getState()
+      const { isDragging, dragStartDate } = store.getState()
       if (!isDragging || !dragStartDate) return
 
       const touch = e.touches[0]
@@ -127,20 +129,20 @@ export function useTimesheetSelection() {
       window.removeEventListener('touchmove', handleGlobalTouchMove)
       cancelScroll()
     }
-  }, [])
+  }, [store])
 
   // テーブル内の mouseUp ハンドラ
   const handleMouseUp = useCallback(() => {
-    useTimesheetStore.getState().setIsDragging(false)
-  }, [])
+    store.getState().setIsDragging(false)
+  }, [store])
 
   // テーブル外クリックで選択解除
   const handleClearSelection = useCallback(() => {
-    const { selectedDates, setSelectedDates } = useTimesheetStore.getState()
+    const { selectedDates, setSelectedDates } = store.getState()
     if (selectedDates.length > 0) {
       setSelectedDates([])
     }
-  }, [])
+  }, [store])
 
   return { handleMouseUp, handleClearSelection }
 }

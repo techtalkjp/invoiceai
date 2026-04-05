@@ -8,7 +8,7 @@ import {
   TimesheetTimeCell,
   TimesheetWorkCell,
 } from './cells'
-import { useIsHighlighted, useIsSelected, useTimesheetStore } from './store'
+import { useIsHighlighted, useIsSelected, useTimesheetStoreApi } from './store'
 import { GRID_COLS } from './table'
 import { DAY_LABELS, getHolidayName, isSaturday, isSunday } from './utils'
 
@@ -22,6 +22,7 @@ interface TimesheetRowProps {
 export const TimesheetRow = memo(function TimesheetRow({
   date,
 }: TimesheetRowProps) {
+  const store = useTimesheetStoreApi()
   // store から自分の選択・ハイライト状態のみ subscribe
   const selected = useIsSelected(date)
   const highlighted = useIsHighlighted(date)
@@ -38,7 +39,7 @@ export const TimesheetRow = memo(function TimesheetRow({
     ) {
       return
     }
-    const currentSelectedDates = useTimesheetStore.getState().selectedDates
+    const currentSelectedDates = store.getState().selectedDates
     if (e.button === 2 && currentSelectedDates.includes(date)) {
       return
     }
@@ -46,11 +47,11 @@ export const TimesheetRow = memo(function TimesheetRow({
       document.activeElement.blur()
     }
     e.preventDefault()
-    useTimesheetStore.getState().startSelection(date, e.shiftKey)
+    store.getState().startSelection(date, e.shiftKey)
   }
 
   const handleMouseEnter = () => {
-    useTimesheetStore.getState().extendSelection(date)
+    store.getState().extendSelection(date)
   }
 
   const handleTouchStart = (e: React.TouchEvent) => {
@@ -63,7 +64,7 @@ export const TimesheetRow = memo(function TimesheetRow({
       return
     }
     lastTouchStartTime = Date.now()
-    useTimesheetStore.getState().startSelection(date, false)
+    store.getState().startSelection(date, false)
   }
 
   const saturday = isSaturday(date)

@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useFetcher } from 'react-router'
 import { toast } from 'sonner'
 import { applyEntries } from '~/components/timesheet/apply-entries'
+import { useTimesheetStoreApi } from '~/components/timesheet/store'
 import { Collapsible, CollapsibleContent } from '~/components/ui/collapsible'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '~/components/ui/tabs'
 import type { ParsedWorkEntry } from '../+ai-parse.server'
@@ -31,6 +32,7 @@ export function ImportPanel({
   hasGitHubPat,
   mappings,
 }: ImportPanelProps) {
+  const store = useTimesheetStoreApi()
   const [inputText, setInputText] = useState('')
   const appliedRef = useRef(false)
 
@@ -69,6 +71,7 @@ export function ImportPanel({
 
     appliedRef.current = true
     applyEntries(
+      store,
       entries.map((e) => ({
         workDate: e.workDate,
         startTime: e.startTime ?? '',
@@ -80,7 +83,7 @@ export function ImportPanel({
     toast.success(`${entries.length}件を反映しました`)
     setInputText('')
     onOpenChange(false)
-  }, [parseFetcher.state, parseFetcher.data, onOpenChange])
+  }, [store, parseFetcher.state, parseFetcher.data, onOpenChange])
 
   const handleApplyGitHub = (
     entries: Array<{
@@ -92,7 +95,7 @@ export function ImportPanel({
     }>,
   ) => {
     if (entries.length === 0) return
-    applyEntries(entries)
+    applyEntries(store, entries)
     toast.success(`${entries.length}件を反映しました`)
     onOpenChange(false)
   }

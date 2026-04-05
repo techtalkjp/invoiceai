@@ -7,8 +7,9 @@ import {
   MonthTotalDisplay,
   TimesheetArea,
   TimesheetClearAllDialog,
+  TimesheetProvider,
   getMonthDates,
-  useTimesheetStore,
+  useTimesheetStoreApi,
 } from '~/components/timesheet'
 import { TimesheetPdfDownloadDialog } from '~/components/timesheet/pdf-download-dialog'
 import { Button } from '~/components/ui/button'
@@ -35,7 +36,15 @@ interface WorkHoursTimesheetProps {
   timezone?: string | undefined
 }
 
-export function WorkHoursTimesheet({
+export function WorkHoursTimesheet(props: WorkHoursTimesheetProps) {
+  return (
+    <TimesheetProvider>
+      <WorkHoursTimesheetInner {...props} />
+    </TimesheetProvider>
+  )
+}
+
+function WorkHoursTimesheetInner({
   clientId,
   clientEntry,
   year,
@@ -50,6 +59,7 @@ export function WorkHoursTimesheet({
   mappings,
   timezone,
 }: WorkHoursTimesheetProps) {
+  const store = useTimesheetStoreApi()
   const monthDates = useMemo(() => getMonthDates(year, month), [year, month])
   const [isImportOpen, setIsImportOpen] = useState(false)
 
@@ -58,23 +68,23 @@ export function WorkHoursTimesheet({
     initializeLastSaved,
     fetcherKey: saveFetcherKey,
     flush,
-  } = useWorkHoursAutoSave(clientId, year, month)
+  } = useWorkHoursAutoSave(store, clientId, year, month)
 
   // サーバーデータを store にセット（key prop で月変更時にリマウントされる）
   useState(() => {
-    const store = useTimesheetStore.getState()
+    const state = store.getState()
     const data = toMonthData(clientEntry.entries)
-    store.setMonthData(data)
-    store.setMonthDates(monthDates)
-    store.setActivitiesByDate(activitiesByDate ?? {})
+    state.setMonthData(data)
+    state.setMonthDates(monthDates)
+    state.setActivitiesByDate(activitiesByDate ?? {})
     initializeLastSaved(JSON.stringify(data))
   })
 
   // 全クリア
   const handleClearAll = useCallback(() => {
-    useTimesheetStore.getState().clearAllData()
+    store.getState().clearAllData()
     flush()
-  }, [flush])
+  }, [store, flush])
 
   return (
     <TimesheetArea monthDates={monthDates}>

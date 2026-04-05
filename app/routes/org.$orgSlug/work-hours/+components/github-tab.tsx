@@ -3,7 +3,7 @@ import { Loader2Icon, SettingsIcon } from 'lucide-react'
 import { useFetcher } from 'react-router'
 import { calculateWorkDuration } from '~/components/time/time-utils'
 import { EntryPreviewList } from '~/components/timesheet/entry-preview-list'
-import { useTimesheetStore } from '~/components/timesheet/store'
+import { useTimesheetStoreApi } from '~/components/timesheet/store'
 import { Button } from '~/components/ui/button'
 import { RepoMappingPanel } from '../$clientId/+components/repo-mapping-panel'
 import type { SuggestResult } from '../+work-entry-suggest.server'
@@ -35,6 +35,7 @@ export function GitHubTab({
   mappings,
   onApply,
 }: GitHubTabProps) {
+  const store = useTimesheetStoreApi()
   const fetcher = useFetcher<{
     suggestion?: SuggestResult | null | undefined
     noActivities?: boolean | undefined
@@ -86,7 +87,7 @@ export function GitHubTab({
     const totalM = totalWorkMinutes % 60
 
     // コンフリクト検出
-    const monthData = useTimesheetStore.getState().monthData
+    const monthData = store.getState().monthData
     const conflictCount = suggestion.entries.filter((e) => {
       const existing = monthData[e.workDate]
       return existing && (existing.startTime || existing.endTime)

@@ -8,7 +8,7 @@ import {
   PopoverContent,
 } from '~/components/ui/popover'
 import { cn } from '~/lib/utils'
-import { useEntryField, useTimesheetStore } from '../store'
+import { useEntryField, useTimesheetStoreApi } from '../store'
 import { navigateToCell } from '../utils'
 
 interface TimesheetTimeCellProps {
@@ -33,6 +33,7 @@ export const TimesheetTimeCell = memo(function TimesheetTimeCell({
   defaultValue = '09:00',
   nextCol,
 }: TimesheetTimeCellProps) {
+  const store = useTimesheetStoreApi()
   // 自分のフィールドのみ subscribe
   const value = useEntryField(date, field) ?? ''
   const startTime = useEntryField(date, 'startTime')
@@ -43,23 +44,22 @@ export const TimesheetTimeCell = memo(function TimesheetTimeCell({
   const handleChange = useCallback(
     (v: string) => {
       // 空→空の変更は store を汚さない（不要な保存を防止）
-      if (v === '' && !useTimesheetStore.getState().monthData[date]?.[field]) {
+      if (v === '' && !store.getState().monthData[date]?.[field]) {
         return
       }
-      useTimesheetStore.getState().updateEntry(date, field, v)
+      store.getState().updateEntry(date, field, v)
     },
-    [date, field],
+    [store, date, field],
   )
 
   const handlePickerSelect = useCallback(
     (v: string) => {
-      useTimesheetStore.getState().updateEntry(date, field, v)
+      store.getState().updateEntry(date, field, v)
       setOpen(false)
       // Picker 選択後、次のセルへフォーカス移動
       if (nextCol !== undefined) {
         const otherField = field === 'startTime' ? 'endTime' : 'startTime'
-        const otherValue =
-          useTimesheetStore.getState().monthData[date]?.[otherField]
+        const otherValue = store.getState().monthData[date]?.[otherField]
         if (!otherValue) {
           // 対になる時刻が未入力 → そのセルの input にフォーカス
           setTimeout(() => {
@@ -79,7 +79,7 @@ export const TimesheetTimeCell = memo(function TimesheetTimeCell({
         }
       }
     },
-    [date, field, nextCol],
+    [store, date, field, nextCol],
   )
 
   const handleFocus = useCallback(() => {
