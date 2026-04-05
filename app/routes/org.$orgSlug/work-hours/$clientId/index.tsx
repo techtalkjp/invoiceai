@@ -1,6 +1,5 @@
 import { parseWithZod } from '@conform-to/zod/v4'
 import { PageHeader } from '~/components/layout/page-header'
-import { getMonthDates } from '~/components/timesheet'
 import {
   deleteClientSourceMapping,
   getActivitiesByMonth,
@@ -16,7 +15,7 @@ import {
 } from '~/lib/activity-sources/types'
 import { requireOrgMember } from '~/lib/auth-helpers.server'
 import { daysInMonth } from '~/utils/date'
-import { getNowInTimezone } from '~/utils/month'
+import { getNowInTimezone, padMonth } from '~/utils/month'
 import { parseWorkHoursText } from '../+ai-parse.server'
 import { toServerEntries } from '../+components/data-mapping'
 import { WorkHoursTimesheet } from '../+components/work-hours-timesheet'
@@ -108,9 +107,9 @@ export async function loader({ request, params }: Route.LoaderArgs) {
         const config = source.config as { username?: string } | null
         const username = config?.username
         if (username) {
-          const startDate = `${year}-${String(month).padStart(2, '0')}-01`
+          const startDate = `${year}-${padMonth(month)}-01`
           const lastDay = daysInMonth(year, month)
-          const endDate = `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`
+          const endDate = `${year}-${padMonth(month)}-${String(lastDay).padStart(2, '0')}`
           const apiActivities = await fetchGitHubActivities(
             pat,
             username,
@@ -136,14 +135,11 @@ export async function loader({ request, params }: Route.LoaderArgs) {
     }
   }
 
-  const monthDates = getMonthDates(year, month)
-
   return {
     organization,
     user: { name: user.name },
     year,
     month,
-    monthDates,
     clientEntry,
     activitiesByDate,
     hasGitHubPat: !!source,
@@ -219,9 +215,9 @@ export async function action({ request, params }: Route.ActionArgs) {
       return { suggestion: null, noActivities: true }
     }
 
-    const startDate = `${year}-${String(month).padStart(2, '0')}-01`
+    const startDate = `${year}-${padMonth(month)}-01`
     const lastDay = daysInMonth(year, month)
-    const endDate = `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`
+    const endDate = `${year}-${padMonth(month)}-${String(lastDay).padStart(2, '0')}`
 
     const allActivities = await fetchGitHubActivities(
       pat,
