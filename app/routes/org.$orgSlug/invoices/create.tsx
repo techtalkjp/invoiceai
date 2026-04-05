@@ -1,5 +1,5 @@
-import { getFormProps, useForm } from '@conform-to/react'
-import { parseWithZod } from '@conform-to/zod/v4'
+import { parseSubmission, report } from '@conform-to/react/future'
+import { coerceFormValue, formatResult } from '@conform-to/zod/v4/future'
 import {
   getBillingDate,
   getPaymentDate,
@@ -36,6 +36,7 @@ import {
 } from '~/components/ui/select'
 import { requireOrgMember } from '~/lib/auth-helpers.server'
 import { db } from '~/lib/db/kysely'
+import { useForm } from '~/lib/form'
 import { getFreeeClientForOrganization } from '~/utils/freee.server'
 import {
   formatYearMonth,
@@ -141,14 +142,15 @@ export async function action({ request, params }: Route.ActionArgs) {
   const { orgSlug } = params
   const { organization } = await requireOrgMember(request, orgSlug)
 
-  const submission = parseWithZod(await request.formData(), {
-    schema: invoiceCreateSchema,
-  })
-  if (submission.status !== 'success') {
-    return { lastResult: submission.reply() }
-  }
+  const formData = await request.formData()
+  const submission = parseSubmission(formData)
+  const result = coerceFormValue(invoiceCreateSchema).safeParse(
+    submission.payload,
+  )
+  const error = formatResult(result)
+  if (!result.success) return { lastResult: report(submission, { error }) }
 
-  const input = submission.value
+  const input = result.data
 
   // クライアントを取得
   const client = await db
@@ -160,16 +162,16 @@ export async function action({ request, params }: Route.ActionArgs) {
 
   if (!client) {
     return {
-      lastResult: submission.reply({
-        formErrors: [`クライアント "${input.clientId}" が見つかりません`],
+      lastResult: report(submission, {
+        error: { formErrors: ['クライアントが見つかりません'] },
       }),
     }
   }
 
   if (!organization.freeeCompanyId) {
     return {
-      lastResult: submission.reply({
-        formErrors: ['freee 会社IDが設定されていません'],
+      lastResult: report(submission, {
+        error: { formErrors: ['freee 会社IDが設定されていません'] },
       }),
     }
   }
@@ -179,22 +181,24 @@ export async function action({ request, params }: Route.ActionArgs) {
   // billing type に応じたバリデーション
   if (client.billingType === 'time' && !client.hourlyRate) {
     return {
-      lastResult: submission.reply({
-        formErrors: ['クライアントの時間単価が設定されていません'],
+      lastResult: report(submission, {
+        error: { formErrors: ['クライアントの時間単価が設定されていません'] },
       }),
     }
   }
   if (client.billingType === 'fixed' && !client.monthlyFee) {
     return {
-      lastResult: submission.reply({
-        formErrors: ['クライアントの月額が設定されていません'],
+      lastResult: report(submission, {
+        error: { formErrors: ['クライアントの月額が設定されていません'] },
       }),
     }
   }
   if (!client.freeePartnerId) {
     return {
-      lastResult: submission.reply({
-        formErrors: ['クライアントの freee 取引先IDが設定されていません'],
+      lastResult: report(submission, {
+        error: {
+          formErrors: ['クライアントの freee 取引先IDが設定されていません'],
+        },
       }),
     }
   }
@@ -370,8 +374,8 @@ export async function action({ request, params }: Route.ActionArgs) {
     const message =
       error instanceof Error ? error.message : '請求書の処理に失敗しました'
     return {
-      lastResult: submission.reply({
-        formErrors: [message],
+      lastResult: report(submission, {
+        error: { formErrors: [message] },
       }),
     }
   }
@@ -393,7 +397,7 @@ export default function InvoiceCreate({
   const navigation = useNavigation()
   const isSubmitting = navigation.state === 'submitting'
   const isEditMode = existingInvoice != null
-  const [form, fields] = useForm({
+  const { form, fields } = useForm(invoiceCreateSchema, {
     lastResult:
       actionData && 'lastResult' in actionData
         ? actionData.lastResult
@@ -403,14 +407,11 @@ export default function InvoiceCreate({
       yearMonth: defaultYearMonth,
       freeeInvoiceId: existingInvoice?.freeeInvoiceId?.toString(),
     },
-    onValidate: ({ formData }) =>
-      parseWithZod(formData, { schema: invoiceCreateSchema }),
-    shouldRevalidate: 'onBlur',
   })
 
-  const selectedMonth = fields.yearMonth.value ?? defaultYearMonth
+  const selectedMonth = fields.yearMonth.defaultValue ?? defaultYearMonth
   const isPrevMonth = selectedMonth === prevMonthId
-  const selectedClientId = fields.clientId.value ?? defaultClientId
+  const selectedClientId = fields.clientId.defaultValue ?? defaultClientId
   const selectedClient = clients.find((c) => c.id === selectedClientId)
 
   if (clients.length === 0) {
@@ -462,7 +463,7 @@ export default function InvoiceCreate({
       <ContentPanel className="p-6">
         <Form
           method="post"
-          {...getFormProps(form)}
+          {...form.props}
           className="grid gap-4 md:grid-cols-2"
         >
           <div className="grid gap-2">
@@ -492,7 +493,7 @@ export default function InvoiceCreate({
               {fields.clientId.errors}
             </div>
             {selectedClient && (
-              <div className="text-muted-foreground text-sm">
+              <div className="text-muted-foreground text-sm tabular-nums">
                 {selectedClient.billingType === 'time'
                   ? `時間単価: ¥${selectedClient.hourlyRate?.toLocaleString() ?? '未設定'}/h`
                   : `月額: ¥${selectedClient.monthlyFee?.toLocaleString() ?? '未設定'}`}
@@ -624,7 +625,7 @@ export default function InvoiceCreate({
           {actionData.billingType === 'time' && (
             <p className="text-sm">稼働時間: {actionData.totalHours} 時間</p>
           )}
-          <p className="text-sm">
+          <p className="text-sm tabular-nums">
             金額: ¥{actionData.amount.toLocaleString()}（税抜）
           </p>
           {actionData.invoice && (

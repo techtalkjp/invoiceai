@@ -432,6 +432,16 @@ function AddExpenseDialog({
   const fetcher = useFetcherDialog('add-expense', open, onOpenChange)
   const labelRef = useRef<HTMLInputElement>(null)
   const [credentialJson, setCredentialJson] = useState('')
+  const [step, setStep] = useState<1 | 2>(1)
+  const [meteredName, setMeteredName] = useState('')
+
+  function handleOpenChange(v: boolean) {
+    if (!v) {
+      setStep(1)
+      setMeteredName('')
+    }
+    onOpenChange(v)
+  }
 
   function autoLabel() {
     const form = labelRef.current?.closest('form')
@@ -445,7 +455,7 @@ function AddExpenseDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>
@@ -454,7 +464,9 @@ function AddExpenseDialog({
           <DialogDescription>
             {mode === 'fixed'
               ? '毎月固定で発生する経費を登録します。'
-              : 'クラウドサービスの利用料を自動で取得します。'}
+              : step === 1
+                ? '名前を入力してください。'
+                : 'GCP Billing Export の接続設定を入力してください。'}
           </DialogDescription>
         </DialogHeader>
 
@@ -503,21 +515,43 @@ function AddExpenseDialog({
               </Button>
             </div>
           </fetcher.Form>
-        ) : (
-          <fetcher.Form method="post" className="space-y-4">
-            <input type="hidden" name="intent" value="createGroupWithItems" />
+        ) : mode === 'metered' && step === 1 ? (
+          <div className="space-y-4">
             <div>
               <Label htmlFor="add-name">名前</Label>
               <Input
                 id="add-name"
-                name="name"
-                placeholder={
-                  mode === 'fixed' ? 'サーバ通信費' : 'Gemini API利用料'
-                }
-                required
-                onBlur={autoLabel}
+                value={meteredName}
+                onChange={(e) => setMeteredName(e.target.value)}
+                placeholder="Gemini API利用料"
               />
             </div>
+            <Button
+              className="w-full"
+              disabled={!meteredName.trim()}
+              onClick={() => setStep(2)}
+            >
+              次へ
+            </Button>
+          </div>
+        ) : (
+          <fetcher.Form method="post" className="space-y-4">
+            <input type="hidden" name="intent" value="createGroupWithItems" />
+            {mode === 'metered' && (
+              <input type="hidden" name="name" value={meteredName} />
+            )}
+            {mode === 'fixed' && (
+              <div>
+                <Label htmlFor="add-name">名前</Label>
+                <Input
+                  id="add-name"
+                  name="name"
+                  placeholder="サーバ通信費"
+                  required
+                  onBlur={autoLabel}
+                />
+              </div>
+            )}
 
             {mode === 'fixed' ? (
               <div className="grid grid-cols-2 gap-3">
@@ -616,9 +650,20 @@ function AddExpenseDialog({
             <input type="hidden" name="sortOrder" value="0" />
             <input ref={labelRef} type="hidden" name="invoiceLabel" value="" />
 
-            <Button type="submit" className="w-full">
-              追加
-            </Button>
+            <div className="flex gap-2">
+              {mode === 'metered' && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setStep(1)}
+                >
+                  戻る
+                </Button>
+              )}
+              <Button type="submit" className="flex-1">
+                追加
+              </Button>
+            </div>
           </fetcher.Form>
         )}
       </DialogContent>

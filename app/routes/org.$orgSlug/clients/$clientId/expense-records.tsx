@@ -1,5 +1,10 @@
-import { ChevronDownIcon, ChevronRightIcon } from 'lucide-react'
+import {
+  ChevronDownIcon,
+  ChevronRightIcon,
+  ReceiptTextIcon,
+} from 'lucide-react'
 import { useMemo, useState } from 'react'
+import { Link } from 'react-router'
 import { ContentPanel } from '~/components/layout/content-panel'
 import { Badge } from '~/components/ui/badge'
 import { requireOrgAdmin } from '~/lib/auth-helpers.server'
@@ -120,6 +125,7 @@ function groupRecordsByGroupId(records: MonthData['records']) {
 
 export default function ExpenseRecords({
   loaderData: { months, groups },
+  params: { orgSlug, clientId },
 }: Route.ComponentProps) {
   const [expandedMonths, setExpandedMonths] = useState<Set<string>>(
     () => new Set(months.slice(0, 2).map((m) => m.yearMonth)),
@@ -155,6 +161,15 @@ export default function ExpenseRecords({
 
   return (
     <div className="grid gap-4">
+      <div className="flex justify-end">
+        <Link
+          to={`/org/${orgSlug}/invoices/create?clientId=${clientId}`}
+          className="text-muted-foreground hover:text-foreground flex items-center gap-1 text-sm transition-colors"
+        >
+          <ReceiptTextIcon className="size-4" />
+          請求書作成
+        </Link>
+      </div>
       <ContentPanel>
         <div className="space-y-6">
           {months.map((month) => {
