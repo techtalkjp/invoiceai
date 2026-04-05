@@ -1,3 +1,4 @@
+import { BigQuery } from '@google-cloud/bigquery'
 import { nanoid } from 'nanoid'
 import { z } from 'zod'
 import { decrypt, encrypt } from '~/lib/activity-sources/encryption.server'
@@ -123,17 +124,6 @@ export async function fetchGoogleCloudMonthlyCost(args: {
   if (!saJson) {
     throw new Error(
       'Google Cloud サービスアカウントが設定されていません。設定画面からJSONキーをアップロードしてください。',
-    )
-  }
-
-  // @google-cloud/bigquery を動的 import（パッケージ未インストール時のエラーを分かりやすく）
-  let BigQuery: typeof import('@google-cloud/bigquery').BigQuery
-  try {
-    const mod = await import('@google-cloud/bigquery')
-    BigQuery = mod.BigQuery
-  } catch {
-    throw new Error(
-      '@google-cloud/bigquery パッケージがインストールされていません。pnpm add @google-cloud/bigquery を実行してください。',
     )
   }
 
