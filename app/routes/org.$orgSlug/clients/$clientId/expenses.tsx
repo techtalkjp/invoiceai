@@ -14,7 +14,7 @@ import {
   Trash2Icon,
   UploadIcon,
 } from 'lucide-react'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useFetcher } from 'react-router'
 import { Badge } from '~/components/ui/badge'
 import { Button } from '~/components/ui/button'
@@ -79,10 +79,6 @@ function formatCurrency(amount: string | null, currency: string): string {
     return `$${n.toLocaleString(undefined, { minimumFractionDigits: 2 })}`
   return `${currency} ${amount}`
 }
-
-// ---------------------------------------------------------------------------
-// Loader & Action (unchanged logic, kept concise)
-// ---------------------------------------------------------------------------
 
 export async function loader({ request, params }: Route.LoaderArgs) {
   const { orgSlug, clientId } = params
@@ -198,10 +194,6 @@ export async function action({ request, params }: Route.ActionArgs) {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Shared hooks
-// ---------------------------------------------------------------------------
-
 function useFetcherDialog(
   key: string,
   open: boolean,
@@ -213,10 +205,6 @@ function useFetcherDialog(
   }, [fetcher.state, fetcher.data, open, onOpenChange])
   return fetcher
 }
-
-// ---------------------------------------------------------------------------
-// Expense Object Card
-// ---------------------------------------------------------------------------
 
 function ExpenseCard({
   group,
@@ -253,6 +241,9 @@ function ExpenseCard({
   const [expanded, setExpanded] = useState(false)
   const hasBreakdown = items.length > 1
   const singleItem = items.length === 1 ? items[0] : null
+  const singleItemConfig = singleItem
+    ? safeParseJson(singleItem.providerConfig)
+    : undefined
   const totalAmount = items.reduce(
     (sum, i) => sum + Number(i.monthlyAmount ?? 0),
     0,
@@ -390,17 +381,12 @@ function ExpenseCard({
       {singleItem && singleItem.type === 'metered' && singleItem.provider && (
         <div className="text-muted-foreground border-t px-4 py-2 text-xs">
           {singleItem.provider === 'google_cloud' ? 'GCP' : singleItem.provider}
-          {safeParseJson(singleItem.providerConfig)?.projectId &&
-            ` · ${safeParseJson(singleItem.providerConfig)?.projectId}`}
+          {singleItemConfig?.projectId && ` · ${singleItemConfig.projectId}`}
         </div>
       )}
     </div>
   )
 }
-
-// ---------------------------------------------------------------------------
-// Empty State
-// ---------------------------------------------------------------------------
 
 function EmptyState({
   onAddFixed,
@@ -431,10 +417,6 @@ function EmptyState({
     </div>
   )
 }
-
-// ---------------------------------------------------------------------------
-// Add Expense Dialog (simple: name + amount + currency)
-// ---------------------------------------------------------------------------
 
 function AddExpenseDialog({
   open,
@@ -644,10 +626,6 @@ function AddExpenseDialog({
   )
 }
 
-// ---------------------------------------------------------------------------
-// Edit Expense Dialog
-// ---------------------------------------------------------------------------
-
 function EditExpenseDialog({
   group,
   open,
@@ -732,10 +710,6 @@ function EditExpenseDialog({
   )
 }
 
-// ---------------------------------------------------------------------------
-// Add Breakdown Dialog
-// ---------------------------------------------------------------------------
-
 function AddBreakdownDialog({
   group,
   open,
@@ -781,12 +755,8 @@ function AddBreakdownDialog({
   )
 }
 
-// ---------------------------------------------------------------------------
-// Delete Confirmation
-// ---------------------------------------------------------------------------
-
 function useDeleteAction() {
-  const fetcher = useFetcher({ key: `delete-${Date.now()}` })
+  const fetcher = useFetcher({ key: 'delete-expense' })
 
   function deleteGroup(groupId: string) {
     if (!confirm('この経費を削除しますか？配下の内訳もすべて削除されます。'))
@@ -808,10 +778,6 @@ function useDeleteAction() {
   return { deleteGroup, deleteItem }
 }
 
-// ---------------------------------------------------------------------------
-// Main Component
-// ---------------------------------------------------------------------------
-
 export default function ExpenseSettings({
   loaderData: { groups, items, hasGcpCredential },
 }: Route.ComponentProps) {
@@ -821,9 +787,21 @@ export default function ExpenseSettings({
   const [editingItemId, setEditingItemId] = useState<string | null>(null)
   const { deleteGroup, deleteItem } = useDeleteAction()
 
+  const itemsByGroup = useMemo(() => {
+    const map = new Map<string | null, typeof items>()
+    for (const item of items) {
+      const key = item.groupId
+      const arr = map.get(key) ?? []
+      arr.push(item)
+      map.set(key, arr)
+    }
+    return map
+  }, [items])
+
   const hasExpenses = groups.length > 0
   const editingGroup = groups.find((g) => g.id === editingGroupId)
   const breakdownGroup = groups.find((g) => g.id === breakdownGroupId)
+  const editingItem = items.find((i) => i.id === editingItemId) ?? null
 
   return (
     <div className="space-y-4">
@@ -831,7 +809,7 @@ export default function ExpenseSettings({
         <>
           <div className="space-y-3">
             {groups.map((group) => {
-              const groupItems = items.filter((i) => i.groupId === group.id)
+              const groupItems = itemsByGroup.get(group.id) ?? []
               return (
                 <ExpenseCard
                   key={group.id}
@@ -903,25 +881,16 @@ export default function ExpenseSettings({
         />
       )}
 
-      {editingItemId &&
-        (() => {
-          const item = items.find((i) => i.id === editingItemId)
-          if (!item) return null
-          return (
-            <EditItemDialog
-              item={item}
-              open={!!editingItemId}
-              onOpenChange={(open) => !open && setEditingItemId(null)}
-            />
-          )
-        })()}
+      {editingItem && (
+        <EditItemDialog
+          item={editingItem}
+          open={!!editingItemId}
+          onOpenChange={(open) => !open && setEditingItemId(null)}
+        />
+      )}
     </div>
   )
 }
-
-// ---------------------------------------------------------------------------
-// Edit Item Dialog (for breakdown items)
-// ---------------------------------------------------------------------------
 
 function EditItemDialog({
   item,
