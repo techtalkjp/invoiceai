@@ -89,6 +89,23 @@ export async function upsertExpenseItem(
   const now = nowISO()
   const id = input.id ?? nanoid()
 
+  // グループ内通貨不一致チェック
+  if (input.groupId) {
+    const group = await db
+      .selectFrom('expenseGroup')
+      .select('currency')
+      .where('id', '=', input.groupId)
+      .where('organizationId', '=', organizationId)
+      .where('clientId', '=', clientId)
+      .executeTakeFirst()
+
+    if (group && group.currency !== input.currency) {
+      throw new Error(
+        `通貨が一致しません: グループは ${group.currency} ですが、項目は ${input.currency} です`,
+      )
+    }
+  }
+
   if (input.id) {
     await db
       .updateTable('expenseItem')

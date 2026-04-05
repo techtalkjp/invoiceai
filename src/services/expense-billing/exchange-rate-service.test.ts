@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { getExchangeRate } from './exchange-rate-service'
 
 // fetchBojRate is private, so we test the BOJ API response parsing logic directly
 describe('BOJ API response parsing', () => {
@@ -55,12 +56,15 @@ describe('BOJ API response parsing', () => {
 })
 
 describe('JPY handling', () => {
-  it('returns rate 1 for JPY currency', () => {
-    // JPY doesn't need exchange rate conversion
-    const currency = 'JPY'
-    const isJpy = currency === 'JPY'
+  it('returns rate 1 for JPY currency via getExchangeRate', async () => {
+    // JPY doesn't hit the DB, so no mock needed
+    const result = await getExchangeRate('any-org-id', '2026-03', 'JPY')
 
-    expect(isJpy).toBe(true)
-    // In the actual service, this returns { rate: '1', source: 'system' }
+    expect(result).toEqual({
+      rate: '1',
+      rateDate: '2026-03-01',
+      source: 'system',
+      isManual: false,
+    })
   })
 })

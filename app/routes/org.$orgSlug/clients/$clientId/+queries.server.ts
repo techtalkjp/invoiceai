@@ -28,10 +28,30 @@ export function getExpenseRecordsByMonth(
   return db
     .selectFrom('expenseRecord')
     .innerJoin('expenseItem', 'expenseItem.id', 'expenseRecord.expenseItemId')
+    .leftJoin('invoiceLine', 'invoiceLine.expenseRecordId', 'expenseRecord.id')
     .selectAll('expenseRecord')
-    .select(['expenseItem.name as itemName', 'expenseItem.groupId'])
+    .select([
+      'expenseItem.name as itemName',
+      'expenseItem.groupId',
+      db.fn.max('invoiceLine.id').as('billedLineId'),
+    ])
     .where('expenseItem.organizationId', '=', organizationId)
     .where('expenseItem.clientId', '=', clientId)
     .where('expenseRecord.yearMonth', '=', yearMonth)
+    .groupBy('expenseRecord.id')
     .execute()
+}
+
+export function getExchangeRateForMonth(
+  organizationId: string,
+  yearMonth: string,
+  currencyPair: string,
+) {
+  return db
+    .selectFrom('exchangeRate')
+    .selectAll()
+    .where('organizationId', '=', organizationId)
+    .where('yearMonth', '=', yearMonth)
+    .where('currencyPair', '=', currencyPair)
+    .executeTakeFirst()
 }

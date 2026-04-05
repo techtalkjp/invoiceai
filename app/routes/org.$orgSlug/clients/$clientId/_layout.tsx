@@ -29,6 +29,7 @@ export async function loader({ request, params }: Route.LoaderArgs) {
 const tabs = [
   { label: '基本設定', path: '' },
   { label: '経費項目', path: '/expenses' },
+  { label: '経費実績', path: '/expense-records' },
 ] as const
 
 export default function ClientDetailLayout({
