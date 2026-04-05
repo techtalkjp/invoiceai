@@ -5,17 +5,37 @@ import {
   hasProviderCredential,
   saveProviderCredential,
 } from '@shared/services/expense-billing/metered-provider'
-import { PencilIcon, PlusIcon, TrashIcon } from 'lucide-react'
-import { nanoid } from 'nanoid'
+import {
+  ChevronDownIcon,
+  CloudIcon,
+  MoreHorizontalIcon,
+  PlusIcon,
+  ServerIcon,
+  Trash2Icon,
+  UploadIcon,
+} from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
-import { Form, useFetcher } from 'react-router'
+import { useFetcher } from 'react-router'
+import { Badge } from '~/components/ui/badge'
 import { Button } from '~/components/ui/button'
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from '~/components/ui/collapsible'
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from '~/components/ui/dialog'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '~/components/ui/dropdown-menu'
 import { Input } from '~/components/ui/input'
 import { Label } from '~/components/ui/label'
 import {
@@ -26,7 +46,6 @@ import {
   SelectValue,
 } from '~/components/ui/select'
 import { requireOrgAdmin } from '~/lib/auth-helpers.server'
-import { useForm } from '~/lib/form'
 import {
   deleteExpenseGroup,
   deleteExpenseItem,
@@ -34,11 +53,7 @@ import {
   upsertExpenseItem,
 } from './+mutations.server'
 import { getExpenseGroups, getExpenseItems } from './+queries.server'
-import {
-  createGroupWithItemsSchema,
-  expenseFormSchema,
-  upsertItemSchema,
-} from './+schema'
+import { expenseFormSchema } from './+schema'
 import type { Route } from './+types/expenses'
 
 function safeParseJson(str: string | null): Record<string, string> | undefined {
@@ -50,36 +65,48 @@ function safeParseJson(str: string | null): Record<string, string> | undefined {
   }
 }
 
+function buildInvoiceLabel(name: string, currency: string): string {
+  if (currency === 'JPY') return `${name} {year}年{month}月`
+  const c = currency === 'USD' ? 'ドル' : currency
+  return `${name} {year}年{month}月 (月{amount_foreign}${c}:${c}円{rate}円換算)`
+}
+
+function formatCurrency(amount: string | null, currency: string): string {
+  if (!amount) return '—'
+  const n = Number(amount)
+  if (currency === 'JPY') return `¥${n.toLocaleString()}`
+  if (currency === 'USD')
+    return `$${n.toLocaleString(undefined, { minimumFractionDigits: 2 })}`
+  return `${currency} ${amount}`
+}
+
+// ---------------------------------------------------------------------------
+// Loader & Action (unchanged logic, kept concise)
+// ---------------------------------------------------------------------------
+
 export async function loader({ request, params }: Route.LoaderArgs) {
   const { orgSlug, clientId } = params
   const { organization } = await requireOrgAdmin(request, orgSlug)
-
   const [groups, items, hasGcpCredential] = await Promise.all([
     getExpenseGroups(organization.id, clientId),
     getExpenseItems(organization.id, clientId),
     hasProviderCredential(organization.id, 'google_cloud_billing'),
   ])
-
   return { groups, items, organizationId: organization.id, hasGcpCredential }
 }
 
 export async function action({ request, params }: Route.ActionArgs) {
   const { orgSlug, clientId } = params
   const { organization } = await requireOrgAdmin(request, orgSlug)
-
   const formData = await request.formData()
   const submission = parseSubmission(formData)
   const result = coerceFormValue(expenseFormSchema).safeParse(
     submission.payload,
   )
   const error = formatResult(result)
-
-  if (!result.success) {
-    return { lastResult: report(submission, { error }) }
-  }
+  if (!result.success) return { lastResult: report(submission, { error }) }
 
   const data = result.data
-
   switch (data.intent) {
     case 'createGroupWithItems': {
       const groupId = await upsertExpenseGroup(organization.id, clientId, {
@@ -94,7 +121,7 @@ export async function action({ request, params }: Route.ActionArgs) {
         if (!item) continue
         await upsertExpenseItem(organization.id, clientId, {
           groupId,
-          name: item.name,
+          name: item.name === '__inherit__' ? data.name : item.name,
           type: item.type,
           currency: data.currency,
           monthlyAmount: item.monthlyAmount,
@@ -121,8 +148,6 @@ export async function action({ request, params }: Route.ActionArgs) {
     case 'upsertItem': {
       const groupId =
         data.groupId && data.groupId !== '__none__' ? data.groupId : null
-
-      // metered の場合、formData から provider config を組み立て
       let providerConfig: string | undefined
       if (data.type === 'metered') {
         const bqProject = formData.get('__bqProject')
@@ -140,7 +165,6 @@ export async function action({ request, params }: Route.ActionArgs) {
           })
         }
       }
-
       await upsertExpenseItem(organization.id, clientId, {
         id: data.itemId || undefined,
         groupId,
@@ -174,13 +198,9 @@ export async function action({ request, params }: Route.ActionArgs) {
   }
 }
 
-function buildInvoiceLabel(name: string, currency: string): string {
-  if (currency === 'JPY') {
-    return `${name} {year}年{month}月`
-  }
-  const currLabel = currency === 'USD' ? 'ドル' : currency
-  return `${name} {year}年{month}月 (月{amount_foreign}${currLabel}:${currLabel}円{rate}円換算)`
-}
+// ---------------------------------------------------------------------------
+// Shared hooks
+// ---------------------------------------------------------------------------
 
 function useFetcherDialog(
   key: string,
@@ -189,52 +209,249 @@ function useFetcherDialog(
 ) {
   const fetcher = useFetcher({ key })
   useEffect(() => {
-    if (fetcher.state === 'idle' && fetcher.data && open) {
-      onOpenChange(false)
-    }
+    if (fetcher.state === 'idle' && fetcher.data && open) onOpenChange(false)
   }, [fetcher.state, fetcher.data, open, onOpenChange])
   return fetcher
 }
 
-function DeleteButton({
-  intent,
-  idName,
-  idValue,
-  iconSize = 'size-4',
+// ---------------------------------------------------------------------------
+// Expense Object Card
+// ---------------------------------------------------------------------------
+
+function ExpenseCard({
+  group,
+  items,
+  onEdit,
+  onDelete,
+  onAddBreakdown,
+  onEditItem,
+  onDeleteItem,
 }: {
-  intent: string
-  idName: string
-  idValue: string
-  iconSize?: string | undefined
+  group: {
+    id: string
+    name: string
+    currency: string
+    taxRate: number
+    invoiceLabel: string
+    sortOrder: number
+  }
+  items: Array<{
+    id: string
+    name: string
+    type: string
+    currency: string
+    monthlyAmount: string | null
+    provider: string | null
+    providerConfig: string | null
+  }>
+  onEdit: () => void
+  onDelete: () => void
+  onAddBreakdown: () => void
+  onEditItem: (id: string) => void
+  onDeleteItem: (id: string) => void
 }) {
-  const fetcher = useFetcher({ key: `${intent}-${idValue}` })
+  const [expanded, setExpanded] = useState(false)
+  const hasBreakdown = items.length > 1
+  const singleItem = items.length === 1 ? items[0] : null
+  const totalAmount = items.reduce(
+    (sum, i) => sum + Number(i.monthlyAmount ?? 0),
+    0,
+  )
+  const isMetered = items.some((i) => i.type === 'metered')
+
   return (
-    <fetcher.Form method="post">
-      <input type="hidden" name="intent" value={intent} />
-      <input type="hidden" name={idName} value={idValue} />
-      <Button variant="ghost" size="icon" type="submit">
-        <TrashIcon className={iconSize} />
-      </Button>
-    </fetcher.Form>
+    <div className="group bg-card rounded-lg border transition-shadow hover:shadow-sm">
+      <div className="flex items-start justify-between p-4">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <div className="bg-muted flex size-8 shrink-0 items-center justify-center rounded-md">
+              {isMetered ? (
+                <CloudIcon className="text-muted-foreground size-4" />
+              ) : (
+                <ServerIcon className="text-muted-foreground size-4" />
+              )}
+            </div>
+            <div className="min-w-0">
+              <h3 className="truncate leading-tight font-medium">
+                {group.name}
+              </h3>
+              <div className="text-muted-foreground mt-0.5 flex items-center gap-1.5 text-xs">
+                <span>{group.currency}</span>
+                <span>·</span>
+                <span>税率 {group.taxRate}%</span>
+                {hasBreakdown && (
+                  <>
+                    <span>·</span>
+                    <span>{items.length}項目</span>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <div className="text-right">
+            {isMetered ? (
+              <Badge variant="secondary" className="text-xs font-normal">
+                自動取得
+              </Badge>
+            ) : (
+              <span className="text-lg font-semibold tabular-nums">
+                {formatCurrency(String(totalAmount), group.currency)}
+              </span>
+            )}
+            {!isMetered && (
+              <div className="text-muted-foreground text-xs">/月</div>
+            )}
+          </div>
+
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="size-8 opacity-0 transition-opacity group-hover:opacity-100"
+              >
+                <MoreHorizontalIcon className="size-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={onEdit}>編集</DropdownMenuItem>
+              {!hasBreakdown && (
+                <DropdownMenuItem onClick={onAddBreakdown}>
+                  内訳を追加
+                </DropdownMenuItem>
+              )}
+              <DropdownMenuItem className="text-destructive" onClick={onDelete}>
+                削除
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      </div>
+
+      {hasBreakdown && (
+        <Collapsible open={expanded} onOpenChange={setExpanded}>
+          <CollapsibleTrigger className="text-muted-foreground hover:bg-muted/50 flex w-full items-center gap-1 border-t px-4 py-2 text-xs transition-colors">
+            <ChevronDownIcon
+              className={`size-3 transition-transform ${expanded ? '' : '-rotate-90'}`}
+            />
+            内訳を{expanded ? '閉じる' : '見る'}
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+            <div className="space-y-1 px-4 pb-3">
+              {items.map((item) => (
+                <div
+                  key={item.id}
+                  className="group/item hover:bg-muted/50 flex items-center justify-between rounded px-2 py-1 text-sm"
+                >
+                  <span className="text-muted-foreground">{item.name}</span>
+                  <div className="flex items-center gap-2">
+                    <span className="tabular-nums">
+                      {item.type === 'metered'
+                        ? '自動取得'
+                        : formatCurrency(item.monthlyAmount, item.currency)}
+                    </span>
+                    <div className="flex gap-0.5 opacity-0 transition-opacity group-hover/item:opacity-100">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="size-6"
+                        onClick={() => onEditItem(item.id)}
+                      >
+                        <MoreHorizontalIcon className="size-3" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="text-destructive size-6"
+                        onClick={() => onDeleteItem(item.id)}
+                      >
+                        <Trash2Icon className="size-3" />
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+              <button
+                type="button"
+                className="text-muted-foreground hover:border-primary hover:text-primary mt-1 flex w-full items-center justify-center gap-1 rounded border border-dashed py-1.5 text-xs transition-colors"
+                onClick={onAddBreakdown}
+              >
+                <PlusIcon className="size-3" />
+                内訳を追加
+              </button>
+            </div>
+          </CollapsibleContent>
+        </Collapsible>
+      )}
+
+      {singleItem && singleItem.type === 'metered' && singleItem.provider && (
+        <div className="text-muted-foreground border-t px-4 py-2 text-xs">
+          {singleItem.provider === 'google_cloud' ? 'GCP' : singleItem.provider}
+          {safeParseJson(singleItem.providerConfig)?.projectId &&
+            ` · ${safeParseJson(singleItem.providerConfig)?.projectId}`}
+        </div>
+      )}
+    </div>
   )
 }
 
-function GroupFormFields({
-  defaultValue,
-}: {
-  defaultValue?:
-    | {
-        name?: string | undefined
-        invoiceLabel?: string | undefined
-        currency?: string | undefined
-        taxRate?: number | undefined
-        sortOrder?: number | undefined
-      }
-    | undefined
-}) {
-  const labelRef = useRef<HTMLInputElement>(null)
+// ---------------------------------------------------------------------------
+// Empty State
+// ---------------------------------------------------------------------------
 
-  function updateLabel() {
+function EmptyState({
+  onAddFixed,
+  onAddMetered,
+}: {
+  onAddFixed: () => void
+  onAddMetered: () => void
+}) {
+  return (
+    <div className="flex flex-col items-center rounded-lg border border-dashed px-6 py-12 text-center">
+      <div className="bg-muted flex size-12 items-center justify-center rounded-full">
+        <ServerIcon className="text-muted-foreground size-6" />
+      </div>
+      <h3 className="mt-4 font-medium">経費はまだ登録されていません</h3>
+      <p className="text-muted-foreground mt-1 max-w-sm text-sm">
+        毎月の固定費やクラウドサービスの利用料を登録すると、請求書に自動で反映されます。
+      </p>
+      <div className="mt-6 flex gap-3">
+        <Button onClick={onAddFixed}>
+          <PlusIcon className="size-4" />
+          固定費を追加
+        </Button>
+        <Button variant="outline" onClick={onAddMetered}>
+          <CloudIcon className="size-4" />
+          利用料を自動取得
+        </Button>
+      </div>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Add Expense Dialog (simple: name + amount + currency)
+// ---------------------------------------------------------------------------
+
+function AddExpenseDialog({
+  open,
+  onOpenChange,
+  mode,
+  hasGcpCredential,
+}: {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  mode: 'fixed' | 'metered'
+  hasGcpCredential: boolean
+}) {
+  const fetcher = useFetcherDialog('add-expense', open, onOpenChange)
+  const labelRef = useRef<HTMLInputElement>(null)
+  const [credentialJson, setCredentialJson] = useState('')
+
+  function autoLabel() {
     const form = labelRef.current?.closest('form')
     if (!form) return
     const name = (form.elements.namedItem('name') as HTMLInputElement)?.value
@@ -246,82 +463,192 @@ function GroupFormFields({
   }
 
   return (
-    <>
-      <div className="grid grid-cols-2 gap-3">
-        <div>
-          <Label htmlFor="group-name">グループ名</Label>
-          <Input
-            id="group-name"
-            name="name"
-            defaultValue={defaultValue?.name}
-            placeholder="サーバ通信費"
-            required
-            onBlur={updateLabel}
-          />
-        </div>
-        <div>
-          <Label htmlFor="group-currency">通貨</Label>
-          <Select
-            name="currency"
-            defaultValue={defaultValue?.currency ?? 'USD'}
-            onValueChange={() => setTimeout(updateLabel, 0)}
-          >
-            <SelectTrigger id="group-currency">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="USD">USD</SelectItem>
-              <SelectItem value="JPY">JPY</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
-      <div>
-        <Label htmlFor="group-label">請求書テンプレート</Label>
-        <Input
-          ref={labelRef}
-          id="group-label"
-          name="invoiceLabel"
-          defaultValue={defaultValue?.invoiceLabel}
-          placeholder="自動生成されます"
-          required
-        />
-        <p className="text-muted-foreground mt-1 text-xs">
-          グループ名と通貨を入力すると自動生成。手動編集も可。
-        </p>
-      </div>
-      <div className="grid grid-cols-2 gap-3">
-        <div>
-          <Label htmlFor="group-tax">税率</Label>
-          <Select
-            name="taxRate"
-            defaultValue={String(defaultValue?.taxRate ?? 10)}
-          >
-            <SelectTrigger id="group-tax">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="10">10%（課税）</SelectItem>
-              <SelectItem value="8">8%（軽減税率）</SelectItem>
-              <SelectItem value="0">0%（非課税）</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        <div>
-          <Label htmlFor="group-sort">表示順</Label>
-          <Input
-            id="group-sort"
-            name="sortOrder"
-            type="number"
-            defaultValue={defaultValue?.sortOrder ?? 0}
-          />
-        </div>
-      </div>
-    </>
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>
+            {mode === 'fixed' ? '固定費を追加' : '利用料の自動取得'}
+          </DialogTitle>
+          <DialogDescription>
+            {mode === 'fixed'
+              ? '毎月固定で発生する経費を登録します。'
+              : 'クラウドサービスの利用料を自動で取得します。'}
+          </DialogDescription>
+        </DialogHeader>
+
+        {mode === 'metered' && !hasGcpCredential ? (
+          <fetcher.Form method="post" className="space-y-4">
+            <input type="hidden" name="intent" value="saveCredential" />
+            <input type="hidden" name="provider" value="google_cloud_billing" />
+            <div className="bg-muted/50 rounded-md p-4">
+              <p className="text-sm font-medium">
+                GCP サービスアカウントの設定
+              </p>
+              <p className="text-muted-foreground mt-1 text-xs">
+                BigQuery Billing Export の読み取りに必要です。
+              </p>
+            </div>
+            <div>
+              <Label>サービスアカウント JSON</Label>
+              <textarea
+                name="credentialsJson"
+                value={credentialJson}
+                onChange={(e) => setCredentialJson(e.target.value)}
+                className="border-input bg-background mt-1 h-28 w-full rounded-md border px-3 py-2 font-mono text-xs"
+                placeholder="JSON キーをペースト"
+              />
+            </div>
+            <div className="flex gap-2">
+              <Button type="submit" disabled={!credentialJson.trim()}>
+                設定して続ける
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  const input = document.createElement('input')
+                  input.type = 'file'
+                  input.accept = '.json'
+                  input.onchange = async (e) => {
+                    const file = (e.target as HTMLInputElement).files?.[0]
+                    if (file) setCredentialJson(await file.text())
+                  }
+                  input.click()
+                }}
+              >
+                <UploadIcon className="size-4" />
+                ファイル
+              </Button>
+            </div>
+          </fetcher.Form>
+        ) : (
+          <fetcher.Form method="post" className="space-y-4">
+            <input type="hidden" name="intent" value="createGroupWithItems" />
+            <div>
+              <Label htmlFor="add-name">名前</Label>
+              <Input
+                id="add-name"
+                name="name"
+                placeholder={
+                  mode === 'fixed' ? 'サーバ通信費' : 'Gemini API利用料'
+                }
+                required
+                onBlur={autoLabel}
+              />
+            </div>
+
+            {mode === 'fixed' ? (
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label htmlFor="add-amount">月額</Label>
+                  <Input
+                    id="add-amount"
+                    name="items[0].monthlyAmount"
+                    placeholder="45.00"
+                    required
+                  />
+                  <input
+                    type="hidden"
+                    name="items[0].name"
+                    value="__inherit__"
+                  />
+                  <input type="hidden" name="items[0].type" value="fixed" />
+                </div>
+                <div>
+                  <Label>通貨</Label>
+                  <Select
+                    name="currency"
+                    defaultValue="USD"
+                    onValueChange={() => setTimeout(autoLabel, 0)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="USD">USD</SelectItem>
+                      <SelectItem value="JPY">JPY</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            ) : (
+              <>
+                <input type="hidden" name="currency" value="JPY" />
+                <input type="hidden" name="items[0].name" value="__inherit__" />
+                <input type="hidden" name="items[0].type" value="metered" />
+                <div className="bg-muted/50 space-y-3 rounded-md p-3">
+                  <p className="text-muted-foreground text-xs font-medium">
+                    GCP Billing Export 設定
+                  </p>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <Label className="text-xs">BigQuery プロジェクト</Label>
+                      <Input
+                        name="__bqProject"
+                        placeholder="techtalk-380714"
+                        className="h-8 text-xs"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-xs">データセット</Label>
+                      <Input
+                        name="__bqDataset"
+                        placeholder="techtalk"
+                        className="h-8 text-xs"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <Label className="text-xs">テーブル名</Label>
+                    <Input
+                      name="__bqTable"
+                      placeholder="gcp_billing_export_v1_..."
+                      className="h-8 text-xs"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <Label className="text-xs">GCP プロジェクトID</Label>
+                      <Input
+                        name="__gcpProjectId"
+                        placeholder="dailove-search"
+                        className="h-8 text-xs"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-xs">
+                        サービスフィルタ（任意）
+                      </Label>
+                      <Input
+                        name="__serviceFilter"
+                        placeholder="Cloud AI API"
+                        className="h-8 text-xs"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
+
+            <input type="hidden" name="taxRate" value="10" />
+            <input type="hidden" name="sortOrder" value="0" />
+            <input ref={labelRef} type="hidden" name="invoiceLabel" value="" />
+
+            <Button type="submit" className="w-full">
+              追加
+            </Button>
+          </fetcher.Form>
+        )}
+      </DialogContent>
+    </Dialog>
   )
 }
 
-function EditGroupDialog({
+// ---------------------------------------------------------------------------
+// Edit Expense Dialog
+// ---------------------------------------------------------------------------
+
+function EditExpenseDialog({
   group,
   open,
   onOpenChange,
@@ -337,19 +664,66 @@ function EditGroupDialog({
   open: boolean
   onOpenChange: (open: boolean) => void
 }) {
-  const fetcher = useFetcherDialog(`edit-group-${group.id}`, open, onOpenChange)
+  const fetcher = useFetcherDialog(
+    `edit-expense-${group.id}`,
+    open,
+    onOpenChange,
+  )
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>グループ編集</DialogTitle>
+          <DialogTitle>経費を編集</DialogTitle>
         </DialogHeader>
-        <fetcher.Form method="post" className="space-y-3">
+        <fetcher.Form method="post" className="space-y-4">
           <input type="hidden" name="intent" value="upsertGroup" />
           <input type="hidden" name="groupId" value={group.id} />
-          <GroupFormFields defaultValue={group} />
-          <Button type="submit" size="sm">
+          <div>
+            <Label>名前</Label>
+            <Input name="name" defaultValue={group.name} required />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label>通貨</Label>
+              <Select name="currency" defaultValue={group.currency}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="USD">USD</SelectItem>
+                  <SelectItem value="JPY">JPY</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label>税率</Label>
+              <Select name="taxRate" defaultValue={String(group.taxRate)}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="10">10%</SelectItem>
+                  <SelectItem value="8">8%</SelectItem>
+                  <SelectItem value="0">0%</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div>
+            <Label>請求書テンプレート</Label>
+            <Input
+              name="invoiceLabel"
+              defaultValue={group.invoiceLabel}
+              required
+            />
+            <p className="text-muted-foreground mt-1 text-xs">
+              {'{year}'}, {'{month}'}, {'{amount_foreign}'}, {'{rate}'}{' '}
+              が使えます
+            </p>
+          </div>
+          <input type="hidden" name="sortOrder" value={group.sortOrder} />
+          <Button type="submit" className="w-full">
             保存
           </Button>
         </fetcher.Form>
@@ -358,123 +732,199 @@ function EditGroupDialog({
   )
 }
 
-function ProviderConfigFields({
-  defaultConfig,
+// ---------------------------------------------------------------------------
+// Add Breakdown Dialog
+// ---------------------------------------------------------------------------
+
+function AddBreakdownDialog({
+  group,
+  open,
+  onOpenChange,
 }: {
-  defaultConfig?: Record<string, string> | undefined
+  group: { id: string; name: string; currency: string }
+  open: boolean
+  onOpenChange: (open: boolean) => void
 }) {
+  const fetcher = useFetcherDialog(
+    `add-breakdown-${group.id}`,
+    open,
+    onOpenChange,
+  )
+
   return (
-    <div className="space-y-2">
-      <div className="grid grid-cols-2 gap-2">
-        <div>
-          <Label className="text-xs">BigQuery プロジェクト</Label>
-          <Input
-            name="__bqProject"
-            defaultValue={defaultConfig?.bigqueryProject ?? ''}
-            placeholder="techtalk-380714"
-            className="h-7 text-xs"
-          />
-        </div>
-        <div>
-          <Label className="text-xs">データセット</Label>
-          <Input
-            name="__bqDataset"
-            defaultValue={defaultConfig?.bigqueryDataset ?? ''}
-            placeholder="techtalk"
-            className="h-7 text-xs"
-          />
-        </div>
-      </div>
-      <div>
-        <Label className="text-xs">テーブル名</Label>
-        <Input
-          name="__bqTable"
-          defaultValue={defaultConfig?.bigqueryTable ?? ''}
-          placeholder="gcp_billing_export_v1_..."
-          className="h-7 text-xs"
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-sm">
+        <DialogHeader>
+          <DialogTitle>内訳を追加</DialogTitle>
+          <DialogDescription>{group.name} の内訳項目</DialogDescription>
+        </DialogHeader>
+        <fetcher.Form method="post" className="space-y-3">
+          <input type="hidden" name="intent" value="upsertItem" />
+          <input type="hidden" name="groupId" value={group.id} />
+          <input type="hidden" name="type" value="fixed" />
+          <input type="hidden" name="currency" value={group.currency} />
+          <input type="hidden" name="sortOrder" value="0" />
+          <div>
+            <Label>名前</Label>
+            <Input name="name" placeholder="Vercel" required />
+          </div>
+          <div>
+            <Label>月額</Label>
+            <Input name="monthlyAmount" placeholder="20.00" required />
+          </div>
+          <Button type="submit" className="w-full">
+            追加
+          </Button>
+        </fetcher.Form>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Delete Confirmation
+// ---------------------------------------------------------------------------
+
+function useDeleteAction() {
+  const fetcher = useFetcher({ key: `delete-${Date.now()}` })
+
+  function deleteGroup(groupId: string) {
+    if (!confirm('この経費を削除しますか？配下の内訳もすべて削除されます。'))
+      return
+    const formData = new FormData()
+    formData.set('intent', 'deleteGroup')
+    formData.set('groupId', groupId)
+    fetcher.submit(formData, { method: 'post' })
+  }
+
+  function deleteItem(itemId: string) {
+    if (!confirm('この内訳を削除しますか？')) return
+    const formData = new FormData()
+    formData.set('intent', 'deleteItem')
+    formData.set('itemId', itemId)
+    fetcher.submit(formData, { method: 'post' })
+  }
+
+  return { deleteGroup, deleteItem }
+}
+
+// ---------------------------------------------------------------------------
+// Main Component
+// ---------------------------------------------------------------------------
+
+export default function ExpenseSettings({
+  loaderData: { groups, items, hasGcpCredential },
+}: Route.ComponentProps) {
+  const [addMode, setAddMode] = useState<'fixed' | 'metered' | null>(null)
+  const [editingGroupId, setEditingGroupId] = useState<string | null>(null)
+  const [breakdownGroupId, setBreakdownGroupId] = useState<string | null>(null)
+  const [editingItemId, setEditingItemId] = useState<string | null>(null)
+  const { deleteGroup, deleteItem } = useDeleteAction()
+
+  const hasExpenses = groups.length > 0
+  const editingGroup = groups.find((g) => g.id === editingGroupId)
+  const breakdownGroup = groups.find((g) => g.id === breakdownGroupId)
+
+  return (
+    <div className="space-y-4">
+      {hasExpenses ? (
+        <>
+          <div className="space-y-3">
+            {groups.map((group) => {
+              const groupItems = items.filter((i) => i.groupId === group.id)
+              return (
+                <ExpenseCard
+                  key={group.id}
+                  group={group}
+                  items={groupItems}
+                  onEdit={() => setEditingGroupId(group.id)}
+                  onDelete={() => deleteGroup(group.id)}
+                  onAddBreakdown={() => setBreakdownGroupId(group.id)}
+                  onEditItem={(id) => setEditingItemId(id)}
+                  onDeleteItem={(id) => deleteItem(id)}
+                />
+              )
+            })}
+          </div>
+
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setAddMode('fixed')}
+            >
+              <PlusIcon className="size-4" />
+              固定費を追加
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setAddMode('metered')}
+            >
+              <CloudIcon className="size-4" />
+              利用料を自動取得
+            </Button>
+          </div>
+
+          {hasGcpCredential && (
+            <div className="text-muted-foreground flex items-center gap-2 text-xs">
+              <div className="size-1.5 rounded-full bg-green-500" />
+              GCP Billing 連携済み
+            </div>
+          )}
+        </>
+      ) : (
+        <EmptyState
+          onAddFixed={() => setAddMode('fixed')}
+          onAddMetered={() => setAddMode('metered')}
         />
-      </div>
-      <div className="grid grid-cols-2 gap-2">
-        <div>
-          <Label className="text-xs">GCP プロジェクトID</Label>
-          <Input
-            name="__gcpProjectId"
-            defaultValue={defaultConfig?.projectId ?? ''}
-            placeholder="dailove-search"
-            className="h-7 text-xs"
-          />
-        </div>
-        <div>
-          <Label className="text-xs">サービスフィルタ（任意）</Label>
-          <Input
-            name="__serviceFilter"
-            defaultValue={defaultConfig?.serviceFilter ?? ''}
-            placeholder="Cloud AI API"
-            className="h-7 text-xs"
-          />
-        </div>
-      </div>
-      <input type="hidden" name="providerConfig" value="" />
-      <p className="text-muted-foreground text-[10px]">
-        ※ BigQuery Billing Export のテーブル情報を入力してください
-      </p>
+      )}
+
+      <AddExpenseDialog
+        open={addMode !== null}
+        onOpenChange={(open) => !open && setAddMode(null)}
+        mode={addMode ?? 'fixed'}
+        hasGcpCredential={hasGcpCredential}
+      />
+
+      {editingGroup && (
+        <EditExpenseDialog
+          group={editingGroup}
+          open={!!editingGroupId}
+          onOpenChange={(open) => !open && setEditingGroupId(null)}
+        />
+      )}
+
+      {breakdownGroup && (
+        <AddBreakdownDialog
+          group={breakdownGroup}
+          open={!!breakdownGroupId}
+          onOpenChange={(open) => !open && setBreakdownGroupId(null)}
+        />
+      )}
+
+      {editingItemId &&
+        (() => {
+          const item = items.find((i) => i.id === editingItemId)
+          if (!item) return null
+          return (
+            <EditItemDialog
+              item={item}
+              open={!!editingItemId}
+              onOpenChange={(open) => !open && setEditingItemId(null)}
+            />
+          )
+        })()}
     </div>
   )
 }
 
-function GcpCredentialUpload() {
-  const fetcher = useFetcher({ key: 'gcp-credential' })
-  const [jsonContent, setJsonContent] = useState('')
-
-  return (
-    <fetcher.Form method="post" className="space-y-2">
-      <input type="hidden" name="intent" value="saveCredential" />
-      <input type="hidden" name="provider" value="google_cloud_billing" />
-      <div>
-        <Label htmlFor="sa-json" className="text-xs">
-          サービスアカウント JSON キー
-        </Label>
-        <textarea
-          id="sa-json"
-          name="credentialsJson"
-          value={jsonContent}
-          onChange={(e) => setJsonContent(e.target.value)}
-          className="border-input bg-background h-32 w-full rounded-md border px-3 py-2 font-mono text-xs"
-          placeholder="JSON キーをペーストするか、ファイルをドロップ"
-        />
-      </div>
-      <div className="flex gap-2">
-        <Button type="submit" size="sm" disabled={!jsonContent.trim()}>
-          保存
-        </Button>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          onClick={() => {
-            const input = document.createElement('input')
-            input.type = 'file'
-            input.accept = '.json'
-            input.onchange = async (e) => {
-              const file = (e.target as HTMLInputElement).files?.[0]
-              if (file) {
-                const text = await file.text()
-                setJsonContent(text)
-              }
-            }
-            input.click()
-          }}
-        >
-          ファイルから読み込み
-        </Button>
-      </div>
-    </fetcher.Form>
-  )
-}
+// ---------------------------------------------------------------------------
+// Edit Item Dialog (for breakdown items)
+// ---------------------------------------------------------------------------
 
 function EditItemDialog({
   item,
-  groups,
   open,
   onOpenChange,
 }: {
@@ -490,7 +940,6 @@ function EditItemDialog({
     taxRate: number | null
     sortOrder: number
   }
-  groups: Array<{ id: string; name: string }>
   open: boolean
   onOpenChange: (open: boolean) => void
 }) {
@@ -498,492 +947,94 @@ function EditItemDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>項目編集</DialogTitle>
+          <DialogTitle>内訳を編集</DialogTitle>
         </DialogHeader>
         <fetcher.Form method="post" className="space-y-3">
           <input type="hidden" name="intent" value="upsertItem" />
           <input type="hidden" name="itemId" value={item.id} />
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <Label>項目名</Label>
-              <Input name="name" defaultValue={item.name} required />
-            </div>
-            <div>
-              <Label>所属グループ</Label>
-              <Select name="groupId" defaultValue={item.groupId ?? '__none__'}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__none__">単独</SelectItem>
-                  {groups.map((g) => (
-                    <SelectItem key={g.id} value={g.id}>
-                      {g.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+          <input
+            type="hidden"
+            name="groupId"
+            value={item.groupId ?? '__none__'}
+          />
+          <input type="hidden" name="type" value={item.type} />
+          <input type="hidden" name="currency" value={item.currency} />
+          <input type="hidden" name="sortOrder" value={item.sortOrder} />
+          <div>
+            <Label>名前</Label>
+            <Input name="name" defaultValue={item.name} required />
           </div>
-          <div className="grid grid-cols-3 gap-3">
+          {item.type === 'fixed' && (
             <div>
-              <Label>種別</Label>
-              <Select name="type" defaultValue={item.type}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="fixed">固定</SelectItem>
-                  <SelectItem value="metered">従量</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label>通貨</Label>
-              <Select name="currency" defaultValue={item.currency}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="USD">USD</SelectItem>
-                  <SelectItem value="JPY">JPY</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label>月額（固定の場合）</Label>
+              <Label>月額</Label>
               <Input
                 name="monthlyAmount"
                 defaultValue={item.monthlyAmount ?? ''}
               />
             </div>
-          </div>
-          {item.type === 'metered' && (
+          )}
+          {item.type === 'metered' && item.provider && (
             <div className="bg-muted/50 space-y-2 rounded-md p-3">
-              <Label className="text-xs font-semibold">
-                従量課金プロバイダ設定
-              </Label>
+              <p className="text-muted-foreground text-xs font-medium">
+                GCP Billing Export
+              </p>
               <input type="hidden" name="provider" value="google_cloud" />
-              <ProviderConfigFields
-                defaultConfig={safeParseJson(item.providerConfig)}
-              />
+              {(() => {
+                const config = safeParseJson(item.providerConfig)
+                return (
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <Label className="text-xs">プロジェクトID</Label>
+                      <Input
+                        name="__gcpProjectId"
+                        defaultValue={config?.projectId ?? ''}
+                        className="h-7 text-xs"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-xs">サービスフィルタ</Label>
+                      <Input
+                        name="__serviceFilter"
+                        defaultValue={config?.serviceFilter ?? ''}
+                        className="h-7 text-xs"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-xs">BQ プロジェクト</Label>
+                      <Input
+                        name="__bqProject"
+                        defaultValue={config?.bigqueryProject ?? ''}
+                        className="h-7 text-xs"
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-xs">BQ データセット</Label>
+                      <Input
+                        name="__bqDataset"
+                        defaultValue={config?.bigqueryDataset ?? ''}
+                        className="h-7 text-xs"
+                      />
+                    </div>
+                    <div className="col-span-2">
+                      <Label className="text-xs">BQ テーブル</Label>
+                      <Input
+                        name="__bqTable"
+                        defaultValue={config?.bigqueryTable ?? ''}
+                        className="h-7 text-xs"
+                      />
+                    </div>
+                  </div>
+                )
+              })()}
             </div>
           )}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <Label>税率（単独の場合）</Label>
-              <Select name="taxRate" defaultValue={String(item.taxRate ?? 10)}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="10">10%</SelectItem>
-                  <SelectItem value="8">8%</SelectItem>
-                  <SelectItem value="0">0%</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label>表示順</Label>
-              <Input
-                name="sortOrder"
-                type="number"
-                defaultValue={item.sortOrder}
-              />
-            </div>
-          </div>
-          <Button type="submit" size="sm">
+          <Button type="submit" className="w-full">
             保存
           </Button>
         </fetcher.Form>
       </DialogContent>
     </Dialog>
-  )
-}
-
-export default function ExpenseSettings({
-  loaderData: { groups, items, hasGcpCredential },
-  actionData,
-}: Route.ComponentProps) {
-  const [editingGroupId, setEditingGroupId] = useState<string | null>(null)
-  const [editingItemId, setEditingItemId] = useState<string | null>(null)
-
-  const { form: groupForm } = useForm(createGroupWithItemsSchema, {
-    lastResult:
-      actionData && 'lastResult' in actionData
-        ? actionData.lastResult
-        : undefined,
-  })
-
-  const { form: itemForm } = useForm(upsertItemSchema, {
-    lastResult:
-      actionData && 'lastResult' in actionData
-        ? actionData.lastResult
-        : undefined,
-  })
-
-  const [newItems, setNewItems] = useState<
-    Array<{
-      id: string
-      name: string
-      type: 'fixed' | 'metered'
-      monthlyAmount: string
-    }>
-  >([])
-
-  const newItemNameRef = useRef<HTMLInputElement>(null)
-  const newItemAmountRef = useRef<HTMLInputElement>(null)
-  const [newItemType, setNewItemType] = useState<'fixed' | 'metered'>('fixed')
-
-  return (
-    <div className="space-y-6">
-      <div className="space-y-4">
-        <h3 className="text-sm font-semibold">経費グループ</h3>
-        {groups.map((group) => {
-          const groupItems = items.filter((i) => i.groupId === group.id)
-          return (
-            <div key={group.id} className="space-y-3 rounded-md border p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="font-medium">{group.name}</div>
-                  <div className="text-muted-foreground text-xs">
-                    {group.currency} / {groupItems.length}項目 / 税率{' '}
-                    {group.taxRate}%
-                  </div>
-                </div>
-                <div className="flex gap-1">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => setEditingGroupId(group.id)}
-                  >
-                    <PencilIcon className="size-4" />
-                  </Button>
-                  <DeleteButton
-                    intent="deleteGroup"
-                    idName="groupId"
-                    idValue={group.id}
-                  />
-                </div>
-              </div>
-              <EditGroupDialog
-                group={group}
-                open={editingGroupId === group.id}
-                onOpenChange={(o) => !o && setEditingGroupId(null)}
-              />
-
-              <div className="ml-4 space-y-1">
-                {groupItems.map((item) => (
-                  <div key={item.id} className="text-sm">
-                    <div className="flex items-center justify-between">
-                      <span>
-                        {item.name}{' '}
-                        <span className="text-muted-foreground">
-                          {item.type === 'fixed'
-                            ? `${item.currency} ${item.monthlyAmount}`
-                            : `metered (${item.provider ?? '未設定'})`}
-                        </span>
-                      </span>
-                      <div className="flex gap-1">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => setEditingItemId(item.id)}
-                        >
-                          <PencilIcon className="size-3" />
-                        </Button>
-                        <DeleteButton
-                          intent="deleteItem"
-                          idName="itemId"
-                          idValue={item.id}
-                          iconSize="size-3"
-                        />
-                      </div>
-                    </div>
-                    <EditItemDialog
-                      item={item}
-                      groups={groups}
-                      open={editingItemId === item.id}
-                      onOpenChange={(o) => !o && setEditingItemId(null)}
-                    />
-                  </div>
-                ))}
-              </div>
-            </div>
-          )
-        })}
-
-        {items
-          .filter((i) => !i.groupId)
-          .map((item) => (
-            <div key={item.id} className="rounded-md border p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="font-medium">{item.name}</div>
-                  <div className="text-muted-foreground text-xs">
-                    {item.currency} /{' '}
-                    {item.type === 'fixed'
-                      ? `${item.monthlyAmount}/月`
-                      : `metered (${item.provider ?? '未設定'})`}{' '}
-                    / 税率 {item.taxRate ?? 10}%
-                  </div>
-                </div>
-                <div className="flex gap-1">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => setEditingItemId(item.id)}
-                  >
-                    <PencilIcon className="size-4" />
-                  </Button>
-                  <DeleteButton
-                    intent="deleteItem"
-                    idName="itemId"
-                    idValue={item.id}
-                  />
-                </div>
-              </div>
-              <EditItemDialog
-                item={item}
-                groups={groups}
-                open={editingItemId === item.id}
-                onOpenChange={(o) => !o && setEditingItemId(null)}
-              />
-            </div>
-          ))}
-      </div>
-
-      <div className="space-y-3 rounded-md border p-4">
-        <h4 className="text-sm font-semibold">グループ追加</h4>
-        <Form
-          method="post"
-          {...groupForm.props}
-          className="space-y-3"
-          onSubmit={() => setNewItems([])}
-        >
-          <input type="hidden" name="intent" value="createGroupWithItems" />
-          <GroupFormFields />
-
-          {newItems.length > 0 && (
-            <div className="space-y-2">
-              <Label className="text-xs font-semibold">配下アイテム</Label>
-              {newItems.map((item, i) => (
-                <div key={item.id} className="flex items-center gap-2">
-                  <input
-                    type="hidden"
-                    name={`items[${i}].name`}
-                    value={item.name}
-                  />
-                  <input
-                    type="hidden"
-                    name={`items[${i}].type`}
-                    value={item.type}
-                  />
-                  <input
-                    type="hidden"
-                    name={`items[${i}].monthlyAmount`}
-                    value={item.monthlyAmount}
-                  />
-                  <span className="text-sm">
-                    {item.name}
-                    {item.type === 'fixed' && item.monthlyAmount
-                      ? ` (${item.monthlyAmount})`
-                      : ' (従量)'}
-                  </span>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="size-6"
-                    onClick={() =>
-                      setNewItems((prev) =>
-                        prev.filter((p) => p.id !== item.id),
-                      )
-                    }
-                  >
-                    <TrashIcon className="size-3" />
-                  </Button>
-                </div>
-              ))}
-            </div>
-          )}
-
-          <div className="flex items-end gap-2">
-            <div className="flex-1">
-              <Label htmlFor="new-item-name" className="text-xs">
-                項目名
-              </Label>
-              <Input
-                ref={newItemNameRef}
-                id="new-item-name"
-                placeholder="Vercel"
-                className="h-8 text-sm"
-              />
-            </div>
-            <div className="w-20">
-              <Label htmlFor="new-item-type" className="text-xs">
-                種別
-              </Label>
-              <Select
-                defaultValue="fixed"
-                onValueChange={(v) => setNewItemType(v as 'fixed' | 'metered')}
-              >
-                <SelectTrigger id="new-item-type" className="h-8 text-sm">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="fixed">固定</SelectItem>
-                  <SelectItem value="metered">従量</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="w-24">
-              <Label htmlFor="new-item-amount" className="text-xs">
-                月額
-              </Label>
-              <Input
-                ref={newItemAmountRef}
-                id="new-item-amount"
-                placeholder="20.00"
-                className="h-8 text-sm"
-              />
-            </div>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="h-8"
-              onClick={() => {
-                const name = newItemNameRef.current?.value?.trim()
-                if (!name) return
-                setNewItems((prev) => [
-                  ...prev,
-                  {
-                    id: nanoid(),
-                    name,
-                    type: newItemType,
-                    monthlyAmount: newItemAmountRef.current?.value ?? '',
-                  },
-                ])
-                if (newItemNameRef.current) newItemNameRef.current.value = ''
-                if (newItemAmountRef.current)
-                  newItemAmountRef.current.value = ''
-              }}
-            >
-              <PlusIcon className="size-3" />
-              追加
-            </Button>
-          </div>
-
-          <div className="text-destructive text-sm empty:hidden">
-            {groupForm.errors}
-          </div>
-          <Button type="submit" size="sm">
-            <PlusIcon className="size-4" />
-            グループ{newItems.length > 0 ? `+ ${newItems.length}項目を` : 'を'}
-            作成
-          </Button>
-        </Form>
-      </div>
-
-      <div className="space-y-3 rounded-md border p-4">
-        <h4 className="text-sm font-semibold">経費項目追加</h4>
-        <Form method="post" {...itemForm.props} className="space-y-3">
-          <input type="hidden" name="intent" value="upsertItem" />
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <Label htmlFor="item-name">項目名</Label>
-              <Input id="item-name" name="name" placeholder="Vercel" required />
-            </div>
-            <div>
-              <Label htmlFor="item-group">所属グループ</Label>
-              <Select name="groupId" defaultValue="__none__">
-                <SelectTrigger id="item-group">
-                  <SelectValue placeholder="単独（グループなし）" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__none__">単独</SelectItem>
-                  {groups.map((g) => (
-                    <SelectItem key={g.id} value={g.id}>
-                      {g.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          <div className="grid grid-cols-3 gap-3">
-            <div>
-              <Label htmlFor="item-type">種別</Label>
-              <Select name="type" defaultValue="fixed">
-                <SelectTrigger id="item-type">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="fixed">固定</SelectItem>
-                  <SelectItem value="metered">従量</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label htmlFor="item-currency">通貨</Label>
-              <Select name="currency" defaultValue="USD">
-                <SelectTrigger id="item-currency">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="USD">USD</SelectItem>
-                  <SelectItem value="JPY">JPY</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label htmlFor="item-amount">月額（固定の場合）</Label>
-              <Input
-                id="item-amount"
-                name="monthlyAmount"
-                placeholder="20.00"
-              />
-            </div>
-          </div>
-          <div className="text-destructive text-sm empty:hidden">
-            {itemForm.errors}
-          </div>
-          <Button type="submit" size="sm">
-            <PlusIcon className="size-4" />
-            項目追加
-          </Button>
-        </Form>
-      </div>
-
-      <div className="space-y-3 rounded-md border p-4">
-        <h4 className="text-sm font-semibold">GCP Billing 連携</h4>
-        {hasGcpCredential ? (
-          <div className="space-y-2">
-            <p className="text-sm text-green-600">サービスアカウント設定済み</p>
-            <Form method="post">
-              <input type="hidden" name="intent" value="deleteCredential" />
-              <input
-                type="hidden"
-                name="provider"
-                value="google_cloud_billing"
-              />
-              <Button variant="outline" size="sm" type="submit">
-                <TrashIcon className="size-3" />
-                認証情報を削除
-              </Button>
-            </Form>
-          </div>
-        ) : (
-          <GcpCredentialUpload />
-        )}
-        <p className="text-muted-foreground text-xs">
-          従量課金（metered）アイテムで GCP Billing
-          を利用するにはサービスアカウントの JSON キーが必要です。
-        </p>
-      </div>
-    </div>
   )
 }
