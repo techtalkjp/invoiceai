@@ -59,18 +59,18 @@ export function toJstMinutes(iso: string): number {
 // 表示フォーマット（Asia/Tokyo）
 // ---------------------------------------------------------------------------
 
-/** 日付を YYYY/MM/DD で表示 */
+/** 日付を YYYY/MM/DD で表示（DB の UTC タイムスタンプを JST に変換） */
 export function formatDate(date: string | Date | null | undefined): string {
   if (!date) return '-'
-  const d = dayjs(date).tz(DISPLAY_TZ)
+  const d = dayjs.utc(date).tz(DISPLAY_TZ)
   if (!d.isValid()) return '-'
   return d.format('YYYY/MM/DD')
 }
 
-/** 日時を YYYY/MM/DD HH:mm で表示 */
+/** 日時を YYYY/MM/DD HH:mm で表示（DB の UTC タイムスタンプを JST に変換） */
 export function formatDateTime(date: string | Date | null | undefined): string {
   if (!date) return '-'
-  const d = dayjs(date).tz(DISPLAY_TZ)
+  const d = dayjs.utc(date).tz(DISPLAY_TZ)
   if (!d.isValid()) return '-'
   return d.format('YYYY/MM/DD HH:mm')
 }
