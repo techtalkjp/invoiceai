@@ -152,18 +152,3 @@ export async function deleteExpenseItem(
     .where('clientId', '=', clientId)
     .execute()
 }
-
-export async function toggleExpenseItemActive(
-  organizationId: string,
-  clientId: string,
-  itemId: string,
-  isActive: boolean,
-) {
-  await db
-    .updateTable('expenseItem')
-    .set({ isActive: isActive ? 1 : 0, updatedAt: nowISO() })
-    .where('id', '=', itemId)
-    .where('organizationId', '=', organizationId)
-    .where('clientId', '=', clientId)
-    .execute()
-}

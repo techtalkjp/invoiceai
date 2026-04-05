@@ -1,7 +1,6 @@
 import Decimal from 'decimal.js'
 import { db } from '~/lib/db/kysely'
-import { dayjs } from '~/utils/dayjs'
-import { parseYearMonthId } from '~/utils/month'
+import { isBeforeSettlement, parseYearMonthId } from '~/utils/month'
 import { getExchangeRate } from './exchange-rate-service'
 import {
   findUnadjustedDifferences,
@@ -97,10 +96,13 @@ export async function getExpensePreview(args: {
   // 3. 必要な為替レートを取得
   const currencies = new Set(records.map((r) => r.currency))
   const exchangeRates: ExpensePreviewResult['exchangeRates'] = {}
-  for (const currency of currencies) {
-    if (currency === 'JPY') continue
-    const rate = await getExchangeRate(yearMonth, currency)
-    exchangeRates[`${currency}/JPY`] = rate
+  const foreignCurrencies = [...currencies].filter((c) => c !== 'JPY')
+  const rates = await Promise.all(
+    foreignCurrencies.map((currency) => getExchangeRate(yearMonth, currency)),
+  )
+  for (let i = 0; i < foreignCurrencies.length; i++) {
+    // biome-ignore lint/style/noNonNullAssertion: indices are guaranteed to be in bounds
+    exchangeRates[`${foreignCurrencies[i]}/JPY`] = rates[i]!
   }
 
   // 4. regular lines を生成
@@ -278,17 +280,4 @@ function currencyLabel(currency: string): string {
   if (currency === 'JPY') return '円'
   if (currency === 'USD') return 'ドル'
   return currency
-}
-
-/**
- * 対象月の翌月5日より前かどうか（従量課金の暫定値判定）
- */
-export function isBeforeSettlement(yearMonth: string): boolean {
-  const { year, month } = parseYearMonthId(yearMonth)
-  if (!year || !month) return false
-  const settlementDate =
-    month === 12
-      ? dayjs(`${year + 1}-01-05`)
-      : dayjs(`${year}-${String(month + 1).padStart(2, '0')}-05`)
-  return dayjs().isBefore(settlementDate)
 }

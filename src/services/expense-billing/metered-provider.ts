@@ -3,8 +3,7 @@ import { z } from 'zod'
 import { decrypt, encrypt } from '~/lib/activity-sources/encryption.server'
 import { db } from '~/lib/db/kysely'
 import { nowISO } from '~/utils/date'
-import { padMonth } from '~/utils/month'
-import { isBeforeSettlement } from './expense-preview-service'
+import { getMonthDateRange, isBeforeSettlement, padMonth } from '~/utils/month'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -79,6 +78,17 @@ export async function getProviderCredential(
   return decrypt(row.encryptedCredentials)
 }
 
+export async function deleteProviderCredential(
+  organizationId: string,
+  provider: string,
+): Promise<void> {
+  await db
+    .deleteFrom('providerCredential')
+    .where('organizationId', '=', organizationId)
+    .where('provider', '=', provider)
+    .execute()
+}
+
 export async function hasProviderCredential(
   organizationId: string,
   provider: string,
@@ -134,10 +144,9 @@ export async function fetchGoogleCloudMonthlyCost(args: {
   })
 
   // 月の開始・終了タイムスタンプ（UTC）
-  const startTime = `${year}-${padMonth(month)}-01T00:00:00Z`
-  const endMonth = month === 12 ? 1 : month + 1
-  const endYear = month === 12 ? year + 1 : year
-  const endTime = `${endYear}-${padMonth(endMonth)}-01T00:00:00Z`
+  const { startDate, endDate } = getMonthDateRange(year, month)
+  const startTime = `${startDate}T00:00:00Z`
+  const endTime = `${endDate}T00:00:00Z`
 
   const query = `
     SELECT

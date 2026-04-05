@@ -7,7 +7,6 @@ import {
 } from '@shared/core/invoice-utils'
 import {
   getExpensePreview,
-  type ExpensePreviewLine,
   type ExpensePreviewResult,
 } from '@shared/services/expense-billing/expense-preview-service'
 import {
@@ -580,42 +579,38 @@ export default function InvoiceCreate({
               </tr>
             </thead>
             <tbody>
-              {(expensePreview.lines as ExpensePreviewLine[]).map(
-                (line: ExpensePreviewLine, i: number) => (
-                  <tr key={i} className="border-b">
-                    <td className="py-1">
-                      {line.description}
-                      {line.isProvisional && (
-                        <span className="text-muted-foreground ml-1 text-xs">
-                          （暫定値）
-                        </span>
-                      )}
-                      {line.expenseKind === 'adjustment' && (
-                        <Badge variant="outline" className="ml-1 text-xs">
-                          差額調整
-                        </Badge>
-                      )}
-                    </td>
-                    <td className="py-1 text-right tabular-nums">
-                      {line.currency !== 'JPY'
-                        ? `${line.currency} ${line.amountForeign}`
-                        : ''}
-                    </td>
-                    <td className="py-1 text-right tabular-nums">
-                      ¥{line.amountJpy.toLocaleString()}
-                    </td>
-                  </tr>
-                ),
-              )}
+              {expensePreview.lines.map((line, i) => (
+                <tr key={i} className="border-b">
+                  <td className="py-1">
+                    {line.description}
+                    {line.isProvisional && (
+                      <span className="text-muted-foreground ml-1 text-xs">
+                        （暫定値）
+                      </span>
+                    )}
+                    {line.expenseKind === 'adjustment' && (
+                      <Badge variant="outline" className="ml-1 text-xs">
+                        差額調整
+                      </Badge>
+                    )}
+                  </td>
+                  <td className="py-1 text-right tabular-nums">
+                    {line.currency !== 'JPY'
+                      ? `${line.currency} ${line.amountForeign}`
+                      : ''}
+                  </td>
+                  <td className="py-1 text-right tabular-nums">
+                    ¥{line.amountJpy.toLocaleString()}
+                  </td>
+                </tr>
+              ))}
             </tbody>
           </table>
           {expensePreview.errors.length > 0 && (
             <div className="text-destructive text-xs">
-              {(expensePreview.errors as Array<{ error: string }>).map(
-                (e: { error: string }, i: number) => (
-                  <div key={i}>{e.error}</div>
-                ),
-              )}
+              {expensePreview.errors.map((e, i) => (
+                <div key={i}>{e.error}</div>
+              ))}
             </div>
           )}
         </ContentPanel>

@@ -1,6 +1,7 @@
 import { parseSubmission, report } from '@conform-to/react/future'
 import { coerceFormValue, formatResult } from '@conform-to/zod/v4/future'
 import {
+  deleteProviderCredential,
   hasProviderCredential,
   saveProviderCredential,
 } from '@shared/services/expense-billing/metered-provider'
@@ -158,12 +159,7 @@ export async function action({ request, params }: Route.ActionArgs) {
       return { lastResult: report(submission, { error }), success: true }
     }
     case 'deleteCredential': {
-      const { db } = await import('~/lib/db/kysely')
-      await db
-        .deleteFrom('providerCredential')
-        .where('organizationId', '=', organization.id)
-        .where('provider', '=', data.provider)
-        .execute()
+      await deleteProviderCredential(organization.id, data.provider)
       return { lastResult: report(submission, { error }), success: true }
     }
   }
