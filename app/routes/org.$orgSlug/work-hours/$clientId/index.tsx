@@ -1,10 +1,13 @@
 import { parseWithZod } from '@conform-to/zod/v4'
+import { useFetcher } from 'react-router'
 import { PageHeader } from '~/components/layout/page-header'
+import { Button } from '~/components/ui/button'
 import {
   deleteClientSourceMapping,
   getActivitiesByMonth,
   getActivitySource,
   getClientSourceMappings,
+  insertActivities,
   saveClientSourceMapping,
 } from '~/lib/activity-sources/activity-queries.server'
 import { decrypt } from '~/lib/activity-sources/encryption.server'
@@ -14,7 +17,8 @@ import {
   type ActivityRecord,
 } from '~/lib/activity-sources/types'
 import { requireOrgMember } from '~/lib/auth-helpers.server'
-import { daysInMonth } from '~/utils/date'
+import { db } from '~/lib/db/kysely'
+import { daysInMonth, formatDateTime } from '~/utils/date'
 import { getNowInTimezone, padMonth } from '~/utils/month'
 import { parseWorkHoursText } from '../+ai-parse.server'
 import { toServerEntries } from '../+components/data-mapping'
@@ -81,14 +85,11 @@ export async function loader({ request, params }: Route.LoaderArgs) {
     throw new Response('クライアントが見つかりません', { status: 404 })
   }
 
-  // マッピング済みリポジトリのアクティビティを取得
-  // まず DB（sync 済みデータ）を試し、なければ GitHub API にフォールバック
+  // マッピング済みリポジトリのアクティビティを DB から取得
   const activitiesByDate: Record<string, ActivityRecord[]> = {}
+  let lastSyncedAt: string | null = null
   const mappedRepos = new Set(mappings.map((m) => m.sourceIdentifier))
   if (mappedRepos.size > 0) {
-    let activities: ActivityRecord[] = []
-
-    // DB から取得
     const dbActivities = await getActivitiesByMonth(
       organization.id,
       user.id,
@@ -97,41 +98,26 @@ export async function loader({ request, params }: Route.LoaderArgs) {
     )
     for (const a of dbActivities) {
       if (!a.repo || !mappedRepos.has(a.repo)) continue
-      activities.push(toActivityRecord(a))
-    }
-
-    // DB にデータがなければ GitHub API にフォールバック
-    if (activities.length === 0 && source?.credentials) {
-      try {
-        const pat = decrypt(source.credentials)
-        const config = source.config as { username?: string } | null
-        const username = config?.username
-        if (username) {
-          const startDate = `${year}-${padMonth(month)}-01`
-          const lastDay = daysInMonth(year, month)
-          const endDate = `${year}-${padMonth(month)}-${String(lastDay).padStart(2, '0')}`
-          const apiActivities = await fetchGitHubActivities(
-            pat,
-            username,
-            startDate,
-            endDate,
-          )
-          activities = apiActivities.filter(
-            (a) => a.repo && mappedRepos.has(a.repo),
-          )
-        }
-      } catch {
-        // API フォールバック失敗時はアクティビティなしで続行
-      }
-    }
-
-    for (const record of activities) {
-      let arr = activitiesByDate[record.eventDate]
+      const record = toActivityRecord(a)
+      let arr = activitiesByDate[a.eventDate]
       if (!arr) {
         arr = []
-        activitiesByDate[record.eventDate] = arr
+        activitiesByDate[a.eventDate] = arr
       }
       arr.push(record)
+    }
+
+    // 最終同期日時を取得（最新アクティビティの createdAt）
+    if (dbActivities.length > 0) {
+      const latest = await db
+        .selectFrom('activity')
+        .select('createdAt')
+        .where('organizationId', '=', organization.id)
+        .where('userId', '=', user.id)
+        .orderBy('createdAt', 'desc')
+        .limit(1)
+        .executeTakeFirst()
+      lastSyncedAt = latest?.createdAt ?? null
     }
   }
 
@@ -142,6 +128,7 @@ export async function loader({ request, params }: Route.LoaderArgs) {
     month,
     clientEntry,
     activitiesByDate,
+    lastSyncedAt,
     hasGitHubPat: !!source,
     mappings,
   }
@@ -152,9 +139,39 @@ export async function action({ request, params }: Route.ActionArgs) {
   const { organization, user } = await requireOrgMember(request, orgSlug)
 
   const formData = await request.formData()
+  const intent = formData.get('intent')
+
+  // GitHub アクティビティの手動同期
+  if (intent === 'syncActivities') {
+    const syncYear = Number(formData.get('year'))
+    const syncMonth = Number(formData.get('month'))
+    if (!syncYear || !syncMonth) {
+      return { synced: false, error: '年月が不正です' }
+    }
+    const source = await getActivitySource(organization.id, user.id, 'github')
+    if (!source?.credentials) {
+      return { synced: false, error: 'GitHub認証情報が設定されていません' }
+    }
+    const pat = decrypt(source.credentials)
+    const config = source.config as { username?: string } | null
+    const username = config?.username
+    if (!username) {
+      return { synced: false, error: 'GitHubユーザー名が設定されていません' }
+    }
+    const startDate = `${syncYear}-${padMonth(syncMonth)}-01`
+    const lastDay = daysInMonth(syncYear, syncMonth)
+    const endDate = `${syncYear}-${padMonth(syncMonth)}-${String(lastDay).padStart(2, '0')}`
+    const activities = await fetchGitHubActivities(
+      pat,
+      username,
+      startDate,
+      endDate,
+    )
+    await insertActivities(organization.id, user.id, activities)
+    return { synced: true }
+  }
 
   // saveMonthData は FormData で直接送信される（conform 経由ではない）
-  const intent = formData.get('intent')
   if (intent === 'saveMonthData') {
     const formClientId = formData.get('clientId') as string
     const yearMonth = (formData.get('yearMonth') as string) || undefined
@@ -327,16 +344,44 @@ export default function ClientWorkHours({
     month,
     clientEntry,
     activitiesByDate,
+    lastSyncedAt,
     hasGitHubPat,
     mappings,
   },
   params: { orgSlug, clientId },
 }: Route.ComponentProps) {
+  const syncFetcher = useFetcher({ key: 'sync-activities' })
+  const isSyncing = syncFetcher.state !== 'idle'
+
   return (
     <div className="grid gap-4">
       <PageHeader
         title={clientEntry.clientName}
         subtitle="セルをクリックして編集 · Tab/Enterで移動"
+        actions={
+          hasGitHubPat && mappings.length > 0 ? (
+            <div className="flex items-center gap-2">
+              {lastSyncedAt && (
+                <span className="text-muted-foreground text-xs">
+                  最終同期: {formatDateTime(lastSyncedAt)}
+                </span>
+              )}
+              <syncFetcher.Form method="post">
+                <input type="hidden" name="intent" value="syncActivities" />
+                <input type="hidden" name="year" value={year} />
+                <input type="hidden" name="month" value={month} />
+                <Button
+                  type="submit"
+                  variant="outline"
+                  size="sm"
+                  disabled={isSyncing}
+                >
+                  {isSyncing ? '同期中...' : 'アクティビティを同期'}
+                </Button>
+              </syncFetcher.Form>
+            </div>
+          ) : undefined
+        }
       />
 
       <WorkHoursTimesheet
