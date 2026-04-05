@@ -150,18 +150,36 @@ export async function markExpenseRecordsAdjusted(
   invoiceId: string,
   adjustmentLines: ExpensePreviewLine[],
 ): Promise<void> {
-  const now = nowISO()
-  for (const line of adjustmentLines) {
-    if (line.expenseKind !== 'adjustment' || !line.expenseRecordId) continue
+  const targets: Array<{ recordId: string; amountForeign: string }> = []
+  for (const l of adjustmentLines) {
+    if (l.expenseKind === 'adjustment' && l.expenseRecordId) {
+      targets.push({
+        recordId: l.expenseRecordId,
+        amountForeign: l.amountForeign,
+      })
+    }
+  }
+  if (targets.length === 0) return
 
+  const now = nowISO()
+  const ids = targets.map((t) => t.recordId)
+
+  // 共通フィールドを一括更新
+  await db
+    .updateTable('expenseRecord')
+    .set({
+      adjustedInInvoiceId: invoiceId,
+      updatedAt: now,
+    })
+    .where('id', 'in', ids)
+    .execute()
+
+  // lastAdjustedAmount はレコードごとに異なるため個別更新
+  for (const t of targets) {
     await db
       .updateTable('expenseRecord')
-      .set({
-        adjustedInInvoiceId: invoiceId,
-        lastAdjustedAmount: line.amountForeign,
-        updatedAt: now,
-      })
-      .where('id', '=', line.expenseRecordId)
+      .set({ lastAdjustedAmount: t.amountForeign })
+      .where('id', '=', t.recordId)
       .execute()
   }
 }

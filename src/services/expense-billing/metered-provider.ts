@@ -143,6 +143,10 @@ export async function fetchGoogleCloudMonthlyCost(args: {
     credentials,
   })
 
+  // テーブル名のサニタイズ（バッククォート内でも安全に）
+  const sanitize = (s: string) => s.replace(/[^a-zA-Z0-9_.-]/g, '')
+  const tableRef = `${sanitize(config.bigqueryProject)}.${sanitize(config.bigqueryDataset)}.${sanitize(config.bigqueryTable)}`
+
   // 月の開始・終了タイムスタンプ（UTC）
   const { startDate, endDate } = getMonthDateRange(year, month)
   const startTime = `${startDate}T00:00:00Z`
@@ -156,7 +160,7 @@ export async function fetchGoogleCloudMonthlyCost(args: {
         )), 0)
       AS STRING) AS amount,
       currency
-    FROM \`${config.bigqueryProject}.${config.bigqueryDataset}.${config.bigqueryTable}\`
+    FROM \`${tableRef}\`
     WHERE project.id = @projectId
       AND usage_start_time >= @startTime
       AND usage_start_time < @endTime
