@@ -661,7 +661,11 @@ function AddExpenseDialog({
                   戻る
                 </Button>
               )}
-              <Button type="submit" className="flex-1">
+              <Button
+                type="submit"
+                className="flex-1"
+                onClick={() => autoLabel()}
+              >
                 追加
               </Button>
             </div>
