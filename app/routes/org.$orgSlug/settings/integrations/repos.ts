@@ -19,7 +19,11 @@ export async function loader({ request, params }: Route.LoaderArgs) {
 
   const source = await getActivitySource(organization.id, user.id, 'github')
   if (!source) {
-    return { ghOrgs: [], repos: [], error: null as string | null }
+    return {
+      ghOrgs: [] as Awaited<ReturnType<typeof fetchGitHubOrgs>>,
+      repos: [] as Awaited<ReturnType<typeof fetchRecentRepos>>,
+      error: null as string | null,
+    }
   }
 
   const url = new URL(request.url)
@@ -28,22 +32,23 @@ export async function loader({ request, params }: Route.LoaderArgs) {
 
   try {
     const pat = decrypt(source.credentials)
-    const [orgs, username] = await Promise.all([
+    const config = source.config as { username?: string } | null
+    const username = config?.username ?? (await fetchGitHubUsername(pat))
+    const [orgs, repos] = await Promise.all([
       fetchGitHubOrgs(pat),
-      fetchGitHubUsername(pat),
+      q
+        ? searchRepos(pat, q, ghOrg ?? undefined, username)
+        : fetchRecentRepos(pat, ghOrg ?? undefined),
     ])
-    const repos = q
-      ? await searchRepos(pat, q, ghOrg ?? undefined, username)
-      : await fetchRecentRepos(pat, ghOrg ?? undefined)
     return { ghOrgs: orgs, repos, error: null as string | null }
   } catch (e) {
     const message = e instanceof Error ? e.message : 'Unknown error'
     const isAuthError =
       message.includes('401') || message.includes('Bad credentials')
     return {
-      ghOrgs: [],
-      repos: [],
-      error: isAuthError ? 'token_expired' : 'fetch_failed',
+      ghOrgs: [] as Awaited<ReturnType<typeof fetchGitHubOrgs>>,
+      repos: [] as Awaited<ReturnType<typeof fetchRecentRepos>>,
+      error: isAuthError ? 'token_expired' : ('fetch_failed' as string | null),
     }
   }
 }
