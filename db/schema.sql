@@ -405,7 +405,7 @@ CREATE INDEX IF NOT EXISTS "expense_record_invoice_idx"
 CREATE TABLE IF NOT EXISTS "provider_credential" (
   "id" TEXT PRIMARY KEY NOT NULL,
   "organization_id" TEXT NOT NULL REFERENCES "organization"("id") ON DELETE CASCADE,
-  "provider" TEXT NOT NULL CHECK ("provider" IN ('google_cloud_billing')),
+  "provider" TEXT NOT NULL CHECK ("provider" IN ('google_cloud_billing', 'anthropic', 'openai', 'aws')),
   "encrypted_credentials" TEXT NOT NULL,
   "config" TEXT,
   "created_at" TEXT NOT NULL DEFAULT (datetime('now')),

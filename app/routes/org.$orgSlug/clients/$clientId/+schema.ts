@@ -56,13 +56,13 @@ export const deleteItemSchema = z.object({
 
 export const saveCredentialSchema = z.object({
   intent: z.literal('saveCredential'),
-  provider: z.literal('google_cloud_billing'),
-  credentialsJson: z.string().min(1, 'JSON キーを入力してください'),
+  provider: z.enum(['google_cloud_billing', 'anthropic', 'openai', 'aws']),
+  credentialsJson: z.string().min(1, '認証情報を入力してください'),
 })
 
 export const deleteCredentialSchema = z.object({
   intent: z.literal('deleteCredential'),
-  provider: z.literal('google_cloud_billing'),
+  provider: z.enum(['google_cloud_billing', 'anthropic', 'openai', 'aws']),
 })
 
 export const expenseFormSchema = z.discriminatedUnion('intent', [
