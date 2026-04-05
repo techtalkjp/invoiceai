@@ -41,3 +41,52 @@ export type ActivityRecord =
 
 // eventType の union（DB 文字列 → 型変換時に使用）
 export type EventType = ActivityRecord['eventType']
+
+/**
+ * DB 行を ActivityRecord に正規化する。
+ * metadata は ParseJSONResultsPlugin で既にパース済みの前提。
+ * eventType が不正な場合は commit として扱う（parseActivityRow と同じ挙動）。
+ */
+export function toActivityRecord(row: {
+  eventType: string
+  eventDate: string
+  eventTimestamp: string
+  repo: string | null
+  title: string | null
+  url: string | null
+  metadata: unknown
+}): ActivityRecord {
+  const base = {
+    eventDate: row.eventDate,
+    eventTimestamp: row.eventTimestamp,
+    repo: row.repo,
+    title: row.title,
+    url: row.url,
+  }
+  const meta = (
+    typeof row.metadata === 'object' && row.metadata != null ? row.metadata : {}
+  ) as Record<string, unknown>
+
+  switch (row.eventType) {
+    case 'pr':
+      return {
+        ...base,
+        eventType: 'pr',
+        metadata: { action: (meta.action as PrAction) ?? 'opened' },
+      }
+    case 'review':
+      return {
+        ...base,
+        eventType: 'review',
+        metadata: { state: (meta.state as ReviewState) ?? 'COMMENTED' },
+      }
+    case 'issue_comment':
+      return { ...base, eventType: 'issue_comment', metadata: null }
+    default:
+      return {
+        ...base,
+        eventType: 'commit',
+        metadata: { oid: (meta.oid as string) ?? '' },
+      }
+  }
+}
