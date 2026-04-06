@@ -44,7 +44,7 @@ export function useAutoSave(store: TimesheetStoreApi, monthKey: string) {
         return
 
       if (timeoutRef.current) clearTimeout(timeoutRef.current)
-      timeoutRef.current = setTimeout(flush, 500)
+      timeoutRef.current = setTimeout(flush, 0)
     })
 
     return () => {
