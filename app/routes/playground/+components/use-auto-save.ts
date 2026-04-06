@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useCallback, useEffect, useRef } from 'react'
 import { timesheetEntrySchema } from '~/components/timesheet/schema'
 import type { TimesheetStoreApi } from '~/components/timesheet/store'
 import type { MonthData } from '~/components/timesheet/types'
@@ -19,6 +19,21 @@ export function useAutoSave(store: TimesheetStoreApi, monthKey: string) {
   const lastEntriesRef = useRef<string>('')
   const lastActivitiesRef = useRef<string>('')
 
+  const flush = useCallback(() => {
+    const { monthData, activitiesByDate } = store.getState()
+    const entries = JSON.stringify(monthData)
+    const activities = JSON.stringify(activitiesByDate)
+
+    if (entries !== lastEntriesRef.current) {
+      lastEntriesRef.current = entries
+      saveMonthToStorage(monthKey, monthData)
+    }
+    if (activities !== lastActivitiesRef.current) {
+      lastActivitiesRef.current = activities
+      saveActivitiesToStorage(monthKey, activitiesByDate)
+    }
+  }, [store, monthKey])
+
   useEffect(() => {
     const unsubscribe = store.subscribe((state, prevState) => {
       // 参照比較で無関係な変更（選択、フィルタ等）を早期スキップ
@@ -28,35 +43,18 @@ export function useAutoSave(store: TimesheetStoreApi, monthKey: string) {
       )
         return
 
-      const entries = JSON.stringify(state.monthData)
-      const activities = JSON.stringify(state.activitiesByDate)
-      const entriesChanged = entries !== lastEntriesRef.current
-      const activitiesChanged = activities !== lastActivitiesRef.current
-      if (!entriesChanged && !activitiesChanged) return
-
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current)
-      }
-
-      timeoutRef.current = setTimeout(() => {
-        if (entriesChanged) {
-          lastEntriesRef.current = entries
-          saveMonthToStorage(monthKey, state.monthData)
-        }
-        if (activitiesChanged) {
-          lastActivitiesRef.current = activities
-          saveActivitiesToStorage(monthKey, state.activitiesByDate)
-        }
-      }, 500)
+      if (timeoutRef.current) clearTimeout(timeoutRef.current)
+      timeoutRef.current = setTimeout(flush, 500)
     })
 
     return () => {
       unsubscribe()
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current)
+        flush()
       }
     }
-  }, [store, monthKey])
+  }, [store, flush])
 }
 
 function saveMonthToStorage(monthKey: string, data: MonthData) {
