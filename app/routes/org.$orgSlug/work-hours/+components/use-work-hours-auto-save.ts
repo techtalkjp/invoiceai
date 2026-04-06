@@ -61,7 +61,11 @@ export function useWorkHoursAutoSave(
 
     return () => {
       unsubscribe()
-      if (timerRef.current) clearTimeout(timerRef.current)
+      // SPA ナビゲーション等でアンマウントされる場合、pending の保存を即実行
+      if (timerRef.current) {
+        clearTimeout(timerRef.current)
+        flush()
+      }
     }
   }, [store, flush])
 
