@@ -39,7 +39,7 @@ export function GitHubTab({
   const fetcher = useFetcher<{
     suggestion?: SuggestResult | null | undefined
     noActivities?: boolean | undefined
-  }>({ key: `suggest-github-${clientId}` })
+  }>({ key: `suggest-github-${clientId}-${year}-${month}` })
   const isLoading = fetcher.state !== 'idle'
 
   // PAT 未設定

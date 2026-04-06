@@ -32,10 +32,10 @@ export interface TimesheetState {
   // データ操作
   setMonthData: (data: MonthData | ((prev: MonthData) => MonthData)) => void
   setShowOnlyFilled: (value: boolean | ((prev: boolean) => boolean)) => void
-  updateEntry: (
+  updateEntry: <K extends keyof TimesheetEntry>(
     date: string,
-    field: keyof TimesheetEntry,
-    value: string | number,
+    field: K,
+    value: TimesheetEntry[K],
   ) => void
   clearAllData: () => void
   // ハイライト操作

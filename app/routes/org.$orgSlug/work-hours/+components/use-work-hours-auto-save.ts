@@ -38,6 +38,8 @@ export function useWorkHoursAutoSave(
     const serialized = JSON.stringify(store.getState().monthData)
     if (serialized === lastSavedRef.current) return false
 
+    // 楽観的に更新。submit 失敗時はリトライされないが、
+    // 次の編集で全データが再送されるため実害は低い。
     lastSavedRef.current = serialized
 
     const formData = new FormData()

@@ -20,10 +20,16 @@ export function useAutoSave(store: TimesheetStoreApi, monthKey: string) {
   const lastActivitiesRef = useRef<string>('')
 
   useEffect(() => {
-    const unsubscribe = store.subscribe((state) => {
+    const unsubscribe = store.subscribe((state, prevState) => {
+      // 参照比較で無関係な変更（選択、フィルタ等）を早期スキップ
+      if (
+        state.monthData === prevState.monthData &&
+        state.activitiesByDate === prevState.activitiesByDate
+      )
+        return
+
       const entries = JSON.stringify(state.monthData)
       const activities = JSON.stringify(state.activitiesByDate)
-
       const entriesChanged = entries !== lastEntriesRef.current
       const activitiesChanged = activities !== lastActivitiesRef.current
       if (!entriesChanged && !activitiesChanged) return

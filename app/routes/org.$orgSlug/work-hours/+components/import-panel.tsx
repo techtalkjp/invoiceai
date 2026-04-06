@@ -40,7 +40,7 @@ export function ImportPanel({
     entries?: ParsedWorkEntry[]
     parseErrors?: string[]
     error?: string
-  }>({ key: `parse-text-${clientId}` })
+  }>({ key: `parse-text-${clientId}-${year}-${month}` })
 
   const isParsing = parseFetcher.state !== 'idle'
 
