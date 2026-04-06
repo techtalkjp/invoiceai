@@ -33,10 +33,10 @@ export function useWorkHoursAutoSave(
   const initializingRef = useRef(true)
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  // 実際の保存処理
-  const flush = useCallback(() => {
+  // 実際の保存処理。保存が実行されたら true を返す。
+  const flush = useCallback((): boolean => {
     const serialized = JSON.stringify(store.getState().monthData)
-    if (serialized === lastSavedRef.current) return
+    if (serialized === lastSavedRef.current) return false
 
     lastSavedRef.current = serialized
 
@@ -46,6 +46,7 @@ export function useWorkHoursAutoSave(
     formData.append('yearMonth', `${year}-${String(month).padStart(2, '0')}`)
     formData.append('monthData', serialized)
     fetcher.submit(formData, { method: 'POST' })
+    return true
   }, [store, clientId, year, month, fetcher.submit])
 
   // store 変更 → デバウンス保存
@@ -67,8 +68,9 @@ export function useWorkHoursAutoSave(
   // beforeunload: 未保存データがあれば即時保存 + 警告
   useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-      flush()
-      e.preventDefault()
+      if (flush()) {
+        e.preventDefault()
+      }
     }
     window.addEventListener('beforeunload', handleBeforeUnload)
     return () => window.removeEventListener('beforeunload', handleBeforeUnload)
