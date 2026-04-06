@@ -55,17 +55,16 @@ function TimesheetDemoInner({
   // 自動保存（debounce 付き）
   useAutoSave(store, monthKey)
 
-  // year/month が変わるたびに store を同期
-  useMemo(() => {
+  // サーバーデータを store にセット（key prop で月変更時にリマウントされる）
+  useState(() => {
     const data = initialData?.[monthKey] ?? {}
     store.getState().setMonthData(data)
     store.getState().setMonthDates(monthDates)
-    // localStorage から保存済みアクティビティを復元
     const savedActivities = loadActivitiesFromStorage(monthKey)
     if (savedActivities) {
       store.getState().setActivitiesByDate(savedActivities)
     }
-  }, [store, monthKey, initialData, monthDates])
+  })
 
   // 全クリア
   const handleClearAll = useCallback(() => {

@@ -96,6 +96,7 @@ export default function PlaygroundIndex({ loaderData }: Route.ComponentProps) {
         />
 
         <TimesheetDemo
+          key={`${year}-${month}`}
           year={year}
           month={month}
           buildUrl={buildPlaygroundUrl}

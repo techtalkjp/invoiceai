@@ -29,18 +29,30 @@ export function useWorkHoursAutoSave(
 ) {
   const fetcherKey = `${AUTO_SAVE_FETCHER_KEY_PREFIX}${clientId}`
   const fetcher = useStableFetcher({ key: fetcherKey })
-  const lastSavedRef = useRef<string>('')
+  // サーバーに確認済みのスナップショット
+  const confirmedRef = useRef<string>('')
+  // 送信中のスナップショット（未確認）
+  const pendingRef = useRef<string | null>(null)
   const initializingRef = useRef(true)
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // fetcher 完了を監視: 送信成功なら confirmed に昇格、失敗なら pending を破棄（次回リトライ）
+  useEffect(() => {
+    if (fetcher.state !== 'idle' || pendingRef.current === null) return
+    if (fetcher.data) {
+      confirmedRef.current = pendingRef.current
+    }
+    pendingRef.current = null
+  }, [fetcher.state, fetcher.data])
 
   // 実際の保存処理。保存が実行されたら true を返す。
   const flush = useCallback((): boolean => {
     const serialized = JSON.stringify(store.getState().monthData)
-    if (serialized === lastSavedRef.current) return false
+    // 確認済みまたは送信中と同じなら送らない
+    if (serialized === confirmedRef.current) return false
+    if (serialized === pendingRef.current) return false
 
-    // 楽観的に更新。submit 失敗時はリトライされないが、
-    // 次の編集で全データが再送されるため実害は低い。
-    lastSavedRef.current = serialized
+    pendingRef.current = serialized
 
     const formData = new FormData()
     formData.append('intent', 'saveMonthData')
@@ -82,9 +94,9 @@ export function useWorkHoursAutoSave(
     return () => window.removeEventListener('beforeunload', handleBeforeUnload)
   }, [flush])
 
-  // 初期データを lastSavedRef に設定（マウント直後の無駄な保存を防ぐ）
+  // 初期データを confirmedRef に設定（マウント直後の無駄な保存を防ぐ）
   const initializeLastSaved = useCallback((data: string) => {
-    lastSavedRef.current = data
+    confirmedRef.current = data
     initializingRef.current = false
   }, [])
 
