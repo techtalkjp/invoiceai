@@ -7,7 +7,7 @@ import {
   PopoverContent,
 } from '~/components/ui/popover'
 import { cn } from '~/lib/utils'
-import { useEntryField, useTimesheetStore } from '../store'
+import { useEntryField, useTimesheetStoreApi } from '../store'
 import { navigateToCell } from '../utils'
 
 interface TimesheetBreakCellProps {
@@ -44,6 +44,7 @@ export const TimesheetBreakCell = memo(function TimesheetBreakCell({
   date,
   col,
 }: TimesheetBreakCellProps) {
+  const store = useTimesheetStoreApi()
   // 自分のフィールドのみ subscribe
   const value = useEntryField(date, 'breakMinutes') ?? 0
   const [open, setOpen] = useState(false)
@@ -80,10 +81,10 @@ export const TimesheetBreakCell = memo(function TimesheetBreakCell({
 
   const handlePickerSelect = useCallback(
     (v: number) => {
-      useTimesheetStore.getState().updateEntry(date, 'breakMinutes', v)
+      store.getState().updateEntry(date, 'breakMinutes', v)
       setOpen(false)
     },
-    [date],
+    [store, date],
   )
 
   return (

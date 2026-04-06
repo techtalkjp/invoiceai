@@ -1,10 +1,10 @@
-import { useTimesheetStore } from './store'
+import { useTimesheetSelector } from './store'
 
 /**
  * 選択操作のヒントとクリップボード状態表示。
  */
 export function SelectionHint() {
-  const clipboardCount = useTimesheetStore((s) => s.clipboard?.length ?? 0)
+  const clipboardCount = useTimesheetSelector((s) => s.clipboard?.length ?? 0)
 
   return (
     <div className="text-muted-foreground text-xs">

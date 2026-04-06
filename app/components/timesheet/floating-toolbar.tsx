@@ -1,17 +1,18 @@
 import { CalendarDays, ClipboardPaste, Copy, Trash2 } from 'lucide-react'
 import { Button } from '~/components/ui/button'
-import { useTimesheetStore } from './store'
+import { useTimesheetSelector, useTimesheetStoreApi } from './store'
 
 export function FloatingToolbar() {
-  const selectedCount = useTimesheetStore((s) => s.selectedDates.length)
-  const hasClipboard = useTimesheetStore(
+  const store = useTimesheetStoreApi()
+  const selectedCount = useTimesheetSelector((s) => s.selectedDates.length)
+  const hasClipboard = useTimesheetSelector(
     (s) => s.clipboard !== null && s.clipboard.length > 0,
   )
 
   if (selectedCount === 0) return null
 
   const { copySelection, pasteToSelected, clearSelectedEntries } =
-    useTimesheetStore.getState()
+    store.getState()
 
   return (
     <div className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2">

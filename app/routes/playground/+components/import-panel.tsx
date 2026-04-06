@@ -3,7 +3,7 @@ import { SparklesIcon } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { useFetcher } from 'react-router'
 import { toast } from 'sonner'
-import { useTimesheetStore } from '~/components/timesheet'
+import { useTimesheetStoreApi } from '~/components/timesheet'
 import { applyEntries } from '~/components/timesheet/apply-entries'
 import { Collapsible, CollapsibleContent } from '~/components/ui/collapsible'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '~/components/ui/tabs'
@@ -30,6 +30,7 @@ export function ImportPanel({
   defaultTab,
   githubResult,
 }: ImportPanelProps) {
+  const store = useTimesheetStoreApi()
   const [inputText, setInputText] = useState('')
   // テキスト解析の結果を反映済みかどうか追跡
   const appliedRef = useRef(false)
@@ -69,6 +70,7 @@ export function ImportPanel({
 
     appliedRef.current = true
     applyEntries(
+      store,
       entries.map((e) => ({
         workDate: e.workDate,
         startTime: e.startTime ?? '',
@@ -80,19 +82,19 @@ export function ImportPanel({
     toast.success(`${entries.length}件を反映しました`)
     setInputText('')
     onOpenChange(false)
-  }, [parseFetcher.state, parseFetcher.data, onOpenChange])
+  }, [store, parseFetcher.state, parseFetcher.data, onOpenChange])
 
   const handleApplyGitHub = () => {
     if (!githubResult?.entries.length) return
 
     // アクティビティを store にセット + localStorage に保存（indicator 表示用）
     if (githubResult.activities) {
-      useTimesheetStore.getState().setActivities(githubResult.activities)
+      store.getState().setActivities(githubResult.activities)
       const monthKey = `${year}-${String(month).padStart(2, '0')}`
-      saveActivities(monthKey, useTimesheetStore.getState().activitiesByDate)
+      saveActivities(monthKey, store.getState().activitiesByDate)
     }
 
-    applyEntries(githubResult.entries)
+    applyEntries(store, githubResult.entries)
     toast.success(
       `@${githubResult.username}: ${githubResult.entries.length}件を反映しました`,
     )

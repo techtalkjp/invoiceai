@@ -1,6 +1,6 @@
-import { useEffect, useRef } from 'react'
+import { useCallback, useEffect, useRef } from 'react'
 import { timesheetEntrySchema } from '~/components/timesheet/schema'
-import { useTimesheetStore } from '~/components/timesheet/store'
+import type { TimesheetStoreApi } from '~/components/timesheet/store'
 import type { MonthData } from '~/components/timesheet/types'
 import type { ActivityRecord } from '~/lib/activity-sources/types'
 
@@ -14,43 +14,47 @@ const ACTIVITY_STORAGE_KEY = 'invoiceai-playground-activities'
  * useFetcher/clientAction を使わず直接 localStorage を操作することで、
  * React Router の revalidation や fetcher state 変更による再レンダリングを完全に回避する。
  */
-export function useAutoSave(monthKey: string) {
+export function useAutoSave(store: TimesheetStoreApi, monthKey: string) {
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const lastEntriesRef = useRef<string>('')
   const lastActivitiesRef = useRef<string>('')
 
+  const flush = useCallback(() => {
+    const { monthData, activitiesByDate } = store.getState()
+    const entries = JSON.stringify(monthData)
+    const activities = JSON.stringify(activitiesByDate)
+
+    if (entries !== lastEntriesRef.current) {
+      lastEntriesRef.current = entries
+      saveMonthToStorage(monthKey, monthData)
+    }
+    if (activities !== lastActivitiesRef.current) {
+      lastActivitiesRef.current = activities
+      saveActivitiesToStorage(monthKey, activitiesByDate)
+    }
+  }, [store, monthKey])
+
   useEffect(() => {
-    const unsubscribe = useTimesheetStore.subscribe((state) => {
-      const entries = JSON.stringify(state.monthData)
-      const activities = JSON.stringify(state.activitiesByDate)
+    const unsubscribe = store.subscribe((state, prevState) => {
+      // 参照比較で無関係な変更（選択、フィルタ等）を早期スキップ
+      if (
+        state.monthData === prevState.monthData &&
+        state.activitiesByDate === prevState.activitiesByDate
+      )
+        return
 
-      const entriesChanged = entries !== lastEntriesRef.current
-      const activitiesChanged = activities !== lastActivitiesRef.current
-      if (!entriesChanged && !activitiesChanged) return
-
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current)
-      }
-
-      timeoutRef.current = setTimeout(() => {
-        if (entriesChanged) {
-          lastEntriesRef.current = entries
-          saveMonthToStorage(monthKey, state.monthData)
-        }
-        if (activitiesChanged) {
-          lastActivitiesRef.current = activities
-          saveActivitiesToStorage(monthKey, state.activitiesByDate)
-        }
-      }, 500)
+      if (timeoutRef.current) clearTimeout(timeoutRef.current)
+      timeoutRef.current = setTimeout(flush, 500)
     })
 
     return () => {
       unsubscribe()
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current)
+        flush()
       }
     }
-  }, [monthKey])
+  }, [store, flush])
 }
 
 function saveMonthToStorage(monthKey: string, data: MonthData) {

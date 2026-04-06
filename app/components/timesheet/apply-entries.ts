@@ -1,4 +1,4 @@
-import { useTimesheetStore } from '~/components/timesheet/store'
+import type { TimesheetStoreApi } from './store'
 
 interface WorkEntry {
   workDate: string
@@ -8,11 +8,11 @@ interface WorkEntry {
   description: string
 }
 
-export function applyEntries(entries: WorkEntry[]) {
-  const store = useTimesheetStore.getState()
+export function applyEntries(store: TimesheetStoreApi, entries: WorkEntry[]) {
+  const state = store.getState()
   const dates: string[] = []
 
-  store.setMonthData((prev) => {
+  state.setMonthData((prev) => {
     const next = { ...prev }
     for (const entry of entries) {
       next[entry.workDate] = {
@@ -27,6 +27,6 @@ export function applyEntries(entries: WorkEntry[]) {
   })
 
   // ハイライト → 自動クリア
-  store.setHighlightedDates(dates)
-  setTimeout(() => store.setHighlightedDates([]), 1500)
+  state.setHighlightedDates(dates)
+  setTimeout(() => store.getState().setHighlightedDates([]), 1500)
 }

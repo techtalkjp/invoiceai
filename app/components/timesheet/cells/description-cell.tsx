@@ -1,7 +1,7 @@
 import { SparklesIcon } from 'lucide-react'
 import { memo, useState } from 'react'
 import { cn } from '~/lib/utils'
-import { useEntryField, useTimesheetStore } from '../store'
+import { useEntryField, useTimesheetStoreApi } from '../store'
 import { navigateToCell } from '../utils'
 import { ActivityIndicator } from './activity-indicator'
 
@@ -14,13 +14,14 @@ export const TimesheetDescriptionCell = memo(function TimesheetDescriptionCell({
   date,
   col,
 }: TimesheetDescriptionCellProps) {
+  const store = useTimesheetStoreApi()
   // 自分のフィールドのみ subscribe
   const value = useEntryField(date, 'description') ?? ''
   const aiGenerated = useEntryField(date, 'aiGenerated') ?? false
   const [isFocused, setIsFocused] = useState(false)
 
   const handleChange = (v: string) => {
-    useTimesheetStore.getState().updateEntry(date, 'description', v)
+    store.getState().updateEntry(date, 'description', v)
   }
 
   return (

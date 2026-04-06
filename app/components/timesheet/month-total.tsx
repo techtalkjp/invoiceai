@@ -1,6 +1,6 @@
 import { DurationDisplay } from '~/components/time/duration-display'
 import { calculateWorkDuration } from '~/components/time/time-utils'
-import { useTimesheetStore } from './store'
+import { useTimesheetSelector } from './store'
 
 interface MonthTotalDisplayProps {
   monthDates: string[]
@@ -8,7 +8,7 @@ interface MonthTotalDisplayProps {
 
 // 月合計表示（自分だけが再レンダリング - monthData の変更で親を再レンダリングしない）
 export function MonthTotalDisplay({ monthDates }: MonthTotalDisplayProps) {
-  const monthTotal = useTimesheetStore((s) => {
+  const monthTotal = useTimesheetSelector((s) => {
     return monthDates.reduce((sum, date) => {
       const entry = s.monthData[date]
       if (!entry?.startTime || !entry?.endTime) return sum

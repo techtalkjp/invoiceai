@@ -8,14 +8,19 @@ import {
   MonthTotalDisplay,
   TimesheetArea,
   TimesheetClearAllDialog,
+  TimesheetProvider,
   getMonthDates,
-  useTimesheetStore,
+  useTimesheetStoreApi,
 } from '~/components/timesheet'
 import { TimesheetPdfDownloadDialog } from '~/components/timesheet/pdf-download-dialog'
 import { Button } from '~/components/ui/button'
 import type { GitHubResult } from '../+lib/github-oauth.server'
 import { ImportPanel } from './import-panel'
-import { clearAllStorage, useAutoSave } from './use-auto-save'
+import {
+  clearAllStorage,
+  loadActivitiesFromStorage,
+  useAutoSave,
+} from './use-auto-save'
 
 interface TimesheetDemoProps {
   year: number
@@ -25,13 +30,22 @@ interface TimesheetDemoProps {
   githubResult?: GitHubResult | null | undefined
 }
 
-export function TimesheetDemo({
+export function TimesheetDemo(props: TimesheetDemoProps) {
+  return (
+    <TimesheetProvider>
+      <TimesheetDemoInner {...props} />
+    </TimesheetProvider>
+  )
+}
+
+function TimesheetDemoInner({
   year,
   month,
   buildUrl,
   initialData,
   githubResult,
 }: TimesheetDemoProps) {
+  const store = useTimesheetStoreApi()
   const monthDates = useMemo(() => getMonthDates(year, month), [year, month])
   const monthKey = `${year}-${String(month).padStart(2, '0')}`
 
@@ -39,20 +53,24 @@ export function TimesheetDemo({
   const defaultImportTab = githubResult ? ('github' as const) : undefined
 
   // 自動保存（debounce 付き）
-  useAutoSave(monthKey)
+  useAutoSave(store, monthKey)
 
-  // year/month が変わるたびに store を同期
-  useMemo(() => {
+  // サーバーデータを store にセット（key prop で月変更時にリマウントされる）
+  useState(() => {
     const data = initialData?.[monthKey] ?? {}
-    useTimesheetStore.getState().setMonthData(data)
-    useTimesheetStore.getState().setMonthDates(monthDates)
-  }, [monthKey, initialData, monthDates])
+    store.getState().setMonthData(data)
+    store.getState().setMonthDates(monthDates)
+    const savedActivities = loadActivitiesFromStorage(monthKey)
+    if (savedActivities) {
+      store.getState().setActivitiesByDate(savedActivities)
+    }
+  })
 
   // 全クリア
   const handleClearAll = useCallback(() => {
-    useTimesheetStore.getState().clearAllData()
+    store.getState().clearAllData()
     clearAllStorage()
-  }, [])
+  }, [store])
 
   return (
     <TimesheetArea monthDates={monthDates}>

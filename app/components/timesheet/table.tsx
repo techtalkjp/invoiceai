@@ -1,7 +1,7 @@
 import { memo, useMemo } from 'react'
 import { cn } from '~/lib/utils'
 import { TimesheetRow } from './row'
-import { useFilledDatesKey, useTimesheetStore } from './store'
+import { useFilledDatesKey, useTimesheetSelector } from './store'
 
 /** ヘッダー・各行で共有する grid-template-columns */
 export const GRID_COLS =
@@ -17,8 +17,8 @@ export const TimesheetTable = memo(function TimesheetTable({
   monthDates,
   onMouseUp,
 }: TimesheetTableProps) {
-  const showOnlyFilled = useTimesheetStore((s) => s.showOnlyFilled)
-  // monthData 全体ではなく「どの日にデータがあるか」だけを subscribe
+  const showOnlyFilled = useTimesheetSelector((s) => s.showOnlyFilled)
+  // monthData 全体ではなく「どの日にデータがあるか」���けを subscribe
   const filledDatesKey = useFilledDatesKey()
   const filteredDates = useMemo(() => {
     if (!showOnlyFilled) return monthDates
