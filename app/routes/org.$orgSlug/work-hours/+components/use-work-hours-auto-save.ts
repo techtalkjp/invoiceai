@@ -67,15 +67,12 @@ export function useWorkHoursAutoSave(
   // beforeunload: 未保存データがあれば即時保存 + 警告
   useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-      const serialized = JSON.stringify(store.getState().monthData)
-      if (serialized !== lastSavedRef.current) {
-        flush()
-        e.preventDefault()
-      }
+      flush()
+      e.preventDefault()
     }
     window.addEventListener('beforeunload', handleBeforeUnload)
     return () => window.removeEventListener('beforeunload', handleBeforeUnload)
-  }, [store, flush])
+  }, [flush])
 
   // 初期データを lastSavedRef に設定（マウント直後の無駄な保存を防ぐ）
   const initializeLastSaved = useCallback((data: string) => {
