@@ -19,8 +19,6 @@ import { useStableFetcher } from '~/hooks/use-stable-fetcher'
  */
 export const AUTO_SAVE_FETCHER_KEY_PREFIX = 'auto-save-'
 
-const DEBOUNCE_MS = 300
-
 export function useWorkHoursAutoSave(
   store: TimesheetStoreApi,
   clientId: string,
@@ -69,8 +67,10 @@ export function useWorkHoursAutoSave(
       if (state.monthData === prevState.monthData) return
       if (initializingRef.current) return
 
+      // store 更新は TimeInput の blur 時のみで高頻度にはならない。
+      // setTimeout(0) で同一同期ブロック内の複数 set() をバッチする。
       if (timerRef.current) clearTimeout(timerRef.current)
-      timerRef.current = setTimeout(flush, DEBOUNCE_MS)
+      timerRef.current = setTimeout(flush, 0)
     })
 
     return () => {
