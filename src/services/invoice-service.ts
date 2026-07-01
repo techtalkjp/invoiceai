@@ -111,11 +111,13 @@ function buildInvoiceLine(
   totalHours: number,
 ) {
   const subject = generateSubject(client, year, month)
+  // テンプレートが既に「分」で終わっている場合は二重付加を避ける
+  const description = subject.endsWith('分') ? subject : `${subject}分`
 
   if (client.billingType === 'fixed') {
     return {
       type: 'item' as const,
-      description: `${subject}分`,
+      description,
       quantity: '1',
       unit: client.unitLabel ?? '式',
       unit_price: String(client.monthlyFee ?? 0),
@@ -128,7 +130,7 @@ function buildInvoiceLine(
   // 時間制
   return {
     type: 'item' as const,
-    description: `${subject}分`,
+    description,
     quantity: String(totalHours),
     unit: '時間',
     unit_price: String(client.hourlyRate ?? 0),

@@ -75,7 +75,7 @@ export async function parseWorkHoursText(
 
   const { output } = await generateText({
     abortSignal: AbortSignal.timeout(30_000),
-    model: google('gemini-flash-latest'),
+    model: google('gemini-3.1-flash-lite'),
     output: Output.object({ schema: parseResultSchema }),
     system: `あなたは稼働報告テキストから稼働時間情報を抽出するアシスタントです。
 
